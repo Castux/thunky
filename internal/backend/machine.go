@@ -45,6 +45,58 @@ const (
 	seqFrame                            // seq: once its first arg is WHNF, continue with Arg (its second)
 )
 
+// squeezeUpdates collapses the update frames that a thunk entry would stack up
+// behind itself.
+//
+// Entering thunk B while an update frame for thunk A is on top means A is
+// waiting for exactly the value B will produce: the frames are adjacent, so
+// nothing can come between them and change the result. A can therefore be made
+// an indirection to B right now and its frame dropped, instead of being kept
+// until B finishes.
+//
+// Without this, a loop whose recursive call is reached by entering a thunk
+// stacks one update frame per iteration and pops none of them until it ends.
+// That covers most effectful loops: `seq a b` continues into b, which is a
+// thunk, and `if c t f` returns one of two thunks, so an ordinary `seq`/`if`
+// loop pushes two per iteration. The frames themselves are small; what makes it
+// a leak is that each pins its thunk and each thunk pins the locals its body
+// captured, so an animation loop retains every board it has ever drawn.
+//
+// This is the reduction-stack half of the story. The other half is dropping the
+// environment when the update finally happens (see the updateFrame case below):
+// squeezing bounds how many thunks are pending, and clearing bounds what a
+// finished one holds onto.
+//
+// GHC does the same collapse, but from threadPaused at a safe point rather than
+// on entry. That variant was tried here and does not work: by the time the stack
+// is walked, the loop's update frames have prim and run frames interleaved
+// between them (40 update frames in 23 separate runs, measured on life.þ), and
+// adjacency is a now-or-never property at the moment of entry.
+func squeezeUpdates(stack []StackFrame, entering *value.Thunk, enteringValue value.Value) []StackFrame {
+	for len(stack) > 0 {
+		top := stack[len(stack)-1]
+		// A thunk already under evaluation on this stack would become an
+		// indirection to itself; leave those alone.
+		if top.Kind != updateFrame || top.Thunk == entering {
+			break
+		}
+		// A named binding's frame is what a reduction trace is made of, so it is
+		// left in place: the accumulating frames in a loop are the anonymous
+		// thunks built for `seq`'s second argument and `if`'s branches.
+		if top.Thunk.Name != "" {
+			break
+		}
+		older := top.Thunk
+		older.Value = enteringValue
+		older.Forced = false
+		older.Code = value.NoCode
+		older.Locals = nil
+		older.Upvalues = nil
+		stack = stack[:len(stack)-1]
+	}
+	return stack
+}
+
 // StackFrame is one entry of the reduction stack.
 type StackFrame struct {
 	Kind  StackFrameKind
@@ -208,12 +260,14 @@ func (m *Machine) reduce(control value.Value, stack []StackFrame) value.Value {
 				// Code thunk: push an update frame to memoise, then run its body. The
 				// body may run to a head (control := head) or suspend at a strict point
 				// (control := the value it needs forced); either way the loop continues.
+				stack = squeezeUpdates(stack, thunk, control)
 				stack = append(stack, StackFrame{Kind: updateFrame, Thunk: thunk})
 				control, stack, _ = m.runFrom(thunk.Code, thunk.Locals, thunk.Upvalues, stack)
 				continue
 			}
 			// Graph-style indirection (NoCode): push an update frame to memoise the
 			// reduced value, then continue with the value it stands for.
+			stack = squeezeUpdates(stack, thunk, control)
 			stack = append(stack, StackFrame{Kind: updateFrame, Thunk: thunk})
 			control = thunk.Value
 			continue
