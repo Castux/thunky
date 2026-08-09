@@ -1,0 +1,36 @@
+-- Rosetta Code: Sieve of Eratosthenes
+--
+-- The sieve is defined by striking out multiples, which wants an array of bits
+-- and O(1) writes. With no such thing, the strike-outs go into a hashmap, so
+-- each is O(log n) rather than O(1) and the whole sieve is O(n log n) — see
+-- TASKS-FINDINGS §9. It is still a genuine sieve: composites are crossed off by
+-- addition, never by division or a primality test.
+--
+-- Compare `examples/euler/euler.th`, whose `primes` is a lazy trial-division
+-- stream: unbounded and fine for a few thousand primes, where this wants its
+-- limit up front and pays for it once.
+
+import core, list, math, text, hashmap in
+
+let
+	limit = 1000,
+
+	-- Cross off p*p, p*p+p, p*p+2p, … : anything smaller with a factor p was
+	-- already crossed off by that smaller factor.
+	crossOff = composites -> p -> iterate (add p) (mul p p)
+		> takeWhile (lte limit)
+		> foldl (marked -> k -> hashmap.set k 1 marked) composites,
+
+	isMarked = composites -> n -> eq 1 (hashmap.getOr 0 n composites),
+
+	composites = rangeIncl 2 (floor (sqrt limit))
+		> foldl (marked -> p -> if (isMarked marked p) marked (crossOff marked p))
+			hashmap.empty,
+
+	primes = rangeIncl 2 limit > filter (isMarked composites *> not)
+in
+	[
+		flatten ["primes below 100: "; primes > takeWhile (lt 100) > map string > join " "];
+		flatten ["count below "; string limit; ": "; string (length primes)];
+		flatten ["largest: "; string (last primes)]
+	] > map write > eval

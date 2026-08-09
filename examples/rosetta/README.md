@@ -25,5 +25,9 @@ thunky examples/rosetta/fizzbuzz.þ
 | N-queens | `n-queens.þ` | backtracking as `flatMap`; 92 solutions, produced lazily |
 | Matrix multiplication | `matrix-multiplication.þ` | `transpose` turns the definition into the implementation |
 | JSON | `json-load-print.þ` | the `json` library: parse, walk by path, build, print pretty |
+| Gray code | `gray-code.þ` | `bit`: encode is one xor, decode folds the value onto itself |
+| CRC-32 | `crc-32.þ` | `bit` against four published checksums — the library's real-world test |
+| LZW compression | `lzw-compression.þ` | both dictionaries as hashmaps; includes the cScSc case |
+| Sieve of Eratosthenes | `sieve-of-eratosthenes.þ` | a real sieve, but O(n log n) without arrays |
 
 See `../TASKS-FINDINGS.md` for what these revealed about the standard library.

@@ -1,0 +1,71 @@
+-- Project Euler 14: Longest Collatz sequence
+-- The starting number under one million with the longest chain.
+-- Answer: 837799
+--
+-- A million chains averaging 150 steps is 150 million steps of interpreter,
+-- which is not happening. Three observations bring it down to a few million:
+--
+--   * only odd starts need testing. An even n has a chain one longer than n/2's,
+--     which was measured earlier, so an even number is never the first to set a
+--     record;
+--   * a chain can stop the moment it falls below its own starting point,
+--     because every smaller start has already been measured. That turns ~150
+--     steps into a handful;
+--   * only the odd lengths need storing. The length of an even m is one more
+--     than the length of m/2, so halving until odd recovers it in a step or
+--     two, and the table stays half the size.
+--
+-- The table is a hashmap threaded through a strict fold: the lengths of all
+-- smaller starts are always present by the time a start needs them.
+
+import core, list, math, hashmap in
+
+let
+	limit = 1000000,
+
+	next = n -> if (even n) (div 2 n) (succ (mul 3 n)),
+
+	-- lengthOf known m: the chain length of any m below the current start.
+	-- Odd values are in the table; even ones halve down to an odd one.
+	lengthOf = known -> m -> if (even m)
+		(succ (lengthOf known (div 2 m)))
+		(hashmap.getOr 0 m known),
+
+	-- walk known start m steps: follow the chain from m until it drops below
+	-- start, then add the length already known from there.
+	walk = known -> start -> m -> steps -> if (lt start m)
+		(add steps (lengthOf known m))
+		(walk known start (next m) (succ steps)),
+
+	-- progress n best bestLength: a line every `progressEvery` starts, so a run
+	-- this long says what it is doing. `seq` is what makes it happen: the value
+	-- is discarded, and forcing it for its output is the whole point.
+	progressEvery = 50000,
+
+	-- The fold only visits odd starts, and no odd number is a multiple of
+	-- progressEvery — so the milestone is one past it, which is odd.
+	progress = n -> best -> bestLength -> if (eq 1 (mod progressEvery n))
+		(write (flatten ["  at "; string n; ": best so far "; string best;
+			" with "; string bestLength]))
+		[],
+
+	step = [known, best, bestLength] -> n ->
+		let
+			measured = walk known n (next n) 1,
+			better   = gt bestLength measured
+		in
+			seq (progress n best bestLength)
+				[
+					hashmap.set n measured known,
+					if better n best,
+					if better measured bestLength
+				],
+
+	-- The chain of 1 is just itself, and it is the floor every walk lands on.
+	seeded = hashmap.singleton 1 1
+in
+	range 3 limit
+	> filter odd
+	> foldlStrict step [seeded, 1, 1]
+	> ([known, best, bestLength] -> [best, bestLength])
+	> show

@@ -22,9 +22,11 @@ in significand bits that travels with the value). The four problems import it,
 and got faster doing so: base 2^32 instead of base 10 took problem 25 from
 14.6 s to 5.3 s and problem 16 from 0.8 s to 0.15 s.
 
-Still open: `intDivMod` is binary long division, one pass per bit of the
-dividend. That is fine at these sizes and would want a proper base-2^32
-schoolbook division if anything leans on it hard.
+Division has since been rewritten as schoolbook (Knuth Algorithm D), one pass
+per limb instead of one per bit: 12.7x on a 338-digit-by-96-digit benchmark.
+And problem 48 added `intPowMod`, because reducing at every squaring is the
+difference between operands the size of the modulus and operands the size of
+1000^1000, which has 3001 digits.
 
 ## 2. No bitwise operations — **addressed, `bit`**
 
@@ -148,16 +150,34 @@ boundary: algorithms whose cost model assumes arrays do not transfer.
   `isInteger` on a float square root, which is exact enough here but is luck,
   not design.
 
-## 11. The performance ceiling
+## 11. Nothing says what a long program is doing
 
-Native build on an Intel Core i7-6700K (4 GHz, 4 cores), 16 GB RAM: problem 4
-at 9.4 s, problem 7 at 9.7 s, problem 25 at
-14.6 s, problem 67 at 4.8 s, problem 22 at 3.9 s. Everything else in the batch
-is under a second.
+Problem 14 runs for four minutes. Nothing in the language reports progress: no
+clock, no counter, no logging that is not also a value. What works is `seq` on a
+`write` inside the fold, discarding the result and keeping it for the output —
+the same trick the animation uses for frames.
 
-This is fine for a toy language and it is *not* a complaint, but it does bound
-the exercise: sieve-scale problems (problem 10 sums the primes below two
-million) are not reachable by any formulation these programs could use.
+Two things bit while doing it. The milestone test has to match the fold's
+stride: the fold visits only odd starts, and no odd number is a multiple of
+50000, so the obvious `mod 50000 n == 0` never fired and the run stayed silent.
+And a progress line is a side effect in a pure fold, so it only happens if
+something forces it — writing it as an unused `let` binding does nothing at all.
+
+`peek` is the nearest thing to a debugger here, and it prints a value rather
+than a message about one.
+
+## 12. The performance ceiling
+
+Native build on an Intel Core i7-6700K (4 GHz, 4 cores), 16 GB RAM. The slowest
+so far: problem 14 at 4 min 15 s, problem 29 at 44 s, problem 36 at 16 s,
+problem 48 at 14 s, problem 7 at 9.7 s, problem 4 at 9.4 s. Most are under a
+second.
+
+This is fine for a toy language and it is *not* a complaint, but it bounds the
+exercise. Problem 14 only finishes at all because three observations cut a
+million chains of ~150 steps down to a handful each; the brute force it
+describes is out of reach, and so is anything sieve-scale (problem 10 sums the
+primes below two million).
 
 ---
 
@@ -173,8 +193,13 @@ million) are not reachable by any formulation these programs could use.
   framing of problem 67 never arises.
 - **Pattern matching on cons cells.** All four sorting algorithms in
   `rosetta/sorting-algorithms.þ` read like their textbook definitions.
-- **`hashmap` keyed by a tuple.** `[x, y]` as a key made the problem 11 grid
-  clean and kept neighbour lookup off the O(n) list path.
+- **`hashmap` keyed by anything.** `[x, y]` as a key made the problem 11 grid
+  clean, and problem 29 keys it by *bigints* — `hash` works on any value, so
+  counting 9801 distinct 200-digit powers is one insert each instead of the
+  O(n^2) structural comparison `nub` would do. LZW keys one dictionary by
+  strings and the other by numbers, in the same program.
+- **The `bit` library survived CRC-32.** Four published checksums, all exact —
+  a real-world check on arithmetic-built bitwise operations, not a self-test.
 - **`flatMap` as backtracking.** `rosetta/n-queens.þ` builds each next row by
   flat-mapping the partial solutions, which makes the 92 solutions a lazy list:
   asking for the first costs one solution's worth of work.

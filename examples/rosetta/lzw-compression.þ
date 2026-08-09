@@ -1,0 +1,79 @@
+-- Rosetta Code: LZW compression
+-- "TOBEORNOTTOBEORTOBEORNOT" compresses to
+-- [84; 79; 66; 69; 79; 82; 78; 79; 84; 256; 258; 260; 265; 259; 261; 263].
+--
+-- Both directions grow a dictionary as they go, and neither transmits it. The
+-- encoder maps strings to codes, the decoder codes to strings, so each uses a
+-- hashmap keyed by whichever side it looks up — `hash` works on a list of code
+-- points as readily as on a number.
+--
+-- The decoder needs the one special case LZW always needs: a code can refer to
+-- an entry that is only being created by this very step, which happens exactly
+-- when the encoder emitted a run like cScSc. Then the entry is the previous
+-- string plus its own first character.
+
+import core, list, math, text, maybe, hashmap in
+
+let
+	firstCode = 256,
+
+	encodeDictionary = rangeIncl 0 255
+		> foldl (dict -> c -> hashmap.set [c;] c dict) hashmap.empty,
+
+	encode = text ->
+		let
+			go = dict -> nextCode -> current -> input -> input > {
+				[] -> if (isEmpty current) [] [hashmap.getOr 0 current dict;],
+				[c, rest] ->
+					let candidate = append [c;] current in
+						hashmap.get candidate dict > {
+							[known] -> go dict nextCode candidate rest,
+							[] -> [
+								hashmap.getOr 0 current dict,
+								go (hashmap.set candidate nextCode dict) (succ nextCode) [c;] rest
+							]
+						}
+			}
+		in
+			go encodeDictionary firstCode [] text,
+
+	decodeDictionary = rangeIncl 0 255
+		> foldl (dict -> c -> hashmap.set c [c;] dict) hashmap.empty,
+
+	decode = codes -> codes > {
+		[] -> [],
+		[firstOne, rest] ->
+			let
+				start = hashmap.getOr [] firstOne decodeDictionary,
+
+				go = dict -> nextCode -> previous -> input -> input > {
+					[] -> [],
+					[code, more] ->
+						let
+							-- The entry is either already known, or is the one this
+							-- step is about to create: previous plus its own head.
+							entry = hashmap.get code dict
+								> maybe.default (append [head previous;] previous),
+							grown = hashmap.set nextCode (append [head entry;] previous) dict
+						in
+							[entry, go grown (succ nextCode) entry more]
+				}
+			in
+				prepend start (flatten (go decodeDictionary firstCode start rest))
+	},
+
+	sample   = "TOBEORNOTTOBEORTOBEORNOT",
+	expected = [84; 79; 66; 69; 79; 82; 78; 79; 84; 256; 258; 260; 265; 259; 261; 263],
+	codes    = encode sample,
+
+	roundTrip = s -> equal (decode (encode s)) s
+in
+	[
+		prepend "input:    " sample;
+		flatten ["codes:    "; string codes];
+		flatten ["expected: "; string expected];
+		flatten ["matches:  "; string (equal codes expected)];
+		prepend "decoded:  " (decode codes);
+		flatten ["round trips: "; string (["banana"; "aaaaaa"; "x"; ""; sample]
+			> allMatch roundTrip)]
+	] > map write > eval

@@ -1,0 +1,36 @@
+-- Rosetta Code: CRC-32
+-- The checksum of "The quick brown fox jumps over the lazy dog" is 0x414FA339.
+--
+-- A real-world test of the `bit` library: this is the bitwise (table-free)
+-- form of CRC-32, so it is exactly the shift/xor/mask arithmetic the library
+-- exists to provide, run 8 times per input byte.
+
+import core, list, math, text, bit in
+
+let
+	-- The reversed polynomial 0x04C11DB7, as CRC-32 is defined LSB-first.
+	polynomial = 3988292384,          -- 0xEDB88320
+
+	-- One bit: shift right, and xor the polynomial back in when the bit that
+	-- fell off was set.
+	stepBit = crc -> if (eq 1 (bit.bAnd 1 crc))
+		(bit.bXor polynomial (bit.shiftRight 1 crc))
+		(bit.shiftRight 1 crc),
+
+	stepByte = crc -> byte -> times 8 stepBit (bit.bXor crc byte),
+
+	crc32 = bytes -> bit.bNot (foldl stepByte 4294967295 bytes),
+
+	cases = [
+		["The quick brown fox jumps over the lazy dog", "414fa339"];
+		["", "00000000"];
+		["a", "e8b7be43"];
+		["123456789", "cbf43926"]
+	]
+in
+	cases
+	> map ([text, expected] -> let got = bit.toHex (crc32 text) in flatten [
+		padRight 46 space (flatten [[dquote;]; take 42 text; [dquote;]]);
+		got; if (equal got expected) "  ok" (flatten ["  EXPECTED "; expected])])
+	> map write
+	> eval

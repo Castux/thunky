@@ -1,0 +1,24 @@
+-- Project Euler 17: Number letter counts
+-- The letters used writing out 1 to 1000 in words, spaces and hyphens excluded.
+-- Answer: 21124
+
+import core, list, math, text in
+
+let
+	units = ["one"; "two"; "three"; "four"; "five"; "six"; "seven"; "eight"; "nine";
+		"ten"; "eleven"; "twelve"; "thirteen"; "fourteen"; "fifteen"; "sixteen";
+		"seventeen"; "eighteen"; "nineteen"],
+
+	tens = ["twenty"; "thirty"; "forty"; "fifty"; "sixty"; "seventy"; "eighty"; "ninety"],
+
+	spell = n -> case
+		(gte 1000 n)  "onethousand"
+		(gte 100 n)   (flatten [
+			nth (pred (div 100 n)) units; "hundred";
+			if (eq 0 (mod 100 n)) "" (prepend "and" (spell (mod 100 n)))])
+		(gte 20 n)    (flatten [
+			nth (sub 2 (div 10 n)) tens;
+			if (eq 0 (mod 10 n)) "" (spell (mod 10 n))])
+		else          (nth (pred n) units)
+in
+	rangeIncl 1 1000 > map (spell *> length) > sum > show

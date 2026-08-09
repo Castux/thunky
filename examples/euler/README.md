@@ -35,13 +35,18 @@ with 16 GB of RAM.
 | 11 | `p011-grid-product.þ` | `data/p011-grid.txt` | 70600674 | 0.5 s |
 | 12 | `p012-triangle-divisors.þ` | | 76576500 | 3.7 s |
 | 13 | `p013-large-sum.þ` | `data/p013-numbers.txt` | 5537376230 | 1.4 s |
+| 14 | `p014-longest-collatz.þ` | | 837799 | 4 min 15 s |
 | 16 | `p016-power-digit-sum.þ` | | 1366 | 0.15 s |
+| 17 | `p017-number-letters.þ` | | 21124 | 0.2 s |
 | 18 | `p018-maximum-path-sum.þ` | `data/p018-triangle.txt` | 1074 | 0.1 s |
 | 20 | `p020-factorial-digit-sum.þ` | | 648 | 0.1 s |
 | 21 | `p021-amicable-numbers.þ` | | 31626 | 2.8 s |
 | 22 | `p022-names-scores.þ` | `data/p022-names.txt` | 871198282 | 3.9 s |
 | 25 | `p025-thousand-digit-fibonacci.þ` | | 4782 | 5.3 s |
+| 29 | `p029-distinct-powers.þ` | | 9183 | 44 s |
+| 36 | `p036-double-base-palindromes.þ` | | 872187 | 16 s |
 | 42 | `p042-coded-triangle-words.þ` | `data/p042-words.txt` | 162 | 0.6 s |
+| 48 | `p048-self-powers.þ` | | 9110846700 | 14 s |
 | 59 | `p059-xor-decryption.þ` | `data/p059-cipher.txt` | 129448 | 5.6 s |
 | 67 | `p018-maximum-path-sum.þ` | `data/p067-triangle.txt` | 7273 | 4.8 s |
 
@@ -49,7 +54,10 @@ Problem 67 is problem 18 with a bigger triangle and no change to the program:
 the bottom-up `foldr` never sees the combinatorial explosion the problem warns
 about.
 
-Problems 13, 16, 20 and 25 use the `big` library for arbitrary-precision
+Problem 14 prints progress as it goes: four minutes of silence is not a
+readable program, and `seq` on a `write` is how a pure fold says where it is.
+
+Problems 13, 16, 20, 25, 29 and 48 use the `big` library for arbitrary-precision
 arithmetic, and 12 and 21 use `euler.th` — the local module beside them holding
 the number theory these problems keep needing (`primes`, `factorise`,
 `divisorCount`, `divisorSum`, `totient`, …). Both of those exist because of what

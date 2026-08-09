@@ -1,0 +1,19 @@
+-- Project Euler 48: Self powers
+-- The last ten digits of 1^1 + 2^2 + ... + 1000^1000.
+-- Answer: 9110846700
+--
+-- 1000^1000 has 3001 digits, and summing a thousand numbers that size to read
+-- ten of them is the wrong order of work. `intPowMod` reduces at every squaring
+-- instead, so nothing ever exceeds the ten-digit modulus.
+
+import core, list, math, text, big in
+
+let
+	modulus = big.intPow (big.intFromNumber 10) 10,
+
+	term = n -> big.intPowMod (big.intFromNumber n) n modulus,
+
+	total = rangeIncl 1 1000
+		> foldl (running -> n -> big.intMod (big.intAdd running (term n)) modulus) big.intZero
+in
+	big.intToString total > padLeft 10 (char '0') > write

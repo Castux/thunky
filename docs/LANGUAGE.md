@@ -1120,6 +1120,7 @@ makes the estimate safe rather than hopeful.
 | `intMulSmall k n` | multiply by a plain number, cheaper than a full multiply |
 | `intDivMod a b`, `intDiv a b`, `intMod a b` | truncating division (schoolbook, one pass per limb); the remainder takes the sign of `a` |
 | `intPow b e` | exponentiation by squaring, non-negative `e` |
+| `intPowMod b e m` | `b^e mod m`, reducing at every step so the operands stay the size of `m` |
 | `intNegate n`, `intAbs n`, `intSign n`, `intIsZero n` | sign handling |
 | `intCompare a b` | `-1`, `0` or `1` as `a` is less than, equal to, or greater than `b` |
 | `floatFromNumber p n`, `floatFromInt p n` | build at precision `p` (bits) |

@@ -320,6 +320,15 @@ intPow = b -> e -> case
 	(even e)  (let half = intPow b (div 2 e) in intMul half half)
 	else      (intMul b (intPow b (pred e))),
 
+-- intPowMod b e m: b^e mod m, for a non-negative exponent. Square-and-multiply
+-- with a reduction at every step, so the operands stay the size of m instead of
+-- growing to the size of b^e. Computing the power first and reducing afterwards
+-- is the same answer and a different order of cost: 1000^1000 has 3001 digits.
+intPowMod = b -> e -> m -> case
+	(eq e 0)  (intMod intOne m)
+	(even e)  (let half = intPowMod b (div 2 e) m in intMod (intMul half half) m)
+	else      (intMod (intMul b (intPowMod b (pred e) m)) m),
+
 -- intToNumber: back to a plain number, losing exactness past 2^53.
 intToNumber = [sign, mag] -> mul sign
 	(mag > foldr (limb -> acc -> add limb (mul base acc)) 0),
