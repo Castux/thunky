@@ -43,11 +43,13 @@ limbBits  = 32,
 
 -- --- magnitudes -----------------------------------------------------------
 
--- Drop the most significant zero limbs, so that every magnitude has one
--- representation and `equal` can be used on whole integers.
-normalize = limbs -> limbs > reverse > dropWhile (eq 0) > reverse,
+-- normalize limbs: drop the most significant zero limbs, so that every
+-- magnitude has one representation and `equal` can be used on whole integers.
+normalize = reverse *> dropWhile (eq 0) *> reverse,
 
 magZero = [],
+
+-- magIsZero mag: is the magnitude zero (that is, empty).
 magIsZero = isEmpty,
 
 -- magFromNumber n: a magnitude from a non-negative integer-valued number.
@@ -142,21 +144,89 @@ magTestBit = i -> mag ->
 	let limbIndex = div limbBits i in
 		if (gte (length mag) limbIndex) 0 (bit.bitAt (mod limbBits i) (nth limbIndex mag)),
 
--- magDivMod a b: [quotient, remainder], by binary long division from the top
--- bit of a down. Each step doubles the remainder, brings in one bit, and
--- subtracts the divisor if it fits — so it costs one pass per bit of a.
-magDivMod = a -> b ->
-	let go = i -> quotient -> remainder -> if (lt 0 i)
-		[quotient, remainder]
-		(let
-			shifted = magAdd (magDouble remainder) (if (eq 1 (magTestBit i a)) [1;] []),
-			fits    = gte 0 (magCompare shifted b)
-		in
-			if fits
-				(go (pred i) (magAdd (magDouble quotient) [1;]) (magSub shifted b))
-				(go (pred i) (magDouble quotient) shifted))
+-- divTwoByOne high low d: (high * 2^32 + low) / d, for high < d < 2^32, as
+-- [quotient, remainder]. The numerator reaches 2^64, so this cannot be a single
+-- division: it is a four-step long division in base 2^16, where a partial
+-- remainder times 2^16 stays under 2^48 and so stays exact.
+divTwoByOne = high -> low -> d ->
+	let
+		digits = [div halfBase high; mod halfBase high; div halfBase low; mod halfBase low],
+		step = [quotient, remainder] -> digit ->
+			let current = add (mul halfBase remainder) digit in
+				[add (mul halfBase quotient) (div d current), mod d current]
 	in
-		go (pred (magBitLength a)) [] [],
+		foldl step [0, 0] digits,
+
+-- magDivMod a b: [quotient, remainder], by schoolbook long division in base
+-- 2^32 — Knuth's Algorithm D.
+--
+-- The dividend is consumed one limb at a time, most significant first, into a
+-- running remainder that never exceeds the divisor's length by more than one
+-- limb. Each step needs one quotient limb, which is *estimated* from the top
+-- two limbs of the remainder over the top limb of the divisor and then
+-- corrected downward.
+--
+-- Normalisation is what bounds that correction. Scaling both operands so the
+-- divisor's top limb has its high bit set (which cannot change the quotient)
+-- makes the estimate at most two too large — a theorem, not a heuristic — so
+-- the correction loop runs at most twice regardless of the numbers. The
+-- remainder is scaled back down at the end.
+--
+-- This replaced binary long division, which needed a pass per *bit* of the
+-- dividend rather than per limb: a factor of 32 on the same operands.
+magDivMod = a -> b -> case
+	(magIsZero b)              [[], []]                      -- caller's error; no crash
+	(eq (negate 1) (magCompare a b)) [[], a]                  -- a < b
+	-- magDivModSmall reports its remainder as a plain number, not a magnitude.
+	(eq 1 (length b))          (magDivModSmall (head b) a
+		> ([quotient, remainder] -> [quotient, magFromNumber remainder]))
+	else                       (magDivModLarge a b),
+
+magDivModLarge = a -> b ->
+	let
+		-- Normalise: shift left so the divisor's top limb has its high bit set.
+		shift  = sub (bitLengthOf (last b)) limbBits,
+		scale  = pow shift 2,
+		an     = magMulSmall scale a,
+		bn     = magMulSmall scale b,
+
+		size   = length bn,
+		topB   = last bn,
+
+		-- One limb of the dividend, one limb of the quotient.
+		step = [quotient, remainder] -> limb ->
+			let
+				current  = magAdd (magShiftLimbs 1 remainder) (if (eq limb 0) [] [limb;]),
+				-- The two limbs the estimate is read from: current is at most one
+				-- limb longer than the divisor, so these are its top two aligned
+				-- against the divisor's length, or zero where it is shorter.
+				high     = if (gt size (length current)) (nth size current) 0,
+				low      = if (gte size (length current)) (nth (pred size) current) 0,
+				estimate = if (gte topB high)
+					(sub 1 base)                            -- saturated: clamp to base - 1
+					(first (divTwoByOne high low topB)),
+				corrected = lowerUntilFits estimate current bn
+			in
+				[[corrected, quotient], magSub current (magMulSmall corrected bn)],
+
+		divided = foldl step [[], []] (reverse an)
+	in
+		[
+			-- Each step conses its limb on, and the steps run most significant
+			-- first, so the accumulated list is already least-significant first.
+			normalize (first divided),
+			first (magDivModSmall scale (second divided))    -- undo the normalisation
+		],
+
+-- Knuth's estimate is at most two too large once normalised, so this loop runs
+-- at most twice; it is written as a loop rather than as two tests because the
+-- bound is a property of the normalisation, not of this code.
+lowerUntilFits = estimate -> remainder -> divisor ->
+	if (eq estimate 0)
+		0
+		(if (gte 0 (magCompare remainder (magMulSmall estimate divisor)))
+			estimate
+			(lowerUntilFits (pred estimate) remainder divisor)),
 
 -- magDivModSmall d mag: divide by a number in [1, 2^32). Works in 16-bit halves
 -- because remainder * base would overflow the exact range of a float64.
@@ -236,8 +306,9 @@ intDivMod = a -> b -> a > ([sa, ma] -> b > ([sb, mb] ->
 			if (magIsZero remainder) intZero [sa, remainder]
 		])),
 
-intDiv = a -> b -> first (intDivMod a b),
-intMod = a -> b -> second (intDivMod a b),
+-- intDiv a b, intMod a b: the two halves of intDivMod.
+intDiv = a -> intDivMod a *> first,
+intMod = a -> intDivMod a *> second,
 
 intMulSmall = k -> [sign, mag] -> if (lt 0 k)
 	[negate sign, magMulSmall (negate k) mag]

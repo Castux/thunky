@@ -35,12 +35,12 @@ wrap = n -> let r = mod size n in if (lt 0 r) (add size r) r,
 powerOfTwo = k -> pow k 2,
 
 -- bitAt k n: bit k of n (k = 0 is the least significant), as 0 or 1.
-bitAt = k -> n -> mod 2 (div (powerOfTwo k) n),
+bitAt = k -> div (powerOfTwo k) *> mod 2,
 
--- The logical operations. `combine` walks both operands bit by bit, applying f
--- to the two bits, and rebuilds the result as it goes. It stops when both
--- operands have run out, so the cost is the width of the larger operand rather
--- than a fixed 32 steps.
+-- combine f a b: the general shape of a logical operation. It walks both
+-- operands bit by bit, applying f to the two bits, and rebuilds the result as
+-- it goes; it stops when both operands have run out, so the cost is the width
+-- of the larger operand rather than a fixed 32 steps.
 combine = f -> a -> b ->
 	let go = weight -> x -> y -> if (and (eq x 0) (eq y 0))
 		0
@@ -50,20 +50,25 @@ combine = f -> a -> b ->
 	in
 		go 1 a b,
 
+-- bAnd a b, bOr a b, bXor a b: the binary logical operations.
+-- bNot n: the one's complement within 32 bits.
 bAnd = combine (x -> y -> mul x y),                    -- 1 only when both are 1
 bOr  = combine (x -> y -> max x y),                    -- 1 when either is 1
 bXor = combine (x -> y -> mod 2 (add x y)),            -- 1 when they differ
-bNot = n -> sub n maxValue,                            -- maxValue - n
+bNot = n -> sub n maxValue,
 
--- Shifts. Left shifts drop the bits carried past bit 31.
-shiftLeft  = k -> n -> mod size (mul (powerOfTwo k) n),
-shiftRight = k -> n -> div (powerOfTwo k) n,
+-- shiftLeft k n, shiftRight k n: shift n by k bits. A left shift drops the bits
+-- carried past bit 31.
+shiftLeft  = k -> mul (powerOfTwo k) *> mod size,
+shiftRight = k -> div (powerOfTwo k),
 
+-- rotateLeft k n, rotateRight k n: rotate n by k bits within its 32.
 rotateLeft  = k -> n -> bOr (shiftLeft k n) (shiftRight (sub k width) n),
 rotateRight = k -> n -> rotateLeft (sub k width) n,
 
--- Single-bit access.
-testBit  = k -> n -> bitAt k n,
+-- Single-bit access, all taking the bit index first and the value second:
+-- testBit k n, setBit k n, clearBit k n, flipBit k n.
+testBit  = bitAt,
 setBit   = k -> n -> bOr n (powerOfTwo k),
 clearBit = k -> n -> bAnd n (bNot (powerOfTwo k)),
 flipBit  = k -> n -> bXor n (powerOfTwo k),
@@ -72,7 +77,7 @@ flipBit  = k -> n -> bXor n (powerOfTwo k),
 popCount = n -> if (eq n 0) 0 (add (mod 2 n) (popCount (div 2 n))),
 
 -- toBits n: the bits of n, least significant first, exactly `width` of them.
--- fromBits inverts it, and accepts a shorter list.
+-- fromBits bits: the inverse, accepting a list shorter than `width`.
 toBits   = n -> range 0 width > map (k -> bitAt k n),
 fromBits = bits -> bits > mapIndex (k -> b -> mul b (powerOfTwo k)) > sum,
 

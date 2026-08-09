@@ -84,22 +84,26 @@ toTable = [tag, content] -> if (equal tag "object") (table.fromList content) tab
 
 -- --- parsing --------------------------------------------------------------
 
-parse = text -> parseValue text > maybe.andThen ([value, rest] ->
+-- parse text: some value if the whole of text is one JSON document, else none.
+parse = parseValue *> maybe.andThen ([value, rest] ->
 	if (isEmpty (skipSpace rest)) (maybe.some value) maybe.none),
 
+-- skipSpace text: drop leading JSON whitespace.
 skipSpace = dropWhile isSpace,
 
-parseValue = text -> skipSpace text > (t -> t > {
+-- parseValue text: the value at the head of text, and what follows it.
+
+parseValue = skipSpace *> {
 	[] -> maybe.none,
 	[c, rest] -> case
 		(eq c (char '{'))  (parseObjectBody (skipSpace rest))
 		(eq c (char '['))  (parseArrayBody (skipSpace rest))
 		(eq c dquote)      (parseStringBody rest > maybe.fmap ([s, r] -> [["string", s], r]))
-		(eq c (char 't'))  (parseLiteral "true" jsonTrue t)
-		(eq c (char 'f'))  (parseLiteral "false" jsonFalse t)
-		(eq c (char 'n'))  (parseLiteral "null" jsonNull t)
-		else               (parseNumber t)
-}),
+		(eq c (char 't'))  (parseLiteral "true" jsonTrue [c, rest])
+		(eq c (char 'f'))  (parseLiteral "false" jsonFalse [c, rest])
+		(eq c (char 'n'))  (parseLiteral "null" jsonNull [c, rest])
+		else               (parseNumber [c, rest])
+},
 
 parseLiteral = word -> value -> text -> if (startsWith word text)
 	(maybe.some [value, drop (length word) text])
@@ -110,21 +114,22 @@ parseLiteral = word -> value -> text -> if (startsWith word text)
 -- applied here.
 isNumberChar = c -> or (isDigit c) (contains c "+-.eE"),
 
-parseNumber = text -> span isNumberChar text > ([digits, rest] ->
+-- parseNumber text, toNumber digits: a JSON number and its conversion.
+parseNumber = span isNumberChar *> ([digits, rest] ->
 	if (isEmpty digits) maybe.none (maybe.some [["number", toNumber digits], rest])),
 
-toNumber = s -> s
-	> map (c -> if (eq c (char 'E')) (char 'e') c)
-	> split "e"
-	> {
+toNumber = map (c -> if (eq c (char 'E')) (char 'e') c)
+	*> split "e"
+	*> {
 		[mantissa;]           -> stringToFloat mantissa,
 		[mantissa; exponent]  -> mul (stringToFloat mantissa)
 			(pow (stringToFloat (dropWhile (eq (char '+')) exponent)) 10),
 		other                 -> 0
 	},
 
--- Strings: called with the opening quote already consumed.
-parseStringBody = text -> text > {
+-- parseStringBody text: the rest of a string, called with the opening quote
+-- already consumed. parseEscape text: one escape sequence and the rest.
+parseStringBody = {
 	[] -> maybe.none,                                   -- unterminated
 	[c, rest] -> case
 		(eq c dquote)     (maybe.some [[], rest])
@@ -133,7 +138,7 @@ parseStringBody = text -> text > {
 			> maybe.fmap ([chars, r] -> [[c, chars], r]))
 },
 
-parseEscape = text -> text > {
+parseEscape = {
 	[] -> maybe.none,
 	[e, rest] -> if (eq e (char 'u'))
 		(parseHex4 rest)
@@ -167,12 +172,14 @@ parseHex4 = text -> if (lt 4 (length text)) maybe.none
 		> maybe.andThen (code -> parseStringBody (drop 4 text)
 			> maybe.fmap ([chars, r] -> [[code, chars], r]))),
 
--- Arrays and objects: called with the opening bracket consumed and whitespace
--- skipped, so an immediate closing bracket is the empty case.
-parseArrayBody = text -> text > {
+-- parseArrayBody text, parseObjectBody text: called with the opening bracket
+-- consumed and whitespace skipped, so an immediate closing bracket is the empty
+-- case. parseElements text and parseMembers text carry the comma-separated
+-- runs, and parseMember text is one "key": value pair.
+parseArrayBody = {
 	[c, rest] -> if (eq c (char ']'))
 		(maybe.some [["array", []], rest])
-		(parseElements text > maybe.fmap ([items, r] -> [["array", items], r])),
+		(parseElements [c, rest] > maybe.fmap ([items, r] -> [["array", items], r])),
 	[] -> maybe.none
 },
 
@@ -186,10 +193,10 @@ parseElements = text -> parseValue text > maybe.andThen ([value, rest] ->
 		[] -> maybe.none
 	})),
 
-parseObjectBody = text -> text > {
+parseObjectBody = {
 	[c, rest] -> if (eq c (char '}'))
 		(maybe.some [["object", []], rest])
-		(parseMembers text > maybe.fmap ([pairs, r] -> [["object", pairs], r])),
+		(parseMembers [c, rest] > maybe.fmap ([pairs, r] -> [["object", pairs], r])),
 	[] -> maybe.none
 },
 
@@ -203,7 +210,7 @@ parseMembers = text -> parseMember (skipSpace text) > maybe.andThen ([pair, rest
 		[] -> maybe.none
 	})),
 
-parseMember = text -> text > {
+parseMember = {
 	[c, rest] -> if (eq c dquote)
 		(parseStringBody rest > maybe.andThen ([key, afterKey] ->
 			skipSpace afterKey > (t -> t > {
@@ -229,6 +236,7 @@ stringify = [tag, content] -> case
 		content > map ([k, v] -> flatten [quote k; ":"; stringify v]) > join ",";
 		"}"]),
 
+-- quote s: s as a quoted JSON string. escapeOne c: one character, escaped.
 quote = s -> flatten [[dquote;]; flatMap escapeOne s; [dquote;]],
 
 escapeOne = c -> case
@@ -245,8 +253,8 @@ toHex4 = n -> if (eq n 0) "0" (toHexGo n),
 toHexGo = n -> if (eq n 0) [] (append [nth (mod 16 n) hexDigits;] (toHexGo (div 16 n))),
 
 -- stringifyPretty indent value: one member or element per line, indented by
--- `indent` spaces per level.
-stringifyPretty = indent -> value -> prettyAt indent 0 value,
+-- `indent` spaces per level. prettyAt indent depth value does the work.
+stringifyPretty = indent -> prettyAt indent 0,
 
 prettyAt = indent -> depth -> [tag, content] ->
 	let
