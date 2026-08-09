@@ -1,0 +1,21 @@
+-- Project Euler 40: Champernowne's constant
+-- The product of the digits at positions 1, 10, 100, ... 1000000 of
+-- 0.123456789101112...
+-- Answer: 210
+--
+-- The constant is an infinite lazy list — `upFrom 1 > flatMap string` — and the
+-- program simply indexes into it. Nothing decides in advance how many digits to
+-- produce; the largest index asked for is what makes the list that long. Naming
+-- it is what makes the seven lookups share one spine instead of rebuilding it.
+
+import core, list, math, text in
+
+let
+	champernowne = upFrom 1 > flatMap string,
+
+	digitAt = i -> nth (pred i) champernowne > digitToInt
+in
+	[1; 10; 100; 1000; 10000; 100000; 1000000]
+	> map digitAt
+	> product
+	> show

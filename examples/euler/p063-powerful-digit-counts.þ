@@ -1,0 +1,15 @@
+-- Project Euler 63: Powerful digit counts
+-- How many n-digit positive integers are also an nth power.
+-- Answer: 49
+--
+-- a^n has n digits only while a < 10, since 10^n has n+1, and the exponent
+-- cannot pass 21 because 9^22 has fewer digits than 22. Both bounds fall out of
+-- the arithmetic, so the search is 9 by 25 and finishes instantly.
+
+import core, list, math, big in
+
+	rangeIncl 1 9
+	> flatMap (a -> rangeIncl 1 25
+		> filter (n -> eq n (length (big.intDigits (big.intPow n (big.intFromNumber a))))))
+	> length
+	> show

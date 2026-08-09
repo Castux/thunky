@@ -1,0 +1,12 @@
+-- Project Euler 2: Even Fibonacci numbers
+-- Sum of the even Fibonacci terms not exceeding four million.
+-- Answer: 4613732
+
+import core, list, math in
+
+let fibonacci = prepend [1; 2] (zipWith add fibonacci (tail fibonacci)) in
+	fibonacci
+	> takeWhile (lt 4000000)
+	> filter even
+	> sum
+	> show

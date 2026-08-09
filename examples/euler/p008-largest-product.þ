@@ -1,0 +1,21 @@
+-- Project Euler 8: Largest product in a series
+-- The greatest product of 13 adjacent digits in the 1000-digit number.
+-- Answer: 23514624000
+--
+--   thunky examples/euler/p008-largest-product.þ < examples/euler/data/p008-number.txt
+--
+-- `tails` gives every suffix, so the sliding windows are `map (take 13)` over
+-- it; the short ones at the end are dropped by length.
+
+import core, list, math, text in
+
+let window = 13 in
+	stdin
+	> filter isDigit
+	> map digitToInt
+	> tails
+	> map (take window)
+	> filter (w -> eq window (length w))
+	> map product
+	> maximum
+	> show

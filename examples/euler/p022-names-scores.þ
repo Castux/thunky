@@ -1,0 +1,21 @@
+-- Project Euler 22: Names scores
+-- Sort the names alphabetically, then total (position * alphabetical value).
+-- Answer: 871198282
+--
+--   thunky examples/euler/p022-names-scores.þ < examples/euler/data/p022-names.txt
+
+import core, list, math, text in
+
+let
+	names = stdin
+		> split ","
+		> map (filter (c -> neq c dquote))
+		> filter (isEmpty *> not)
+		> sortStrings,
+
+	alphabeticalValue = name -> name > map (c -> succ (sub (char 'A') c)) > sum
+in
+	names
+	> mapIndex (i -> name -> mul (succ i) (alphabeticalValue name))
+	> sum
+	> show

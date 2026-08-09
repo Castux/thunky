@@ -1,0 +1,27 @@
+-- Rosetta Code: Matrix multiplication
+--
+-- Transposing the right operand turns the definition into exactly what it says:
+-- every row against every column, each pair zipped and summed.
+
+import core, list, math, text in
+
+let
+	multiply = a -> b ->
+		let columns = transpose b in
+			a > map (row -> columns > map (column -> zipWith mul row column > sum)),
+
+	render = name -> matrix -> prepend [name;]
+		(matrix > map (row -> row > map (n -> padLeft 5 space (string n)) > flatten)),
+
+	a = [[1; 2; 3]; [4; 5; 6]],
+	b = [[7; 8]; [9; 10]; [11; 12]],
+
+	identity = n -> rangeIncl 1 n
+		> map (i -> rangeIncl 1 n > map (j -> if (eq i j) 1 0))
+in
+	flatten [
+		render "A" a;
+		render "B" b;
+		render "A x B" (multiply a b);
+		render "A x I" (multiply a (identity 3))
+	] > map write > eval

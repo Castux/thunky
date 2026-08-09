@@ -1,0 +1,7 @@
+-- Project Euler 5: Smallest multiple
+-- The smallest number evenly divisible by all of 1 to 20.
+-- Answer: 232792560
+
+import core, list, math in
+
+	rangeIncl 1 20 > foldl lcm 1 > show

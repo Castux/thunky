@@ -1,0 +1,11 @@
+-- Project Euler 20: Factorial digit sum
+-- The sum of the digits of 100!.
+-- Answer: 648
+
+import core, list, math, big in
+
+	rangeIncl 2 100
+	> foldl (product -> k -> big.intMulSmall k product) big.intOne
+	> big.intDigits
+	> sum
+	> show

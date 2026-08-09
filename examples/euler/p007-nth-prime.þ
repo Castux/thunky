@@ -1,0 +1,17 @@
+-- Project Euler 7: 10001st prime
+-- Answer: 104743
+--
+-- The prime list is defined in terms of itself: a candidate is prime when no
+-- prime already in the list, up to its square root, divides it. Laziness makes
+-- that legal and memoization makes it fast — the primes below sqrt(n) are
+-- always computed by the time n is tested.
+
+import core, list, math in
+
+let
+	primes  = prepend [2;] (upFrom 3 > filter isPrime),
+	isPrime = n -> primes
+		> takeWhile (lte (sqrt n))
+		> noneMatch (p -> eq 0 (mod p n))
+in
+	nth 10000 primes > show

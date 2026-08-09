@@ -59,11 +59,17 @@ lexical, syntactic, or name-resolution error is reported with a located diagnost
 and the program does not run; a run-time error is reported with a source location
 and a reduction trace.
 
-**Module search order.** For each import `name`, the runtime first looks for
-`./name.th` (or `./name.þ`) in the current working directory. If that file does not exist, it
-falls back to the standard library embedded in the binary (see
-[§14](#14-standard-library)). A file in the working directory therefore always
-shadows the built-in module of the same name.
+**Module search order.** For each import `name`, the runtime looks for
+`name.th` (or `name.þ`) in, in order: the **directory holding the program being
+run**, then the **current working directory**, then the standard library
+embedded in the binary (see [§14](#14-standard-library)). A program can
+therefore be shipped with its helper modules beside it and run by path from
+anywhere — `thunky some/where/prog.þ` resolves `import helper` to
+`some/where/helper.th`.
+
+A local file always shadows the built-in module of the same name, which
+includes the program itself: a program stored as `json.þ` shadows the `json`
+library for its own run.
 
 There is **no automatic library import**. A program that wants the standard
 library must say so explicitly:
@@ -648,12 +654,13 @@ import list in
 
 The standard library is a collection of Thunky modules **embedded in the
 Thunky binary** — no separate installation is needed. Modules are written in
-Thunky itself and are split by concern across seven files in `core/`.
+Thunky itself and are split by concern across twelve files in `core/`.
 
-**Module search order.** For every `import name`, the runtime first checks
-`./name.th` (or `./name.þ`) in the working directory, then falls back to the embedded library.
-Placing your own `list.þ` (or any other core module name) next to your program
-**shadows** the built-in one for that run.
+**Module search order.** For every `import name`, the runtime checks the
+directory of the program being run, then the working directory, then the
+embedded library ([§2](#2-running-a-program)). Placing your own `list.þ` (or any
+other core module name) beside your program **shadows** the built-in one for
+that run.
 
 ### Core modules
 
@@ -1051,6 +1058,153 @@ show [hashmap.get "x" m; hashmap.getOr 0 "z" m]   -- [[10]; 0]
 
 ---
 
+#### `bit` — bitwise operations on 32-bit integers
+
+Built from the existing arithmetic; there are no bitwise builtins. A 32-bit
+value and the sum of two of them are exactly representable in the float64 a
+Thunky number is, so the results are exact. Every operation takes and returns a
+value in `[0, 2^32)`; use `wrap` to bring anything else into range.
+
+The names are prefixed with `b` because an unqualified import would otherwise
+put `and`, `or` and `not` beside `core`'s logical operations of the same name.
+
+| Name | Description |
+|------|-------------|
+| `width`, `size`, `maxValue` | `32`, `2^32`, `2^32 - 1` |
+| `wrap n` | bring any integer into `[0, 2^32)` by two's-complement wrapping |
+| `bAnd a b`, `bOr a b`, `bXor a b` | the binary logical operations |
+| `bNot n` | one's complement within 32 bits |
+| `shiftLeft k n`, `shiftRight k n` | shift by `k`; left shifts drop bits past bit 31 |
+| `rotateLeft k n`, `rotateRight k n` | rotate by `k` |
+| `bitAt k n`, `testBit k n` | bit `k` (0 is least significant) as `0` or `1` |
+| `setBit k n`, `clearBit k n`, `flipBit k n` | single-bit edits |
+| `popCount n` | how many bits are set |
+| `toBits n`, `fromBits bits` | to and from a list of 32 bits, least significant first |
+| `toHex n` | eight lowercase hex digits |
+
+```
+import bit in
+show [bit.bXor 12 10, bit.popCount 255, bit.toHex 3735928559]
+```
+
+---
+
+#### `big` — arbitrary-precision integers and floats
+
+A Thunky number is a float64: exact for integers to 2^53, and 53 bits of
+significand. This module lifts both limits.
+
+An **integer** is `[sign, magnitude]`, the magnitude a little-endian list of
+32-bit limbs; zero is `[1, []]`. A **float** is `[mantissa, exponent,
+precision]`, meaning `mantissa * 2^exponent` held to `precision` significand
+bits — precision travels with the value, so a computation inherits it instead of
+consulting a global setting. Results are truncated toward zero.
+
+The non-commutative operations put the operand first and the value last —
+`intSub k n` is `n - k`, `intMod d n` is `n mod d`, `intPow e b` is `b^e` — for
+the same reason the `sub`, `div`, `mod` and `pow` builtins do: it is the order
+that makes partial application and piping work. `n > intMod m` reduces n; had
+the library used mathematical order it would silently have reduced m by n.
+
+Base 2^32 is the largest that keeps a limb, and the sum of two limbs, exactly
+representable. Multiplication splits limbs into 16-bit halves, whose products
+stay under 2^32, because a full limb product would reach 2^64.
+
+Division is Knuth's Algorithm D: the dividend is consumed a limb at a time into
+a running remainder, and each quotient limb is estimated from the top two limbs
+of the remainder over the top limb of the divisor, then corrected downward.
+Normalising both operands so the divisor's top limb has its high bit set — which
+cannot change the quotient — bounds that correction at two steps, which is what
+makes the estimate safe rather than hopeful.
+
+| Name | Description |
+|------|-------------|
+| `intZero`, `intOne` | constants |
+| `intFromNumber n`, `intFromString s` | conversion in; exact below 2^53 for a number |
+| `intToString n`, `intToNumber n`, `intDigits n` | conversion out (`intDigits` is decimal, most significant first) |
+| `intAdd a b`, `intMul a b` | arithmetic |
+| `intSub k n` | `n - k` |
+| `intMulSmall k n` | multiply by a plain number, cheaper than a full multiply |
+| `intDivMod d n`, `intDiv d n`, `intMod d n` | truncating division of `n` by `d` (schoolbook, one pass per limb); the remainder takes the sign of `n` |
+| `intPow e b` | `b^e` by squaring, non-negative `e` |
+| `intPowMod m e b` | `b^e mod m` for a plain-number `e`, reducing at every step so the operands stay the size of `m` |
+| `intPowModBig m e b` | the same with `e` an arbitrary-precision integer — a plain `e` cannot exceed 2^53 |
+| `intNegate n`, `intAbs n`, `intSign n`, `intIsZero n` | sign handling |
+| `intCompare a b` | `-1`, `0` or `1` as `a` is less than, equal to, or greater than `b` |
+| `intLt t n`, `intLte t n`, `intGt t n`, `intGte t n` | threshold-first predicates, like the builtins |
+| `floatFromNumber p n`, `floatFromInt p n` | build at precision `p` (bits) |
+| `floatWithPrecision p x` | the same value carried at another precision |
+| `floatAdd a b`, `floatMul a b` | arithmetic; the result takes the larger precision |
+| `floatSub k x`, `floatDiv d x` | `x - k` and `x / d` |
+| `floatNegate x`, `floatIsZero x`, `floatCompare a b` | as for integers |
+| `floatLt t x`, `floatLte t x`, `floatGt t x`, `floatGte t x` | threshold-first predicates |
+| `floatSqrt x` | Newton's method to the working precision |
+| `floatToString digits x` | decimal rendering with that many places, truncated |
+
+```
+import big in
+[
+  big.intToString (big.intPow (big.intFromNumber 2) 100);
+  big.floatToString 20 (big.floatSqrt (big.floatFromNumber 200 2))
+] > map write > eval
+```
+
+---
+
+#### `json` — JSON parsing and printing
+
+JSON's types do not map onto Thunky's without ambiguity — a JSON string is a
+list of code points and so is an array of numbers — so a value is a tagged
+2-tuple:
+
+```thunky-static
+["null",   0]                  ["string", code points]
+["bool",   0 or 1]             ["array",  list of values]
+["number", n]                  ["object", list of [key, value] pairs]
+```
+
+The tags are strings so that a consumer can match them literally, which is the
+point of the shape:
+
+```thunky-static
+total = {
+  ["number", n]      -> n,
+  ["array", items]   -> items > map total > sum,
+  ["object", pairs]  -> pairs > map (second *> total) > sum,
+  other              -> 0
+}
+```
+
+Objects keep their pairs in document order, so printing a parsed document gives
+it back unchanged; `get` is therefore O(n) in the number of keys, and `toTable`
+hands the pairs to the `table` module.
+
+| Name | Description |
+|------|-------------|
+| `parse text` | `some value`, or `none` if the document is not valid JSON |
+| `stringify value` | compact text |
+| `stringifyPretty indent value` | one member or element per line, indented |
+| `jsonNull`, `jsonTrue`, `jsonFalse` | constants |
+| `jsonBool b`, `jsonNumber n`, `jsonString s`, `jsonArray items`, `jsonObject pairs` | constructors |
+| `typeOf value` | `"null"`, `"bool"`, `"number"`, `"string"`, `"array"` or `"object"` |
+| `isNull value` | |
+| `get key value` | an object member, or `none` |
+| `at index value` | an array element, or `none` |
+| `path steps value` | follow a chain of keys (strings) and indices (numbers) |
+| `asNumber`, `asString`, `asBool`, `asArray`, `asObject` | extract, or `none` on a type mismatch |
+| `toTable value` | an object's pairs as a `table` |
+
+`parse` reports failure as `none` without a location: locating an error would
+mean threading a position through every parser, which is deliberately not done
+yet.
+
+```
+import json, maybe in
+json.parse '{"a":[1,2]}' > maybe.value > json.stringifyPretty 2 > write
+```
+
+---
+
 #### `text` — string formatting, parsing, and value rendering
 
 Strings are lists of Unicode code points, so all `list` functions work on them;
@@ -1084,6 +1238,10 @@ The named constants cover the characters that cannot be written literally:
 | Name | Description |
 |------|-------------|
 | `join sep strings` | intercalate `sep` between each string in the list |
+| `lines s` | split on line feeds; a single trailing newline does not add an empty last line, so `lines ""` is `[]` |
+| `unlines ls` | join with line feeds, without a trailing one — `unlines (lines s)` returns `s` when `s` does not end in a newline |
+| `words s` | split on runs of whitespace, discarding the empty pieces around them |
+| `unwords ws` | join with single spaces |
 | `trim s` | remove leading/trailing whitespace |
 | `padLeft n fill s` | left-pad `s` with code point `fill` to minimum width `n` |
 | `padRight n fill s` | right-pad `s` with code point `fill` to minimum width `n` |

@@ -1,0 +1,46 @@
+-- Rosetta Code: JSON
+-- Load a JSON document into a native data structure and serialise it back.
+--
+-- JSON values are tagged 2-tuples (see core/json.þ), so consuming one is a
+-- pattern match on the tag — the `total` function below sums every number
+-- anywhere in a document without knowing its shape.
+
+import core, list, math, text, maybe, json in
+
+let
+	document = flatten [
+		'{"name": "Thunky", "lazy": true, "version": 1.5,';
+		' "modules": ["list", "text", "json"],';
+		' "counts": {"builtins": 24, "modules": 12}}'
+	],
+
+	value = json.parse document > maybe.value,
+
+	-- Recursive descent over an unknown document: add up every number in it.
+	total = { ["number", n] -> n,
+		["array", items] -> items > map total > sum,
+		["object", pairs] -> pairs > map (second *> total) > sum,
+		other -> 0 },
+
+	name = json.path ["name";] value > maybe.andThen json.asString > maybe.default "?",
+	third = json.path ["modules"; 2] value > maybe.andThen json.asString > maybe.default "?",
+
+	-- Building a document and printing it.
+	built = json.jsonObject [
+		["ok", json.jsonTrue];
+		["items", json.jsonArray (rangeIncl 1 3 > map json.jsonNumber)];
+		["note", json.jsonString (flatten ["two"; [lf;]; "lines"])]
+	]
+in
+	[
+		prepend "name:        " name;
+		prepend "3rd module:  " third;
+		flatten ["sum of all numbers: "; string (total value)];
+		"";
+		prepend "compact:  " (json.stringify built);
+		"pretty:";
+		json.stringifyPretty 2 built;
+		"";
+		flatten ["round trip identical: ";
+			string (equal (json.parse (json.stringify value) > maybe.value) value)]
+	] > map write > eval

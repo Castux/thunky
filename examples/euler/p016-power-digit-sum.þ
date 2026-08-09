@@ -1,0 +1,7 @@
+-- Project Euler 16: Power digit sum
+-- The sum of the digits of 2^1000.
+-- Answer: 1366
+
+import core, list, math, big in
+
+	big.intPow 1000 (big.intFromNumber 2) > big.intDigits > sum > show

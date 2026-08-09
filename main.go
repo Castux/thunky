@@ -30,19 +30,39 @@ func LoadProgram(path string) *syntax.Program {
 	return prog
 }
 
-// LexModule tries to load a module by name: first from the working directory
+// moduleDirs are the directories searched for a local module, in order: the
+// directory holding the program being run, then the working directory. A
+// program can therefore be shipped with its helper modules beside it and run by
+// path from anywhere, which is what `thunky some/where/prog.þ` has to do for
+// `import helper` to mean `some/where/helper.th`.
+var moduleDirs []string
+
+// setModuleDirs records where local modules are searched for, given the path of
+// the program being run. The working directory stays in the list, second, so
+// that running from inside a directory keeps working as before.
+func setModuleDirs(programPath string) {
+	dir := filepath.Dir(programPath)
+	moduleDirs = []string{dir}
+	if dir != "." {
+		moduleDirs = append(moduleDirs, ".")
+	}
+}
+
+// LexModule tries to load a module by name: from each of moduleDirs in order
 // (trying .th then .þ), then from the embedded core/ library. Returns nil if
 // not found in any location.
 func LexModule(name string) []syntax.Token {
-	for _, ext := range []string{".th", ".þ"} {
-		path := name + ext
-		text, err := os.ReadFile(path)
-		if err == nil {
-			return syntax.LexContent(path, string(text))
-		}
-		if !errors.Is(err, fs.ErrNotExist) {
-			fmt.Printf("Could not read %s: %v\n", path, err)
-			return nil
+	for _, dir := range moduleDirs {
+		for _, ext := range []string{".th", ".þ"} {
+			path := filepath.Join(dir, name+ext)
+			text, err := os.ReadFile(path)
+			if err == nil {
+				return syntax.LexContent(path, string(text))
+			}
+			if !errors.Is(err, fs.ErrNotExist) {
+				fmt.Printf("Could not read %s: %v\n", path, err)
+				return nil
+			}
 		}
 	}
 
@@ -54,7 +74,8 @@ func LexModule(name string) []syntax.Token {
 		}
 	}
 
-	fmt.Printf("Module not found: %s (looked for %s.th and core/%s.th)\n", name, name, name)
+	fmt.Printf("Module not found: %s (looked for %s.th/%s.þ in %s, and in the embedded library)\n",
+		name, name, name, strings.Join(moduleDirs, ", "))
 	return nil
 }
 
@@ -130,6 +151,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	setModuleDirs(path)
 	program := LoadProgram(path)
 	modules := LoadModules(program.Imports)
 

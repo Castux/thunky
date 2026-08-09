@@ -1,0 +1,36 @@
+-- Project Euler 34: Digit factorials
+-- The sum of every number that equals the sum of the factorials of its digits.
+-- Answer: 40730
+--
+-- Scanning the range is the obvious approach and it does not finish here: the
+-- bound is 7 * 9! = 2540160, and 2.5 million candidates ran past ten minutes.
+--
+-- The search is over the wrong thing. The digit-factorial sum depends only on
+-- *which* digits a number has, not their order, so the candidates are the
+-- multisets of at most seven digits — 11440 of them, not 2.5 million. Each one
+-- is summed and then tested for the fixed point: does the sum's own digit
+-- multiset come back to the one that produced it.
+
+import core, list, math, text in
+
+let
+	digitFactorials = rangeIncl 0 9 > map (n -> if (eq n 0) 1 (factorial n)),
+
+	-- Non-decreasing digit sequences of the given size: a multiset, generated
+	-- once each rather than once per permutation.
+	multisets = size -> lowest -> if (eq size 0)
+		[[];]
+		(rangeIncl lowest 9 > flatMap (d -> multisets (pred size) d > map (prepend [d;]))),
+
+	factorialSum = map (d -> nth d digitFactorials) *> sum,
+
+	-- A multiset qualifies when the sum it produces is itself made of those
+	-- digits. Single-digit sums are excluded by the problem statement.
+	valueOf = ms -> let total = factorialSum ms in
+		if (and (gte 10 total) (equal (sort (digits total)) ms)) total 0
+in
+	rangeIncl 1 7
+	> flatMap (size -> multisets size 0)
+	> map valueOf
+	> sum
+	> show

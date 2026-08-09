@@ -28,6 +28,25 @@ join = separator -> {
 	}
 },
 
+-- lines s: split on line feeds. A single trailing newline does not produce a
+-- final empty line, so `lines` of a file that ends in a newline gives exactly
+-- the lines it contains.
+lines = split [lf;] *> dropTrailingEmpty,
+
+-- dropTrailingEmpty ls: drop one trailing empty element, if there is one.
+dropTrailingEmpty = ls -> if (isEmpty ls) ls (if (isEmpty (last ls)) (init ls) ls),
+
+-- unlines ls: join a list of lines with line feeds, without a trailing one, so
+-- that `unlines (lines s)` returns s for any s not ending in a newline.
+unlines = join [lf;],
+
+-- words s: split on runs of whitespace, discarding the empty pieces that
+-- leading, trailing or repeated whitespace would otherwise leave.
+words = splitWith isSpace *> filter (isEmpty *> not),
+
+-- unwords ws: join a list of words with single spaces.
+unwords = join " ",
+
 -- padLeft n fill s: left-pad string s with code point fill to minimum width n
 padLeft = n -> fill -> s -> let
 	padLen = n > sub (length s) > max 0

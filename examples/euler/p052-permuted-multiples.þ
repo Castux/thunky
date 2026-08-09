@@ -1,0 +1,17 @@
+-- Project Euler 52: Permuted multiples
+-- The smallest x for which x, 2x, 3x, 4x, 5x and 6x share the same digits.
+-- Answer: 142857
+--
+-- "Same digits" is sorted digits compared structurally, which is one `equal`
+-- rather than a counting argument. `find` over an unbounded list stops at the
+-- first hit, so no upper limit has to be invented.
+
+import core, list, math, maybe in
+
+let
+	digitSignature = digits *> sort,
+
+	sharesDigits = x -> rangeIncl 2 6
+		> allMatch (k -> equal (digitSignature x) (digitSignature (mul k x)))
+in
+	upFrom 1 > find sharesDigits > maybe.value > show

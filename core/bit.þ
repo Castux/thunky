@@ -1,0 +1,87 @@
+-- bit.þ: bitwise operations on 32-bit unsigned integers.
+--
+-- There are no bitwise builtins and this module adds none: every operation here
+-- is built from the arithmetic that already exists. A 32-bit value fits exactly
+-- in the float64 a Thunky number is (2^32 < 2^53), and so does the sum of two
+-- of them, so the arithmetic is exact throughout.
+--
+-- The logical operations walk the operands two bits at a time — one `mod 2` per
+-- operand per step — and stop as soon as both are exhausted, so operating on
+-- small numbers costs only as many steps as they have bits. The shifts and
+-- rotates are multiplication and division by powers of two, which is what they
+-- are defined to be.
+--
+-- Every operation takes and returns a value in [0, 2^32). Feeding it anything
+-- else — a negative, a fraction, something over 2^32 — is a programming error;
+-- `wrap` is provided to bring a value into range explicitly.
+--
+-- Names are prefixed with b (bAnd, bOr, bNot) because an unqualified import
+-- lands them in the importer's scope, where `and`, `or` and `not` already mean
+-- core's logical operations on 0 and 1.
+
+import core, math, list in
+
+module
+
+width = 32,                 -- bits per word
+size  = 4294967296,         -- 2^32
+maxValue = 4294967295,      -- 2^32 - 1
+
+-- wrap n: bring any integer into [0, 2^32) by two's-complement wrapping.
+-- `mod` truncates toward zero, so a negative operand needs the extra step.
+wrap = n -> let r = mod size n in if (lt 0 r) (add size r) r,
+
+-- powerOfTwo k: 2^k, for k in [0, 32].
+powerOfTwo = k -> pow k 2,
+
+-- bitAt k n: bit k of n (k = 0 is the least significant), as 0 or 1.
+bitAt = k -> div (powerOfTwo k) *> mod 2,
+
+-- combine f a b: the general shape of a logical operation. It walks both
+-- operands bit by bit, applying f to the two bits, and rebuilds the result as
+-- it goes; it stops when both operands have run out, so the cost is the width
+-- of the larger operand rather than a fixed 32 steps.
+combine = f -> a -> b ->
+	let go = weight -> x -> y -> if (and (eq x 0) (eq y 0))
+		0
+		(add
+			(mul weight (f (mod 2 x) (mod 2 y)))
+			(go (mul 2 weight) (div 2 x) (div 2 y)))
+	in
+		go 1 a b,
+
+-- bAnd a b, bOr a b, bXor a b: the binary logical operations.
+-- bNot n: the one's complement within 32 bits.
+bAnd = combine (x -> y -> mul x y),                    -- 1 only when both are 1
+bOr  = combine (x -> y -> max x y),                    -- 1 when either is 1
+bXor = combine (x -> y -> mod 2 (add x y)),            -- 1 when they differ
+bNot = n -> sub n maxValue,
+
+-- shiftLeft k n, shiftRight k n: shift n by k bits. A left shift drops the bits
+-- carried past bit 31.
+shiftLeft  = k -> mul (powerOfTwo k) *> mod size,
+shiftRight = k -> div (powerOfTwo k),
+
+-- rotateLeft k n, rotateRight k n: rotate n by k bits within its 32.
+rotateLeft  = k -> n -> bOr (shiftLeft k n) (shiftRight (sub k width) n),
+rotateRight = k -> n -> rotateLeft (sub k width) n,
+
+-- Single-bit access, all taking the bit index first and the value second:
+-- testBit k n, setBit k n, clearBit k n, flipBit k n.
+testBit  = bitAt,
+setBit   = k -> n -> bOr n (powerOfTwo k),
+clearBit = k -> n -> bAnd n (bNot (powerOfTwo k)),
+flipBit  = k -> n -> bXor n (powerOfTwo k),
+
+-- popCount n: how many bits are set.
+popCount = n -> if (eq n 0) 0 (add (mod 2 n) (popCount (div 2 n))),
+
+-- toBits n: the bits of n, least significant first, exactly `width` of them.
+-- fromBits bits: the inverse, accepting a list shorter than `width`.
+toBits   = n -> range 0 width > map (k -> bitAt k n),
+fromBits = bits -> bits > mapIndex (k -> b -> mul b (powerOfTwo k)) > sum,
+
+-- toHex n: eight lowercase hex digits, most significant first.
+hexDigits = "0123456789abcdef",
+toHex = n -> range 0 8
+	> map (i -> nth (bAnd 15 (shiftRight (mul 4 (sub i 7)) n)) hexDigits)

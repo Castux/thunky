@@ -1,0 +1,19 @@
+-- Project Euler 13: Large sum
+-- The first ten digits of the sum of one hundred 50-digit numbers.
+-- Answer: 5537376230
+--
+--   thunky examples/euler/p013-large-sum.þ < examples/euler/data/p013-numbers.txt
+--
+-- A 50-digit number does not fit in a float64, so this is `big`: parse each
+-- line as an arbitrary-precision integer, fold with intAdd, print, take ten.
+
+import core, list, math, text, big in
+
+	stdin
+	> split [lf;]
+	> filter (isEmpty *> not)
+	> map big.intFromString
+	> foldl big.intAdd big.intZero
+	> big.intToString
+	> take 10
+	> write

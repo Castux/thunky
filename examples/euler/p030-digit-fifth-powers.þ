@@ -1,0 +1,14 @@
+-- Project Euler 30: Digit fifth powers
+-- The sum of every number that equals the sum of the fifth powers of its digits.
+-- Answer: 443839
+--
+-- The upper bound is the arithmetic, not a guess: six digits of 9 give
+-- 6 * 9^5 = 354294, and a seven-digit number cannot reach its own value, so
+-- nothing above that can qualify.
+
+import core, list, math, euler in
+
+	range 10 354295
+	> filter (n -> eq n (digits n > map (pow 5) > sum))
+	> sum
+	> show

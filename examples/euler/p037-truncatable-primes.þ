@@ -1,0 +1,26 @@
+-- Project Euler 37: Truncatable primes
+-- The sum of the only eleven primes that stay prime when truncated from the
+-- left and from the right.
+-- Answer: 748317
+--
+-- There are exactly eleven, which the problem states, so `take 11` over a lazy
+-- filtered stream stops on its own — no upper bound has to be guessed.
+
+import core, list, math, text, euler in
+
+let
+	-- Truncations from both ends, as numbers.
+	truncations = n -> let ds = digits n in
+		flatten [
+			rangeIncl 1 (pred (length ds)) > map (k -> drop k ds);
+			rangeIncl 1 (pred (length ds)) > map (k -> take k ds)
+		]
+		> map (foldl (acc -> d -> add d (mul 10 acc)) 0),
+
+	isTruncatable = n -> and (euler.isPrime n) (truncations n > allMatch euler.isPrime)
+in
+	upFrom 11
+	> filter isTruncatable
+	> take 11
+	> sum
+	> show

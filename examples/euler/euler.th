@@ -1,0 +1,76 @@
+-- euler.th: the number theory that Project Euler problems keep re-deriving.
+--
+-- Not part of the standard library: this is a local module, found because it
+-- sits beside the programs that import it. It is also a proposal — most of what
+-- is here would serve any number-theoretic program, and `divides`, `primes`,
+-- `isPrime` and `factorise` had been written out by hand in four of these
+-- files before this existed.
+--
+-- Everything is built on one lazy prime stream, defined in terms of itself: a
+-- candidate is prime when no prime already in the list, up to its square root,
+-- divides it. Memoization means the primes below sqrt(n) are always computed by
+-- the time n is tested, and the stream grows only as far as it is used.
+
+import core, list, math in
+
+module
+
+divides = d -> n -> eq 0 (mod d n),
+
+primes = prepend [2;] (upFrom 3 > filter isPrime),
+
+isPrime = n -> if (lte 1 n)
+	0
+	(primes > takeWhile (lte (sqrt n)) > noneMatch (p -> divides p n)),
+
+-- multiplicity p n: how many times p divides n.
+multiplicity = p -> n -> if (divides p n) (succ (multiplicity p (div p n))) 0,
+
+-- withoutFactor p n: n with every factor of p removed.
+withoutFactor = p -> n -> if (divides p n) (withoutFactor p (div p n)) n,
+
+-- factorise n: the prime factorisation as [prime, exponent] pairs, ascending.
+-- Trial division by the prime stream, stopping as soon as the square of the
+-- candidate passes what is left — at which point the remainder is itself prime.
+factorise = n -> if (lte 1 n) [] (factoriseWith n primes),
+
+-- The n <= 1 guard is not redundant: when the last factor is removed exactly,
+-- what remains is 1, and the "square passed the remainder" branch would
+-- otherwise report 1 as a prime factor of itself.
+factoriseWith = n -> ps -> if (lte 1 n) [] (ps > ([p, rest] -> case
+	(gt n (mul p p))  [[n, 1];]
+	(divides p n)     (prepend [[p, multiplicity p n];]
+		(factoriseWith (withoutFactor p n) rest))
+	else              (factoriseWith n rest))),
+
+-- divisorCount n: the number of divisors, from the exponents alone.
+divisorCount = n -> if (lte 1 n) 1 (factorise n > map (second *> succ) > product),
+
+-- divisorSum n: the sum of every divisor, including n itself.
+divisorSum = n -> if (lte 1 n) 1
+	(factorise n > map ([p, e] -> div (pred p) (pred (pow (succ e) p))) > product),
+
+-- properDivisorSum n: the sum of the divisors below n.
+properDivisorSum = n -> sub n (divisorSum n),
+
+-- divisors n: every divisor, ascending. Built from the factorisation rather
+-- than by trial division, so it costs the number of divisors, not n.
+divisors = n -> factorise n
+	> foldl (acc -> [p, e] -> rangeIncl 0 e
+		> flatMap (k -> acc > map (d -> mul d (pow k p)))) [1;]
+	> sort,
+
+-- totient n: how many numbers below n are coprime with it.
+totient = n -> factorise n
+	> foldl (acc -> [p, e] -> mul acc (mul (pred p) (pow (pred e) p))) 1,
+
+-- Figurate numbers and digit helpers.
+-- triangle n: the nth triangle number. isPalindromeNumber n: does n read the
+-- same both ways. digitSum n: the sum of n's decimal digits.
+triangle = n -> div 2 (mul n (succ n)),
+isPalindromeNumber = n -> let s = string n in equal s (reverse s),
+digitSum = digits *> sum,
+
+-- amicable n: the partner of n if the two are amicable, else 0.
+amicable = n -> let partner = properDivisorSum n in
+	if (and (neq partner n) (eq n (properDivisorSum partner))) partner 0

@@ -1,0 +1,67 @@
+-- Rosetta Code: Zebra puzzle
+-- Fifteen constraints over five houses; who drinks water and who owns the zebra.
+-- The answer is the Norwegian and the Japanese.
+--
+-- Each category is a permutation saying which house each attribute occupies, so
+-- "the Englishman lives in the red house" is `eq english red` and needs no
+-- search of its own. The categories nest with `flatMap`, and each level rejects
+-- its impossible permutations before the next is generated — which is why 120^5
+-- (twenty-four billion) never happens: the colours alone drop to 24
+-- arrangements, and the nations to a handful.
+--
+-- `flatMap` over a rejected branch returns [], so a failing guard prunes the
+-- whole subtree with no control flow to say so.
+--
+-- Two notes from writing it. One `guardAll` per level rather than nested `if`s,
+-- because the first version closed sixteen parentheses on one line and got the
+-- count wrong; two openers per level and ten closers at the end is countable.
+-- And the patterns destructure a permutation, which is a five-element *list* —
+-- `[red; green; …]` with semicolons. Written `[red, green, …]` it is a
+-- five-tuple, matches nothing, and fails at run time rather than at compile
+-- time, since the two are the same syntax for different shapes.
+
+import core, list, math, text, comb in
+
+let
+	arrangements = comb.permutations (rangeIncl 1 5),
+
+	rightOf = a -> b -> eq a (succ b),
+	nextTo  = a -> b -> eq 1 (abs (sub a b)),
+
+	guardAll = conditions -> results -> if (andList conditions) results [],
+
+	solutions =
+		arrangements > flatMap ([red; green; ivory; yellow; blue] ->
+		guardAll [rightOf green ivory;] (
+		arrangements > flatMap ([english; spaniard; ukrainian; norwegian; japanese] ->
+		guardAll [eq english red; eq norwegian 1; nextTo norwegian blue] (
+		arrangements > flatMap ([coffee; tea; milk; juice; water] ->
+		guardAll [eq coffee green; eq ukrainian tea; eq milk 3] (
+		arrangements > flatMap ([oldGold; kools; chesterfields; luckyStrike; parliaments] ->
+		guardAll [eq kools yellow; eq luckyStrike juice; eq japanese parliaments] (
+		arrangements > flatMap ([dog; snails; fox; horse; zebra] ->
+		guardAll [eq spaniard dog; eq oldGold snails;
+			nextTo chesterfields fox; nextTo kools horse] (
+			[[water, zebra, norwegian, japanese, english, spaniard, ukrainian];]
+		)))))))))),
+
+	nationAt = position -> [water, zebra, norwegian, japanese, english, spaniard, ukrainian] ->
+		case
+			(eq position norwegian)  "Norwegian"
+			(eq position japanese)   "Japanese"
+			(eq position english)    "Englishman"
+			(eq position spaniard)   "Spaniard"
+			else                     "Ukrainian",
+
+	-- core.first and core.second read 2-tuples only, and this is a 7-tuple, so
+	-- the fields are taken by pattern rather than by accessor.
+	waterHouse = [water, zebra, norwegian, japanese, english, spaniard, ukrainian] -> water,
+	zebraHouse = [water, zebra, norwegian, japanese, english, spaniard, ukrainian] -> zebra,
+
+	answer = head solutions
+in
+	[
+		flatten [string (length solutions); " solution"];
+		prepend "water:  " (nationAt (waterHouse answer) answer);
+		prepend "zebra:  " (nationAt (zebraHouse answer) answer)
+	] > map write > eval

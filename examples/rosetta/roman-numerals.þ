@@ -1,0 +1,38 @@
+-- Rosetta Code: Roman numerals (encode and decode)
+--
+-- Encoding is a greedy walk down a table of value/symbol pairs, including the
+-- subtractive forms; decoding sums each letter, negated when a larger letter
+-- follows it.
+
+import core, list, math, maybe, text in
+
+let
+	table = [
+		[1000, "M"]; [900, "CM"]; [500, "D"]; [400, "CD"];
+		[100, "C"];  [90, "XC"];  [50, "L"];  [40, "XL"];
+		[10, "X"];   [9, "IX"];   [5, "V"];   [4, "IV"]; [1, "I"]
+	],
+
+	encode = n -> if (eq n 0) "" (table
+		> find ([value, symbol] -> lte n value)      -- the largest value <= n
+		> maybe.value
+		> ([value, symbol] -> prepend symbol (encode (sub value n)))),
+
+	letterValue = c -> table
+		> find ([value, symbol] -> and (eq 1 (length symbol)) (eq c (head symbol)))
+		> maybe.mapDefault 0 first,
+
+	-- A letter counts negative when a larger one follows it: IX is -1 + 10.
+	decode = roman -> let values = map letterValue roman in
+		zipWith (current -> next -> if (lt next current) (negate current) current)
+			values (append [0;] (tail values))
+		> sum,
+
+	samples = [1; 4; 9; 14; 40; 90; 400; 1990; 2008; 3999]
+in
+	samples
+	> map (n -> let roman = encode n in
+		flatten [padLeft 4 space (string n); " -> "; padRight 16 space roman;
+			"-> "; string (decode roman)])
+	> map write
+	> eval

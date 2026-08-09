@@ -1,0 +1,521 @@
+-- big.þ: arbitrary-precision integers and floats.
+--
+-- A Thunky number is a float64: exact for integers up to 2^53, and carrying 53
+-- bits of significand. This module lifts both limits.
+--
+-- ## Representation
+--
+-- A **magnitude** is a little-endian list of *limbs*, each in [0, 2^32),
+-- normalised so that the most significant limb is non-zero. The empty list is
+-- zero. Base 2^32 is the largest that keeps a limb, and the sum of two limbs,
+-- exactly representable in a float64.
+--
+-- Multiplication is the one place the base bites: the product of two limbs
+-- reaches 2^64, well past the 2^53 a float64 holds exactly. `mulLimb` therefore
+-- splits each limb into 16-bit halves, whose products are at most 2^32, and
+-- reassembles the 64-bit result as a pair of limbs. Division by a small divisor
+-- has the same problem in reverse — a remainder times the base overflows — so it
+-- too works in 16-bit steps.
+--
+-- An **integer** is `[sign, magnitude]` with sign 1 or -1; zero is `[1, []]`,
+-- and no operation produces a negative zero.
+--
+-- A **float** is `[mantissa, exponent, precision]`, meaning
+-- `mantissa * 2^exponent`, where mantissa is an integer and precision is the
+-- number of significand bits kept: every operation rounds its result back to
+-- that many bits (truncating toward zero). Precision travels with the value,
+-- so a computation inherits it rather than consulting a global setting.
+--
+-- ## Naming
+--
+-- An unqualified import puts every one of these names in the importer's scope,
+-- where `add`, `mul` and `compare` already mean the builtins. So the integer
+-- operations are `intAdd`, `intMul`, … and the float ones `floatAdd`,
+-- `floatMul`, …, and both read well qualified: `big.intAdd`, `big.floatDiv`.
+
+import core, math, list, text, bit in
+
+module
+
+base      = 4294967296,     -- 2^32
+halfBase  = 65536,          -- 2^16
+limbBits  = 32,
+
+-- --- magnitudes -----------------------------------------------------------
+
+-- normalize limbs: drop the most significant zero limbs, so that every
+-- magnitude has one representation and `equal` can be used on whole integers.
+normalize = reverse *> dropWhile (eq 0) *> reverse,
+
+magZero = [],
+
+-- magIsZero mag: is the magnitude zero (that is, empty).
+magIsZero = isEmpty,
+
+-- magFromNumber n: a magnitude from a non-negative integer-valued number.
+-- Exact for n below 2^53, which is where a plain number stops being exact.
+magFromNumber = n -> if (lt 1 n) [] (prepend [mod base n;] (magFromNumber (div base n))),
+
+magCompare = a -> b ->
+	let la = length a, lb = length b in case
+		(neq la lb) (if (lt lb la) (negate 1) 1)
+		else (magCompareSameLength (reverse a) (reverse b)),
+
+-- Both lists most significant first and of equal length.
+magCompareSameLength = xs -> ys -> xs > {
+	[] -> 0,
+	[x, xrest] -> ys > { [y, yrest] -> case
+		(lt y x) (negate 1)
+		(lt x y) 1
+		else     (magCompareSameLength xrest yrest)
+	}
+},
+
+magAdd = a -> b ->
+	let go = carry -> x -> y -> if (and (isEmpty x) (isEmpty y))
+		(if (eq carry 0) [] [carry;])
+		(let
+			hx = if (isEmpty x) 0 (head x),
+			hy = if (isEmpty y) 0 (head y),
+			s  = add carry (add hx hy)
+		in
+			[mod base s, go (div base s) (drop 1 x) (drop 1 y)])
+	in
+		go 0 a b,
+
+-- magSub a b: a - b, requiring a >= b.
+magSub = a -> b ->
+	let go = borrow -> x -> y -> if (isEmpty x)
+		[]
+		(let
+			hx = head x,
+			hy = if (isEmpty y) 0 (head y),
+			d  = sub (add borrow hy) hx        -- hx - (hy + borrow)
+		in
+			if (lt 0 d)
+				[add base d, go 1 (drop 1 x) (drop 1 y)]
+				[d, go 0 (drop 1 x) (drop 1 y)])
+	in
+		normalize (go 0 a b),
+
+-- mulLimb a b: the product of two limbs as [low, high], via 16-bit halves so
+-- that no intermediate exceeds 2^53.
+mulLimb = a -> b ->
+	let
+		al = mod halfBase a, ah = div halfBase a,
+		bl = mod halfBase b, bh = div halfBase b,
+		low0    = mul al bl,                       -- < 2^32
+		middle  = add (mul al bh) (mul ah bl),     -- < 2^33
+		high0   = mul ah bh,                       -- < 2^32
+		low1    = add low0 (mul halfBase (mod halfBase middle)),   -- < 2^33
+		low     = mod base low1,
+		high    = add high0 (add (div halfBase middle) (div base low1))
+	in
+		[low, high],
+
+magMulSmall = k -> mag ->
+	let go = carry -> m -> if (isEmpty m)
+		(if (eq carry 0) [] [carry;])
+		(let
+			product = mulLimb k (head m),
+			low     = add (first product) carry,
+			limb    = mod base low,
+			carry2  = add (second product) (div base low)
+		in
+			[limb, go carry2 (drop 1 m)])
+	in
+		normalize (go 0 mag),
+
+-- Shift by whole limbs: little-endian, so this is prepending zeros.
+magShiftLimbs = n -> mag -> if (magIsZero mag) [] (prepend (replicate n 0) mag),
+
+magMul = a -> b -> b
+	> mapIndex (i -> limb -> magShiftLimbs i (magMulSmall limb a))
+	> foldl magAdd [],
+
+magDouble = magMulSmall 2,
+
+magBitLength = mag -> if (magIsZero mag) 0
+	(let top = last mag in add (mul limbBits (pred (length mag))) (bitLengthOf top)),
+
+bitLengthOf = n -> if (eq n 0) 0 (succ (bitLengthOf (div 2 n))),
+
+magTestBit = i -> mag ->
+	let limbIndex = div limbBits i in
+		if (gte (length mag) limbIndex) 0 (bit.bitAt (mod limbBits i) (nth limbIndex mag)),
+
+-- divTwoByOne high low d: (high * 2^32 + low) / d, for high < d < 2^32, as
+-- [quotient, remainder]. The numerator reaches 2^64, so this cannot be a single
+-- division: it is a four-step long division in base 2^16, where a partial
+-- remainder times 2^16 stays under 2^48 and so stays exact.
+divTwoByOne = high -> low -> d ->
+	let
+		digits = [div halfBase high; mod halfBase high; div halfBase low; mod halfBase low],
+		step = [quotient, remainder] -> digit ->
+			let current = add (mul halfBase remainder) digit in
+				[add (mul halfBase quotient) (div d current), mod d current]
+	in
+		foldl step [0, 0] digits,
+
+-- magDivMod a b: [quotient, remainder], by schoolbook long division in base
+-- 2^32 — Knuth's Algorithm D.
+--
+-- The dividend is consumed one limb at a time, most significant first, into a
+-- running remainder that never exceeds the divisor's length by more than one
+-- limb. Each step needs one quotient limb, which is *estimated* from the top
+-- two limbs of the remainder over the top limb of the divisor and then
+-- corrected downward.
+--
+-- Normalisation is what bounds that correction. Scaling both operands so the
+-- divisor's top limb has its high bit set (which cannot change the quotient)
+-- makes the estimate at most two too large — a theorem, not a heuristic — so
+-- the correction loop runs at most twice regardless of the numbers. The
+-- remainder is scaled back down at the end.
+--
+-- This replaced binary long division, which needed a pass per *bit* of the
+-- dividend rather than per limb: a factor of 32 on the same operands.
+magDivMod = a -> b -> case
+	(magIsZero b)              [[], []]                      -- caller's error; no crash
+	(eq (negate 1) (magCompare a b)) [[], a]                  -- a < b
+	-- magDivModSmall reports its remainder as a plain number, not a magnitude.
+	(eq 1 (length b))          (magDivModSmall (head b) a
+		> ([quotient, remainder] -> [quotient, magFromNumber remainder]))
+	else                       (magDivModLarge a b),
+
+magDivModLarge = a -> b ->
+	let
+		-- Normalise: shift left so the divisor's top limb has its high bit set.
+		shift  = sub (bitLengthOf (last b)) limbBits,
+		scale  = pow shift 2,
+		an     = magMulSmall scale a,
+		bn     = magMulSmall scale b,
+
+		size   = length bn,
+		topB   = last bn,
+
+		-- One limb of the dividend, one limb of the quotient.
+		step = [quotient, remainder] -> limb ->
+			let
+				current  = magAdd (magShiftLimbs 1 remainder) (if (eq limb 0) [] [limb;]),
+				-- The two limbs the estimate is read from: current is at most one
+				-- limb longer than the divisor, so these are its top two aligned
+				-- against the divisor's length, or zero where it is shorter.
+				high     = if (gt size (length current)) (nth size current) 0,
+				low      = if (gte size (length current)) (nth (pred size) current) 0,
+				estimate = if (gte topB high)
+					(sub 1 base)                            -- saturated: clamp to base - 1
+					(first (divTwoByOne high low topB)),
+				corrected = lowerUntilFits estimate current bn
+			in
+				[[corrected, quotient], magSub current (magMulSmall corrected bn)],
+
+		divided = foldl step [[], []] (reverse an)
+	in
+		[
+			-- Each step conses its limb on, and the steps run most significant
+			-- first, so the accumulated list is already least-significant first.
+			normalize (first divided),
+			first (magDivModSmall scale (second divided))    -- undo the normalisation
+		],
+
+-- Knuth's estimate is at most two too large once normalised, so this loop runs
+-- at most twice; it is written as a loop rather than as two tests because the
+-- bound is a property of the normalisation, not of this code.
+lowerUntilFits = estimate -> remainder -> divisor ->
+	if (eq estimate 0)
+		0
+		(if (gte 0 (magCompare remainder (magMulSmall estimate divisor)))
+			estimate
+			(lowerUntilFits (pred estimate) remainder divisor)),
+
+-- magDivModSmall d mag: divide by a number in [1, 2^32). Works in 16-bit halves
+-- because remainder * base would overflow the exact range of a float64.
+magDivModSmall = d -> mag ->
+	let
+		halves = mag > flatMap (limb -> [mod halfBase limb; div halfBase limb]),
+
+		go = remainder -> hs -> hs > {
+			[] -> [[], remainder],
+			[h, rest] -> let
+				current = add (mul halfBase remainder) h,
+				rest2   = go (mod d current) rest
+			in
+				[[div d current, first rest2], second rest2]
+		},
+
+		divided        = go 0 (reverse halves),
+		quotientHalves = reverse (first divided)
+	in
+		[
+			quotientHalves
+				> splitEqual 2
+				> map (pair -> add (head pair)
+					(mul halfBase (if (eq 1 (length pair)) 0 (nth 1 pair))))
+				> normalize,
+			second divided
+		],
+
+-- --- integers -------------------------------------------------------------
+
+intZero = [1, []],
+intOne  = [1, [1;]],
+
+intSign      = [sign, mag] -> if (magIsZero mag) 0 sign,
+intMagnitude = [sign, mag] -> mag,
+intIsZero    = [sign, mag] -> magIsZero mag,
+
+-- intFromNumber n: from an integer-valued number; exact below 2^53.
+intFromNumber = n -> if (lt 0 n)
+	[negate 1, magFromNumber (negate n)]
+	[1, magFromNumber n],
+
+intNegate = [sign, mag] -> if (magIsZero mag) [1, mag] [negate sign, mag],
+intAbs    = [sign, mag] -> [1, mag],
+
+-- intCompare a b: -1, 0 or 1 as a is less than, equal to, or greater than b.
+intCompare = a -> b ->
+	let sa = intSign a, sb = intSign b in case
+		(neq sa sb) (if (lt sb sa) (negate 1) 1)
+		(eq sa 0)   0
+		else        (mul sa (magCompare (intMagnitude a) (intMagnitude b))),
+
+intAdd = a -> b -> a > ([sa, ma] -> b > ([sb, mb] ->
+	if (eq sa sb)
+		[sa, magAdd ma mb]
+		(let c = magCompare ma mb in case
+			(eq c 0)  intZero
+			(eq c 1)  [sa, magSub ma mb]                -- |a| > |b|
+			else      [sb, magSub mb ma]))),
+
+-- intSub k n: n - k. The operand comes first and the value it applies to last,
+-- exactly as the `sub` builtin does, so `n > intSub k` reads as "subtract k"
+-- and the partial application is the useful one. The same holds for intDiv,
+-- intMod, intDivMod, intPow and intPowMod below: a library that ordered these
+-- mathematically would silently compute the reverse when piped into.
+intSub = k -> n -> intAdd n (intNegate k),
+
+intMul = a -> b -> a > ([sa, ma] -> b > ([sb, mb] ->
+	let mag = magMul ma mb in
+		if (magIsZero mag) intZero [mul sa sb, mag])),
+
+-- intDivMod d n: [n / d, n mod d], truncating, the remainder taking the sign
+-- of n — the convention of the div and mod builtins.
+intDivMod = d -> n -> n > ([sa, ma] -> d > ([sb, mb] ->
+	let
+		divided   = magDivMod ma mb,
+		quotient  = first divided,
+		remainder = second divided
+	in
+		[
+			if (magIsZero quotient) intZero [mul sa sb, quotient],
+			if (magIsZero remainder) intZero [sa, remainder]
+		])),
+
+-- intDiv d n, intMod d n: the two halves of intDivMod.
+intDiv = d -> intDivMod d *> first,
+intMod = d -> intDivMod d *> second,
+
+intMulSmall = k -> [sign, mag] -> if (lt 0 k)
+	[negate sign, magMulSmall (negate k) mag]
+	(let m = magMulSmall k mag in if (magIsZero m) intZero [sign, m]),
+
+-- intPow e b: b^e for a non-negative e, by squaring — the argument order of the
+-- `pow` builtin, where `pow 2 x` is x squared.
+intPow = e -> b -> case
+	(eq e 0)  intOne
+	(even e)  (let half = intPow (div 2 e) b in intMul half half)
+	else      (intMul b (intPow (pred e) b)),
+
+-- intPowMod m e b: b^e mod m, for a non-negative exponent. Square-and-multiply
+-- with a reduction at every step, so the operands stay the size of m instead of
+-- growing to the size of b^e. Computing the power first and reducing afterwards
+-- is the same answer and a different order of cost: 1000^1000 has 3001 digits.
+intPowMod = m -> e -> b -> case
+	(eq e 0)  (intMod m intOne)
+	(even e)  (let half = intPowMod m (div 2 e) b in intMod m (intMul half half))
+	else      (intMod m (intMul b (intPowMod m (pred e) b))),
+
+-- intPowModBig m e b: b^e mod m with the exponent itself an arbitrary-precision
+-- integer. `intPowMod` takes a plain number, which caps the exponent at 2^53 —
+-- and that is exactly where the interesting uses start: an RSA private exponent
+-- is the size of the modulus, and passing it as a number makes `pred e` a no-op
+-- and the recursion endless. This walks the exponent's bits instead, most
+-- significant first, squaring at each step and multiplying where the bit is set.
+intPowModBig = m -> e -> b ->
+	let
+		mag = intMagnitude e,
+		go = i -> acc -> if (lt 0 i)
+			acc
+			(let squared = intMod m (intMul acc acc) in
+				go (pred i) (if (eq 1 (magTestBit i mag))
+					(intMod m (intMul squared b))
+					squared))
+	in
+		if (intIsZero e) (intMod m intOne) (go (pred (magBitLength mag)) intOne),
+
+-- Threshold-first predicates, matching the lt/lte/gt/gte builtins: the
+-- reference value comes first and the value under test last, so
+-- `n > intLt limit` reads as "is n less than limit". intCompare is deliberately
+-- *not* of this shape — a three-way result is not a predicate, and it answers
+-- "how does a compare to b" in the usual order.
+intLt  = threshold -> value -> eq (negate 1) (intCompare value threshold),
+intLte = threshold -> value -> neq 1 (intCompare value threshold),
+intGt  = threshold -> value -> eq 1 (intCompare value threshold),
+intGte = threshold -> value -> neq (negate 1) (intCompare value threshold),
+
+-- intToNumber: back to a plain number, losing exactness past 2^53.
+intToNumber = [sign, mag] -> mul sign
+	(mag > foldr (limb -> acc -> add limb (mul base acc)) 0),
+
+chunkDigits = 9,
+chunkBase   = 1000000000,      -- 10^9, the largest power of ten below 2^32
+
+-- intToString: repeated division by 10^9, so nine decimal digits come out per
+-- division rather than one.
+intToString = [sign, mag] -> if (magIsZero mag) "0"
+	(let
+		chunks = magToChunks mag,
+		body = flatten [
+			string (head chunks);
+			tail chunks > map (c -> padLeft chunkDigits (char '0') (string c)) > flatten
+		]
+	in
+		if (lt 0 sign) (prepend "-" body) body),
+
+-- Most significant chunk first.
+magToChunks = mag -> if (magIsZero mag) []
+	(let divided = magDivModSmall chunkBase mag in
+		append [second divided;] (magToChunks (first divided))),
+
+intFromString = s -> s > {
+	[] -> intZero,
+	[c, rest] -> if (eq c (char '-'))
+		(intNegate (intFromDigits rest))
+		(intFromDigits [c, rest])
+},
+
+intFromDigits = digits -> [1, digits
+	> filter isDigit
+	> foldl (acc -> c -> magAdd (magMulSmall 10 acc) (magFromNumber (digitToInt c))) []],
+
+-- intDigits: the decimal digits, most significant first.
+intDigits = n -> intToString n > filter isDigit > map digitToInt,
+
+-- --- floats ---------------------------------------------------------------
+--
+-- [mantissa, exponent, precision] means mantissa * 2^exponent, with the
+-- mantissa held to `precision` significand bits.
+
+floatMantissa  = [m, e, p] -> m,
+floatExponent  = [m, e, p] -> e,
+floatPrecision = [m, e, p] -> p,
+
+-- floatRound: bring a value back to its precision by dropping low bits of the
+-- mantissa and raising the exponent to match. Truncation toward zero.
+floatRound = [m, e, p] ->
+	let excess = sub p (magBitLength (intMagnitude m)) in
+		if (lt 1 excess)
+			[m, e, p]
+			(let shifted = first (intDivMod (intPow excess (intFromNumber 2)) m) in
+				[shifted, add e excess, p]),
+
+floatFromInt = precision -> n -> floatRound [n, 0, precision],
+
+-- floatFromNumber: a plain number keeps its fraction. Doubling is exact in
+-- binary, so scaling up until the value is integral loses nothing, and the
+-- count of doublings is the exponent. A float64 carries at most 52 fractional
+-- bits, so this terminates well before the mantissa could overflow.
+floatFromNumber = precision -> n ->
+	let go = value -> exponent -> if (isInteger value)
+		(floatRound [intFromNumber value, exponent, precision])
+		(go (mul 2 value) (pred exponent))
+	in
+		go n 0,
+
+-- floatWithPrecision: the same value carried at a different precision.
+floatWithPrecision = precision -> [m, e, p] -> floatRound [m, e, precision],
+
+-- Align two floats on the lower exponent, so their mantissas can be combined.
+floatAlign = a -> b ->
+	let
+		ea = floatExponent a, eb = floatExponent b,
+		low = min ea eb,
+		lift = value -> exponent -> intMul (floatMantissa value)
+			(intPow (sub low exponent) (intFromNumber 2))
+	in
+		[lift a ea, lift b eb, low],
+
+floatAdd = a -> b -> floatAlign a b > ([ma, mb, e] ->
+	floatRound [intAdd ma mb, e, max (floatPrecision a) (floatPrecision b)]),
+
+-- floatSub k x: x - k, and floatDiv d x: x / d, ordered like their integer
+-- counterparts and like the builtins.
+floatSub = k -> x -> floatAdd x (floatNegate k),
+
+floatNegate = [m, e, p] -> [intNegate m, e, p],
+
+floatMul = a -> b -> floatRound [
+	intMul (floatMantissa a) (floatMantissa b),
+	add (floatExponent a) (floatExponent b),
+	max (floatPrecision a) (floatPrecision b)
+],
+
+-- floatDiv: shift the numerator up by enough bits that the quotient lands with
+-- the requested precision, then divide the mantissas.
+floatDiv = d -> a ->
+	let
+		b     = d,
+		p     = max (floatPrecision a) (floatPrecision b),
+		shift = add p (add 2 (sub (magBitLength (intMagnitude (floatMantissa a)))
+			(magBitLength (intMagnitude (floatMantissa b))))),
+		lifted = intMul (floatMantissa a) (intPow (max 0 shift) (intFromNumber 2))
+	in
+		floatRound [
+			first (intDivMod (floatMantissa b) lifted),
+			sub (max 0 shift) (sub (floatExponent b) (floatExponent a)),
+			p
+		],
+
+floatCompare = a -> b -> floatAlign a b > ([ma, mb, e] -> intCompare ma mb),
+
+floatIsZero = [m, e, p] -> intIsZero m,
+
+-- The same threshold-first predicates for floats.
+floatLt  = threshold -> value -> eq (negate 1) (floatCompare value threshold),
+floatLte = threshold -> value -> neq 1 (floatCompare value threshold),
+floatGt  = threshold -> value -> eq 1 (floatCompare value threshold),
+floatGte = threshold -> value -> neq (negate 1) (floatCompare value threshold),
+
+-- floatToString digits: a decimal rendering with that many places after the
+-- point, truncated. The value is scaled by 10^digits as an exact integer first,
+-- so the printed digits are the true ones rather than a repeated conversion.
+floatToString = digits -> [m, e, p] ->
+	let
+		scaled  = intMul m (intPow digits (intFromNumber 10)),
+		shifted = if (lt 0 e)
+			(first (intDivMod (intPow (negate e) (intFromNumber 2)) scaled))
+			(intMul scaled (intPow e (intFromNumber 2))),
+		negative = eq (negate 1) (intSign shifted),
+		text     = intToString (intAbs shifted),
+		padded   = padLeft (succ digits) (char '0') text,
+		point    = sub digits (length padded)
+	in
+		flatten [
+			if negative "-" "";
+			take point padded;
+			".";
+			drop point padded
+		],
+
+-- floatSqrt: Newton's method, x' = (x + v/x)/2, run until the step stops
+-- changing the value at the working precision.
+floatSqrt = value ->
+	let
+		p    = floatPrecision value,
+		two  = floatFromNumber p 2,
+		-- floatDiv is divisor-first: `floatDiv x value` is value / x.
+		step = x -> floatDiv two (floatAdd x (floatDiv x value)),
+		go   = x -> let next = step x in
+			if (eq 0 (floatCompare next x)) x (go next)
+	in
+		if (floatIsZero value) value (go (floatWithPrecision p value))

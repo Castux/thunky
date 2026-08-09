@@ -1,0 +1,21 @@
+-- Project Euler 25: 1000-digit Fibonacci number
+-- The index of the first Fibonacci term with 1000 digits.
+-- Answer: 4782
+--
+-- "Has 1000 digits" is tested as ">= 10^999" rather than by rendering the
+-- number: intCompare walks limbs and stops early, while intToString would
+-- convert all 4782 terms to decimal.
+--
+-- The search carries the pair (F(n), F(n+1)) rather than indexing a named
+-- stream, so only two terms are ever live.
+
+import core, list, math, big in
+
+let
+	limit = big.intPow 999 (big.intFromNumber 10),
+
+	search = index -> a -> b -> if (gte 0 (big.intCompare a limit))
+		index
+		(search (succ index) b (big.intAdd a b))
+in
+	search 1 big.intOne big.intOne > show

@@ -1,0 +1,60 @@
+-- Rosetta Code: Sorting algorithms
+-- Quicksort, insertion sort, merge sort and bubble sort, each written the way
+-- the language wants it: as recursion over cons cells rather than as index
+-- arithmetic over an array.
+--
+-- All comparators are threshold-first, like the builtins: `before pivot x` is
+-- "does x belong before pivot".
+
+import core, list, math, text in
+
+let
+	before = lt,                                  -- ascending: x before p when x < p
+
+	quickSort = {
+		[] -> [],
+		[pivot, rest] -> flatten [
+			quickSort (filter (before pivot) rest);
+			[pivot;];
+			quickSort (filter (before pivot *> not) rest)
+		]
+	},
+
+	insert = x -> {
+		[] -> [x;],
+		[h, t] -> if (before h x) [x, [h, t]] [h, insert x t]
+	},
+	insertionSort = foldr insert [],
+
+	merge = {
+		[] -> ys -> ys,
+		[x, xs] -> {
+			[] -> [x, xs],
+			[y, ys] -> if (before y x) [x, merge xs [y, ys]] [y, merge [x, xs] ys]
+		}
+	},
+	mergeSort = l -> if (lte 1 (length l)) l
+		(splitAt (div 2 (length l)) l > ([left, right] -> merge (mergeSort left) (mergeSort right))),
+
+	-- One bubble pass, repeated until a pass changes nothing.
+	bubblePass = {
+		[a, [b, rest]] -> if (before a b)
+			[b, bubblePass [a, rest]]
+			[a, bubblePass [b, rest]],
+		short -> short
+	},
+	bubbleSort = l -> let passed = bubblePass l in
+		if (equal passed l) l (bubbleSort passed),
+
+	sample = [5; 3; 9; 1; 4; 1; 8; 2; 7; 6],
+
+	report = name -> sorted -> flatten [padRight 15 space name; string sorted]
+in
+	[
+		report "input"     sample;
+		report "quick"     (quickSort sample);
+		report "insertion" (insertionSort sample);
+		report "merge"     (mergeSort sample);
+		report "bubble"    (bubbleSort sample);
+		report "list.sort"  (sort sample)
+	] > map write > eval

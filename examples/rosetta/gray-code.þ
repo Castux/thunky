@@ -1,0 +1,34 @@
+-- Rosetta Code: Gray code
+-- Encode and decode the reflected binary code, where consecutive values differ
+-- in exactly one bit.
+--
+-- Encoding is one line: n XOR (n >> 1). Decoding folds the value onto itself at
+-- doubling shifts, which is the standard trick for propagating the parity of
+-- every higher bit downward.
+
+import core, list, math, text, bit in
+
+let
+	encode = n -> bit.bXor n (bit.shiftRight 1 n),
+
+	decode = g -> foldl (acc -> shift -> bit.bXor acc (bit.shiftRight shift acc))
+		g [1; 2; 4; 8; 16],
+
+	binary = width -> n -> bit.toBits n
+		> take width
+		> reverse
+		> map intToDigit,
+
+	row = n -> let g = encode n in flatten [
+		padLeft 3 space (string n); "  ";
+		binary 5 n; "  ->  "; binary 5 g;
+		"  ("; padLeft 3 space (string g); ")  decoded "; string (decode g)
+	],
+
+	roundTrips = rangeIncl 0 1000 > allMatch (n -> eq n (decode (encode n)))
+in
+	flatten [
+		["  n  binary   gray        decoded";];
+		rangeIncl 0 15 > map row;
+		[flatten ["round trip holds for 0..1000: "; string roundTrips];]
+	] > map write > eval

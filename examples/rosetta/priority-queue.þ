@@ -1,0 +1,34 @@
+-- Rosetta Code: Priority queue
+-- Insert tasks with priorities, remove them in priority order.
+--
+-- This is the `heap` module doing its job: a leftist heap with O(log n) insert
+-- and pop. The only thing to get right is the comparator, and the convention is
+-- that `cmp a b = 1` means a reaches the root — so `on gt first` compares the
+-- priorities and lets the *smaller* one win, giving a min-queue.
+
+import core, list, math, text, maybe, heap in
+
+let
+	byPriority = on gt first,
+
+	tasks = [
+		[3, "Clear drains"];
+		[4, "Feed cat"];
+		[5, "Make tea"];
+		[1, "Solve RC tasks"];
+		[2, "Tax return"]
+	],
+
+	queue = heap.fromList byPriority tasks,
+
+	-- Draining the queue is unfold-shaped: pop until empty.
+	drain = h -> if (heap.isEmpty h) [] [heap.top h, drain (heap.pop byPriority h)],
+
+	render = [priority, name] -> flatten [string priority; "  "; name]
+in
+	flatten [
+		["inserted in this order:";];
+		tasks > map (render *> prepend "  ");
+		["";  "removed in priority order:"];
+		drain queue > map (render *> prepend "  ")
+	] > map write > eval

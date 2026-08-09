@@ -20,9 +20,9 @@ in
 
 // The ceiling on a single run. It is a backstop against a runaway program, not
 // a budget: the examples menu ships programs that legitimately run for minutes
-// under wasm (sudoku ~90 s, countdown ~60 s, random-chisquare ~200 s on a 2024
-// laptop, and slower hardware in proportion), and the Stop button is always
-// available, so the limit is set well above the slowest of them.
+// under wasm (sudoku ~90 s, countdown ~60 s, random-chisquare ~200 s measured on
+// an Intel Core i7-6700K, and slower hardware in proportion), and the Stop
+// button is always available, so the limit is set well above the slowest.
 const TIMEOUT_MS = 300000;
 const TIMEOUT_LABEL = TIMEOUT_MS >= 60000
     ? TIMEOUT_MS / 60000 + " min"

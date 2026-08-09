@@ -1,0 +1,25 @@
+-- Project Euler 18: Maximum path sum I  (and 67, unchanged)
+-- The maximum total from top to bottom of the triangle.
+-- Answer: 1074 for problem 18, 7273 for problem 67.
+--
+--   thunky examples/euler/p018-maximum-path-sum.þ < examples/euler/data/p018-triangle.txt
+--   thunky examples/euler/p018-maximum-path-sum.þ < examples/euler/data/p067-triangle.txt
+--
+-- Bottom-up: collapse the last two rows into one by adding each cell to the
+-- better of the two below it, and repeat. That is exactly a `foldr` over the
+-- rows, so the brute force problem 67 says is impossible never arises — the
+-- same program does 100 rows in the same time as 15.
+
+import core, list, math, text in
+
+let
+	rows = stdin
+		> split [lf;]
+		> map (line -> line > split " " > filter (isEmpty *> not) > map stringToInt)
+		> filter (isEmpty *> not),
+
+	collapse = row -> below ->
+		zipWith3 (value -> left -> right -> add value (max left right))
+			row below (tail below)
+in
+	foldr collapse (last rows) (init rows) > head > show

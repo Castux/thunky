@@ -1,0 +1,52 @@
+-- Rosetta Code: Tree traversal
+-- Preorder, inorder, postorder and level order on the standard task tree.
+--
+-- A node is the 3-tuple [value, left, right] and the empty tree is [], so the
+-- three depth-first orders are one two-case lambda each, differing only in
+-- where the value is spliced. Level order is the odd one out: it needs a queue,
+-- and the natural functional queue is a list used front-to-back, with the
+-- children appended as they are met.
+
+import core, list, math, text in
+
+let
+	node = value -> left -> right -> [value, left, right],
+	leaf = value -> node value [] [],
+
+	tree = node 1
+		(node 2 (node 4 (leaf 7) []) (leaf 5))
+		(node 3 (node 6 (leaf 8) (leaf 9)) []),
+
+	preorder = {
+		[] -> [],
+		[value, left, right] -> flatten [[value;]; preorder left; preorder right]
+	},
+
+	inorder = {
+		[] -> [],
+		[value, left, right] -> flatten [inorder left; [value;]; inorder right]
+	},
+
+	postorder = {
+		[] -> [],
+		[value, left, right] -> flatten [postorder left; postorder right; [value;]]
+	},
+
+	-- The queue is the list of subtrees still to visit; each visit appends that
+	-- node's children to the back.
+	levelorder = queue -> queue > {
+		[] -> [],
+		[current, rest] -> current > {
+			[] -> levelorder rest,
+			[value, left, right] -> [value, levelorder (append [left; right] rest)]
+		}
+	},
+
+	report = name -> order -> flatten [padRight 12 space name; order > map string > join " "]
+in
+	[
+		report "preorder"   (preorder tree);
+		report "inorder"    (inorder tree);
+		report "postorder"  (postorder tree);
+		report "level order" (levelorder [tree;])
+	] > map write > eval

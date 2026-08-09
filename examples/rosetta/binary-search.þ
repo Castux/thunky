@@ -1,0 +1,36 @@
+-- Rosetta Code: Binary search
+--
+-- Worth reading as a negative result. Binary search needs O(1) indexing, and
+-- Thunky's only compound type is the tuple, so a "sequence" is a cons list and
+-- `nth` costs O(n). The algorithm below is a faithful binary search and it is
+-- *slower* than a linear scan: O(log n) probes of O(n) each.
+--
+-- A balanced tree gives the real thing — that is what `hashmap` is — but there
+-- is no ordered-container equivalent in the standard library today.
+
+import core, list, math, maybe, text in
+
+let
+	-- Faithful binary search over indices, on a sorted list.
+	search = target -> items ->
+		let
+			probe = low -> high -> if (lt low high) maybe.none
+				(let
+					middle = div 2 (add low high),
+					value  = nth middle items
+				in case
+					(eq value target) (maybe.some middle)
+					(lt target value) (probe (succ middle) high)    -- lt t v: v < t, go right
+					else              (probe low (pred middle)))
+		in
+			probe 0 (pred (length items)),
+
+	sorted = rangeIncl 1 40 > map (mul 3),        -- 3, 6, 9, ... 120
+
+	report = target -> flatten [
+		"search "; padLeft 4 space (string target); " -> ";
+		search target sorted > maybe.mapDefault "not found" (i ->
+			flatten ["index "; string i])
+	]
+in
+	[3; 60; 120; 61] > map report > map write > eval

@@ -1,0 +1,22 @@
+-- Rosetta Code: 100 doors
+-- 100 closed doors; pass i toggles every ith door. Which are open at the end?
+--
+-- Simulated rather than reasoned about: each pass is a fold step over the door
+-- list, so the answer (the perfect squares) is a result rather than an input.
+
+import core, list, math, text in
+
+let
+	doors = replicate 100 0,                    -- 0 closed, 1 open
+
+	togglePass = state -> step ->
+		mapIndex (i -> open -> if (eq 0 (mod step (succ i))) (not open) open) state,
+
+	final = foldl togglePass doors (rangeIncl 1 100),
+
+	openDoors = final
+		> mapIndex (i -> open -> [succ i, open])
+		> filter second
+		> map first
+in
+	flatten ["open doors: "; openDoors > map string > join ", "] > write
