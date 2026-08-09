@@ -1,0 +1,37 @@
+-- Rosetta Code: N-queens problem
+-- 92 solutions for an 8x8 board.
+--
+-- A partial solution is the list of columns chosen so far, most recent first,
+-- so "the queen placed i rows ago" is the ith element and the diagonal test is
+-- a distance comparison against the index. Building every next row with
+-- flatMap makes the search a lazy list of solutions: `head` of it costs one
+-- solution's worth of work, not all 92.
+
+import core, list, math, text in
+
+let
+	size = 8,
+
+	safe = column -> placed -> placed
+		> mapIndex (i -> c -> and
+			(neq c column)
+			(neq (abs (sub c column)) (succ i)))
+		> andList,
+
+	extend = placed -> rangeIncl 1 size
+		> filter (column -> safe column placed)
+		> map (column -> [column, placed]),
+
+	solutions = times size (rows -> flatMap extend rows) [[];],
+
+	render = placed -> reverse placed
+		> map (column -> flatten [
+			replicate (pred column) (char '.');
+			"Q";
+			replicate (sub column size) (char '.')])
+in
+	flatten [
+		[flatten [string (length solutions); " solutions for "; string size;
+			" queens; the first is"];];
+		render (head solutions)
+	] > map write > eval

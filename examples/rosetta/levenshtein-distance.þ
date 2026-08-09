@@ -1,0 +1,38 @@
+-- Rosetta Code: Levenshtein distance
+-- kitten -> sitting is 3.
+--
+-- Worth reading alongside binary-search.þ as the other place where the absence
+-- of arrays shows. The textbook algorithm fills an (n+1)x(m+1) table by index;
+-- with cons lists the table is built one row at a time, each row a fold that
+-- carries the cell to its left. The row is accumulated reversed so that "the
+-- cell to my left" is `head` (O(1)) rather than `last` (O(n)) — written the
+-- obvious way, this is O(n^3).
+
+import core, list, math, text in
+
+let
+	nextRow = target -> above -> ca ->
+		let
+			leading = succ (head above),
+
+			cell = row -> [cb, diagonal, up] ->
+				let substitution = add diagonal (if (eq ca cb) 0 1) in
+					[min (min (succ (head row)) (succ up)) substitution, row]
+		in
+			foldl cell [leading;] (zip3 target above (tail above)) > reverse,
+
+	distance = source -> target ->
+		foldl (nextRow target) (rangeIncl 0 (length target)) source > last,
+
+	pairs = [
+		["kitten", "sitting"];
+		["rosettacode", "raisethysword"];
+		["saturday", "sunday"];
+		["", "abc"]
+	]
+in
+	pairs
+	> map ([a, b] -> flatten [
+		padRight 14 space a; padRight 16 space b; string (distance a b)])
+	> map write
+	> eval

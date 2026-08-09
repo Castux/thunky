@@ -109,7 +109,19 @@ stream that half a dozen later problems will want.
 `divisors`, `divisorSum`, `totient`. This is the highest-leverage *domain*
 addition, as opposed to §3 which is the highest-leverage *general* one.
 
-## 8. No ordered container, and no O(1) indexing
+## 8. Dynamic programming has to be rewritten, not transcribed
+
+`rosetta/levenshtein-distance.þ` fills an (n+1)x(m+1) table, which without
+arrays becomes one row at a time, each row a fold carrying the cell to its left.
+That much is fine — it is arguably clearer than the array version. The trap is
+that the row must be accumulated *reversed*, so that "the cell to my left" is
+`head` and not `last`; written the obvious way the algorithm is O(n^3) rather
+than O(n^2), with nothing to warn you.
+
+Same shape as §3: the language does not resist the wrong version, it just makes
+it slower.
+
+## 9. No ordered container, and no O(1) indexing
 
 `rosetta/binary-search.þ` is written as a negative result. Binary search needs
 random access; the only compound type is the tuple, so a sequence is a cons list
@@ -120,7 +132,7 @@ no ordering — there is no sorted map, no sorted set, no "next key after".
 Not obviously worth fixing in a language of this shape, but worth knowing the
 boundary: algorithms whose cost model assumes arrays do not transfer.
 
-## 9. Smaller gaps noticed in passing
+## 10. Smaller gaps noticed in passing
 
 - `list.windows n` — sliding windows. Problem 8 does `tails > map (take 13) >
   filter (length = 13)`, which is the standard workaround.
@@ -130,7 +142,7 @@ boundary: algorithms whose cost model assumes arrays do not transfer.
   `isInteger` on a float square root, which is exact enough here but is luck,
   not design.
 
-## 10. The performance ceiling
+## 11. The performance ceiling
 
 Native build, 2024 laptop: problem 4 at 9.4 s, problem 7 at 9.7 s, problem 25 at
 14.6 s, problem 67 at 4.8 s, problem 22 at 3.9 s. Everything else in the batch
@@ -156,5 +168,9 @@ million) are not reachable by any formulation these programs could use.
   `rosetta/sorting-algorithms.þ` read like their textbook definitions.
 - **`hashmap` keyed by a tuple.** `[x, y]` as a key made the problem 11 grid
   clean and kept neighbour lookup off the O(n) list path.
+- **`flatMap` as backtracking.** `rosetta/n-queens.þ` builds each next row by
+  flat-mapping the partial solutions, which makes the 92 solutions a lazy list:
+  asking for the first costs one solution's worth of work.
+- **`transpose`.** Matrix multiplication becomes the definition read aloud.
 - **Pipes.** Nearly every solution reads as a single left-to-right sentence,
   which is why the ones that do not (the comparator folds of §3) stand out.
