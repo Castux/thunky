@@ -8,71 +8,66 @@ Ordered by how much it cost, not by how hard it would be to fix.
 
 ---
 
-## 1. No arbitrary-precision integers
+## 1. No arbitrary-precision integers — **addressed, `big`**
 
 Numbers are float64, exact to 2^53. Four problems in the first batch (13, 16,
 20, 25) are *about* numbers larger than that, and they are not exotic — 2^1000,
-100!, a 1000-digit Fibonacci term, a sum of 50-digit numbers.
+100!, a 1000-digit Fibonacci term, a sum of 50-digit numbers. Each of those four
+files carried its own copy of the same fifteen lines of decimal-digit
+arithmetic, because there was nowhere shared to put one (see §4).
 
-Each of those four files therefore carries its own copy of the same fifteen
-lines: a little-endian decimal digit list, `fromInt`, a carry pass, `zipLong`,
-and `bigAdd`. That is the clearest "should be factored out" signal in the whole
-exercise — the same code, written four times, because there is nowhere to put
-it (see §4).
+`core/big.þ` now provides arbitrary-precision integers (little-endian 32-bit
+limbs with a sign) and floats (bigint mantissa, binary exponent, and a precision
+in significand bits that travels with the value). The four problems import it,
+and got faster doing so: base 2^32 instead of base 10 took problem 25 from
+14.6 s to 5.3 s and problem 16 from 0.8 s to 0.15 s.
 
-**Wanted:** a `bignum` module — `fromInt`, `fromString`, `toString`, `add`,
-`sub`, `mul`, `mulSmall`, `compare`, `digits`. Nothing exotic; the digit-list
-representation used in these files is already most of it.
+Still open: `intDivMod` is binary long division, one pass per bit of the
+dividend. That is fine at these sizes and would want a proper base-2^32
+schoolbook division if anything leans on it hard.
 
-## 2. No bitwise operations
+## 2. No bitwise operations — **addressed, `bit`**
 
-Problem 59 is XOR decryption. With no `bxor`, each XOR is eight `div`/`mod`
-extractions, an add per bit, and a weighted sum — about twenty arithmetic
-operations where a machine has one instruction. It works and it is even
-readable, but it puts a whole category of task (hashing, checksums, bit
-twiddling, most binary formats) out of comfortable reach.
+Problem 59 is XOR decryption, and with no `bxor` each XOR was eight `div`/`mod`
+extractions and a weighted sum.
 
-**Wanted:** `band`, `bor`, `bxor`, `bnot`, `shl`, `shr` as builtins, or at
-minimum a `bits` module with `toBits` / `fromBits` so the conversion is written
-once.
+`core/bit.þ` now provides the 32-bit operations, built from the arithmetic that
+already exists rather than from new builtins: a 32-bit value and the sum of two
+of them are exactly representable in a float64, so the results are exact. The
+logical operations walk both operands two bits at a time and stop when both are
+exhausted, so small numbers cost only their own width.
 
-## 3. Comparators are the main source of bugs
+## 3. Comparators: where the bugs were, but working as intended
 
-Every bug written in this batch was a threshold-first inversion, and every one
-was **silent** — a plausible wrong answer, never an error:
+Every bug written in the first batch was a threshold-first inversion, and every
+one was silent — `hailstone.þ` reported the longest Collatz start below 10000 as
+`1`, and `binary-search.þ` found only the exact midpoint.
 
-- `hailstone.þ`: `lt (second best) (second candidate)` reads as "best <
-  candidate" and means the reverse. It reported the longest Collatz start below
-  10000 as `1`.
-- `binary-search.þ`: `lt target value` reads as "target < value" and means
-  "value < target", so both branches went the wrong way and only the exact
-  midpoint was ever found.
-
-The convention itself is fine in a pipe (`x > lt 4`). It misleads in the one
-place it is used most: as a two-argument comparator passed to a fold.
-
-**Wanted:** key-based helpers that remove the comparator from user code
-entirely — `list.maximumBy f`, `list.minimumBy f`, `list.sortOn f`, where `f`
-extracts a comparable key. Both bugs above would have been impossible to write:
-`maximumBy second` and `sortOn first` say what they mean. This is the single
-highest-value addition on this page.
-
-## 4. Modules resolve against the working directory, not the importing file
+Recorded here as a fact about where mistakes land, not as a defect. The
+convention is deliberate, and the explicit form reads unambiguously when it
+matters:
 
 ```
-$ thunky examples/euler/usetiny.þ
-Module not found: tiny (looked for tiny.th and core/tiny.th)
-$ cd examples/euler && thunky usetiny.þ
-42
+if (a > lt b) …          -- "is a less than b", left to right
 ```
 
-A program cannot be shipped with a helper module next to it and run by path.
-This is what forced the bignum duplication in §1: a shared `bignum.th` in
-`examples/euler/` would only work when run from inside that directory, so every
-example that needs it would stop working from the repository root.
+Both bugs above were written in the bare `lt x y` form inside a fold. The
+lesson is to write the pipe form in a comparator, not to change the convention.
 
-**Wanted:** resolve imports relative to the importing file's directory (falling
-back to the working directory and then the embedded library).
+## 4. Modules resolved against the working directory — **fixed**
+
+`thunky examples/euler/prog.þ` could not find `examples/euler/helper.th`,
+because local modules were searched for only in the working directory. That is
+what forced the bignum duplication in §1.
+
+The search order is now: the directory holding the program, then the working
+directory, then the embedded library. `examples/euler/euler.th` — the number
+theory those problems kept re-deriving — exists because of this change.
+
+One consequence worth knowing: a local file shadows a library of the same name,
+and that now includes the program itself. A program stored as `json.þ` shadows
+the `json` library for its own run, which is why `rosetta/json-load-print.þ` is
+not called `json.þ`.
 
 ## 5. Import is all-or-nothing and unqualified
 
@@ -98,16 +93,25 @@ and the ones reading numbers add `> map (line -> line > split " " > filter
 
 **Wanted:** `text.lines`, `text.words`, `text.unlines`, `text.unwords`.
 
-## 7. No prime utilities
+## 7. No prime utilities — **addressed locally, not in the library**
 
-Number theory is most of Project Euler, and every such program re-derives the
-same primitives: `divides`, a prime test, a prime stream, factorisation, divisor
-lists. `p001` and `p003` each define `divides` inline; `p007` defines the prime
-stream that half a dozen later problems will want.
+Number theory is most of Project Euler, and every such program re-derived
+`divides`, a prime test, a prime stream, factorisation and divisor lists.
 
-**Wanted:** a `prime` module — `primes` (lazy stream), `isPrime`, `factorise`,
-`divisors`, `divisorSum`, `totient`. This is the highest-leverage *domain*
-addition, as opposed to §3 which is the highest-leverage *general* one.
+`examples/euler/euler.th` now carries them: `divides`, `primes`, `isPrime`,
+`factorise`, `divisorCount`, `divisorSum`, `divisors`, `totient`, `triangle`,
+`amicable`. Problems 12 and 21 are three lines each on top of it.
+
+It is deliberately *not* in `core/`: it is domain code for one puzzle set, and
+belongs next to the programs that use it. Whether a general `prime` module
+belongs in the standard library is a separate question — the factorisation and
+divisor functions here would be most of it.
+
+Writing it turned up a bug worth recording, because the language gave no help:
+`factorise` emitted a phantom factor `[1, 1]` when the last prime divided out
+exactly, since the "square passed the remainder, so it is prime" branch fired on
+the leftover 1. It silently doubled every divisor count, and surfaced as a
+division by zero three functions away.
 
 ## 8. Dynamic programming has to be rewritten, not transcribed
 
@@ -136,6 +140,8 @@ boundary: algorithms whose cost model assumes arrays do not transfer.
 
 - `list.windows n` — sliding windows. Problem 8 does `tails > map (take 13) >
   filter (length = 13)`, which is the standard workaround.
+- JSON is now covered by `core/json.þ`, which was written as part of this
+  exercise; see the reference for the tagged-value representation.
 - `splitEqual` is what every other library calls `chunksOf`.
 - No rounding-to-places or number formatting: `huffman.þ` hand-rolls `round2`.
 - No `math.isSquare` / integer square root; problem 42 gets there through

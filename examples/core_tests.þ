@@ -1,4 +1,4 @@
-import core, math, list, comb, text, heap, maybe, table, hashmap, bit, big in
+import core, math, list, comb, text, heap, maybe, table, hashmap, bit, big, json in
 
 let
 	assert = name -> expr -> expected ->
@@ -444,5 +444,31 @@ runTests [
 	assert "big.floatMul" (big.floatToString 5 (big.floatMul (big.floatFromNumber 100 1.5) (big.floatFromNumber 100 4)))
 		"6.00000";
 	assert "big.floatSqrt" (big.floatToString 20 (big.floatSqrt (big.floatFromNumber 200 2)))
-		"1.41421356237309504880"
+		"1.41421356237309504880";
+
+	-- json.þ
+	assert "json.parse-number" (json.parse "42" > maybe.value > json.asNumber) [42];
+	assert "json.parse-negative" (json.parse "-1.5" > maybe.value > json.asNumber) [0 > sub 1.5];
+	assert "json.parse-exponent" (json.parse "1.2e3" > maybe.value > json.asNumber) [1200];
+	assert "json.parse-string" (json.parse '"hi"' > maybe.value > json.asString) ["hi"];
+	assert "json.parse-true" (json.parse "true" > maybe.value > json.asBool) [1];
+	assert "json.parse-null" (json.parse "null" > maybe.value > json.isNull) 1;
+	assert "json.parse-array" (json.parse "[1,2,3]" > maybe.value > json.stringify) "[1,2,3]";
+	assert "json.parse-empty-array" (json.parse "[]" > maybe.value > json.stringify) "[]";
+	assert "json.parse-object" (json.parse '{"a":1,"b":[2,3]}' > maybe.value > json.stringify) '{"a":1,"b":[2,3]}';
+	assert "json.parse-whitespace" (json.parse ' { "a" : 1 } ' > maybe.value > json.stringify) '{"a":1}';
+	assert "json.parse-escape" (json.parse '"q\"b"' > maybe.value > json.asString > maybe.value)
+		(flatten ["q"; [dquote;]; "b"]);
+	assert "json.parse-unicode" (json.parse '"A"' > maybe.value > json.asString) ["A"];
+	assert "json.parse-invalid" (json.parse "{oops}") [];
+	assert "json.parse-trailing" (json.parse "1 2") [];
+	assert "json.get" (json.parse '{"a":7}' > maybe.value > json.get "a" > maybe.andThen json.asNumber) [7];
+	assert "json.get-missing" (json.parse '{"a":7}' > maybe.value > json.get "z") [];
+	assert "json.at" (json.parse "[4,5,6]" > maybe.value > json.at 2 > maybe.andThen json.asNumber) [6];
+	assert "json.path" (json.parse '{"a":{"b":[9,8]}}' > maybe.value
+		> json.path ["a"; "b"; 1] > maybe.andThen json.asNumber) [8];
+	assert "json.roundtrip" (let d = json.parse '{"a":[1,{"b":null}],"c":"x"}' > maybe.value in
+		equal (json.parse (json.stringify d) > maybe.value) d) 1;
+	assert "json.stringify-escape" (json.stringify (json.jsonString (flatten ["a"; [lf;]; "b"])))
+		(flatten [[dquote;]; "a"; [backslash;]; "n"; "b"; [dquote;]])
 ]

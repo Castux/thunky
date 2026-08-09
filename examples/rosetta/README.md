@@ -24,5 +24,6 @@ thunky examples/rosetta/fizzbuzz.þ
 | Levenshtein distance | `levenshtein-distance.þ` | DP without arrays: the table is built a row at a time |
 | N-queens | `n-queens.þ` | backtracking as `flatMap`; 92 solutions, produced lazily |
 | Matrix multiplication | `matrix-multiplication.þ` | `transpose` turns the definition into the implementation |
+| JSON | `json-load-print.þ` | the `json` library: parse, walk by path, build, print pretty |
 
 See `../TASKS-FINDINGS.md` for what these revealed about the standard library.

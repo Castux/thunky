@@ -24,8 +24,12 @@ is lazy throughout.
   via the `show`, `write`, and `peek` builtins.
 - **Four operators** — `>` (pipe), `<` (reverse-pipe), `*>` and `<*` (forward
   and backward composition) — cover the common function-chaining idioms.
-- **Standard library in Thunky** — `list`, `math`, `text`, `comb`, `heap`,
-  and `core` are written in the language itself and embedded in the binary.
+- **Standard library in Thunky** — `core`, `list`, `math`, `text`, `maybe`,
+  `comb`, `heap`, `table`, `hashmap`, `bit`, `big` and `json` are written in the
+  language itself and embedded in the binary. `bit` and `big` are worth a look
+  as a demonstration: 32-bit bitwise operations and arbitrary-precision
+  arithmetic, both built from the ordinary float64 arithmetic with no builtins
+  added for them.
 
 For the full language reference see [docs/LANGUAGE.md](docs/LANGUAGE.md).
 
@@ -35,9 +39,11 @@ For the full language reference see [docs/LANGUAGE.md](docs/LANGUAGE.md).
 thunky <path>
 ```
 
-Runs the program at `<path>` on the G-machine. Modules are searched first in the
-current directory (`./name.th` (or `./name.þ`)), then in the embedded standard library. Errors are
-reported with source locations; runtime errors include a reduction trace.
+Runs the program at `<path>` on the G-machine. Modules are searched for first
+beside the program, then in the current directory (`name.th` or `name.þ`), then
+in the embedded standard library — so a program can be shipped with its helper
+modules and run by path from anywhere. Errors are reported with source
+locations; runtime errors include a reduction trace.
 
 To inspect the compiler's intermediate forms instead of running the program, pass
 one or more dump flags:
