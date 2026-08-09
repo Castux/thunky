@@ -38,7 +38,7 @@ let
 	width      = 40,          -- cells; each is drawn two columns wide
 	height     = 24,
 	frames     = 300,
-	frameDelay = 30000,       -- ~20 ms on a 2024 laptop, on top of ~60 ms of work
+	frameDelay = 30000,       -- ~20 ms on an i7-6700K, on top of ~60 ms of work
 	density    = 32,          -- percentage of cells alive in the initial soup
 	seed       = "thunky",
 
