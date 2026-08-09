@@ -18,7 +18,8 @@ The files in `data/` are the official ones, downloaded from projecteuler.net —
 the ones given inline in a problem statement were extracted from that
 problem's page and checked for shape (1000 digits, 20×20, 100×50, 15 rows).
 
-Timings are from a 2024 laptop, native build.
+Timings are from the native build on an Intel Core i7-6700K (4 GHz, 4 cores)
+with 16 GB of RAM.
 
 | # | File | Input | Answer | Time |
 |---|------|-------|--------|------|

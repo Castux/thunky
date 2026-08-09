@@ -150,7 +150,8 @@ boundary: algorithms whose cost model assumes arrays do not transfer.
 
 ## 11. The performance ceiling
 
-Native build, 2024 laptop: problem 4 at 9.4 s, problem 7 at 9.7 s, problem 25 at
+Native build on an Intel Core i7-6700K (4 GHz, 4 cores), 16 GB RAM: problem 4
+at 9.4 s, problem 7 at 9.7 s, problem 25 at
 14.6 s, problem 67 at 4.8 s, problem 22 at 3.9 s. Everything else in the batch
 is under a second.
 
