@@ -1,0 +1,42 @@
+-- Project Euler 13: Large sum
+-- The first ten digits of the sum of one hundred 50-digit numbers.
+-- Answer: 5537376230
+--
+--   thunky examples/euler/p013-large-sum.þ < examples/euler/data/p013-numbers.txt
+--
+-- Numbers are float64, exact only to 2^53, so a 50-digit value cannot be held
+-- as one. The standard library has no arbitrary-precision type, so this file
+-- carries its own: a natural is a little-endian list of decimal digits, and
+-- addition is digit-wise `zipLong` followed by a carry pass.
+
+import core, list, math, text in
+
+let
+	fromInt = n -> if (lt 10 n) [n;] (prepend [mod 10 n;] (fromInt (div 10 n))),
+
+	-- Propagate carries along a list whose "digits" may exceed 9.
+	carry = c -> {
+		[] -> if (eq c 0) [] (fromInt c),
+		[d, rest] -> let s = add d c in [mod 10 s, carry (div 10 s) rest]
+	},
+
+	-- Digit-wise sum, keeping the longer tail.
+	zipLong = {
+		[] -> b -> b,
+		[x, xs] -> {
+			[] -> [x, xs],
+			[y, ys] -> [add x y, zipLong xs ys]
+		}
+	},
+
+	bigAdd  = a -> b -> carry 0 (zipLong a b),
+	bigFromDigits = digits -> reverse (map digitToInt digits),
+
+	numbers = stdin
+		> split [lf;]
+		> filter (isEmpty *> not)
+		> map bigFromDigits,
+
+	total = foldl bigAdd [0;] numbers
+in
+	total > reverse > take 10 > map intToDigit > write

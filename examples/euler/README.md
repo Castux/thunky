@@ -1,33 +1,53 @@
 # Project Euler in Thunky
 
 One file per problem, each stating the problem, the answer, and whatever the
-solution had to work around. Run one with:
+solution had to work around.
 
 ```sh
 thunky examples/euler/p001-multiples.þ
 ```
 
+Problems whose input is a data file read it from **standard input**, since that
+is the only input Thunky has:
+
+```sh
+thunky examples/euler/p011-grid-product.þ < examples/euler/data/p011-grid.txt
+```
+
+The files in `data/` are the official ones, downloaded from projecteuler.net —
+the ones given inline in a problem statement were extracted from that
+problem's page and checked for shape (1000 digits, 20×20, 100×50, 15 rows).
+
 Timings are from a 2024 laptop, native build.
 
-| # | File | Answer | Time |
-|---|------|--------|------|
-| 1 | `p001-multiples.þ` | 233168 | 0.3 s |
-| 2 | `p002-even-fibonacci.þ` | 4613732 | 0.1 s |
-| 3 | `p003-largest-prime-factor.þ` | 6857 | 0.1 s |
-| 4 | `p004-palindrome-product.þ` | 906609 | 9.4 s |
-| 5 | `p005-smallest-multiple.þ` | 232792560 | 0.1 s |
-| 6 | `p006-sum-square-difference.þ` | 25164150 | 0.1 s |
-| 7 | `p007-nth-prime.þ` | 104743 | 9.7 s |
-| 9 | `p009-pythagorean-triplet.þ` | 31875000 | 1.4 s |
+| # | File | Input | Answer | Time |
+|---|------|-------|--------|------|
+| 1 | `p001-multiples.þ` | | 233168 | 0.3 s |
+| 2 | `p002-even-fibonacci.þ` | | 4613732 | 0.1 s |
+| 3 | `p003-largest-prime-factor.þ` | | 6857 | 0.1 s |
+| 4 | `p004-palindrome-product.þ` | | 906609 | 9.4 s |
+| 5 | `p005-smallest-multiple.þ` | | 232792560 | 0.1 s |
+| 6 | `p006-sum-square-difference.þ` | | 25164150 | 0.1 s |
+| 7 | `p007-nth-prime.þ` | | 104743 | 9.7 s |
+| 8 | `p008-largest-product.þ` | `data/p008-number.txt` | 23514624000 | 0.4 s |
+| 9 | `p009-pythagorean-triplet.þ` | | 31875000 | 1.4 s |
+| 11 | `p011-grid-product.þ` | `data/p011-grid.txt` | 70600674 | 0.5 s |
+| 13 | `p013-large-sum.þ` | `data/p013-numbers.txt` | 5537376230 | 0.7 s |
+| 16 | `p016-power-digit-sum.þ` | | 1366 | 0.8 s |
+| 18 | `p018-maximum-path-sum.þ` | `data/p018-triangle.txt` | 1074 | 0.1 s |
+| 20 | `p020-factorial-digit-sum.þ` | | 648 | 0.1 s |
+| 22 | `p022-names-scores.þ` | `data/p022-names.txt` | 871198282 | 3.9 s |
+| 25 | `p025-thousand-digit-fibonacci.þ` | | 4782 | 14.6 s |
+| 42 | `p042-coded-triangle-words.þ` | `data/p042-words.txt` | 162 | 0.6 s |
+| 59 | `p059-xor-decryption.þ` | `data/p059-cipher.txt` | 129448 | 5.6 s |
+| 67 | `p018-maximum-path-sum.þ` | `data/p067-triangle.txt` | 7273 | 4.8 s |
 
-## Problems not attempted, and why
+Problem 67 is problem 18 with a bigger triangle and no change to the program:
+the bottom-up `foldr` never sees the combinatorial explosion the problem warns
+about.
 
-**Problems whose input is a data file** (8, 11, 13, 18, 22, 42, 59, 67, …).
-Thunky reads standard input and nothing else, so the data would have to be
-pasted into the source. That is possible, but the data has to be *correct* —
-reproducing a 1000-digit constant or a 100-row grid from memory is not
-verifiable, and a single wrong digit yields a confidently wrong answer. These
-need the real files, fed on stdin or embedded from a download.
+Problems 13, 16, 20 and 25 each carry their own copy of a decimal-digit
+bignum, because there is no such type in the library and nowhere shared to put
+one — see `../TASKS-FINDINGS.md` §1 and §4.
 
-See `../TASKS-FINDINGS.md` for what these programs revealed about the language
-and its standard library.
+See `../TASKS-FINDINGS.md` for the full list of what these exposed.

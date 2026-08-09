@@ -1,0 +1,48 @@
+-- Project Euler 59: XOR decryption
+-- The cipher is XORed with a repeating three-lowercase-letter key; find it and
+-- sum the plaintext bytes. Answer: 129448
+--
+--   thunky examples/euler/p059-xor-decryption.þ < examples/euler/data/p059-cipher.txt
+--
+-- There are no bitwise builtins, so XOR is built from arithmetic: extract each
+-- of the eight bits with div/mod by a power of two, add them mod 2, and weigh
+-- them back. That is ~8 arithmetic operations per byte-pair where a machine
+-- instruction would do.
+--
+-- Trying all 26^3 keys would be 17576 full decryptions. Instead each key
+-- position is solved on its own: the three columns are independent, and the
+-- right letter is the one that turns the most of its column into spaces.
+
+import core, list, math, text in
+
+let
+	codes = stdin
+		> split ","
+		> map (filter (isDigit))
+		> filter (isEmpty *> not)
+		> map stringToInt,
+
+	bitAt = k -> n -> mod 2 (div (pow k 2) n),
+
+	xor = a -> b -> rangeIncl 0 7
+		> map (k -> mul (pow k 2) (mod 2 (add (bitAt k a) (bitAt k b))))
+		> sum,
+
+	column = position -> filterIndex (i -> c -> eq position (mod 3 i)) codes,
+
+	-- The letter that produces the most spaces in this column.
+	bestLetter = position -> rangeIncl (char 'a') (char 'z')
+		> map (letter -> [letter, column position > count (c -> eq space (xor c letter))])
+		> foldl (best -> candidate ->
+			if (gt (second best) (second candidate)) candidate best) [0, negate 1]
+		> first,
+
+	key = [0; 1; 2] > map bestLetter,
+
+	plain = codes > mapIndex (i -> c -> xor c (nth (mod 3 i) key))
+in
+	[
+		flatten ["key: "; key];
+		flatten ["text: "; take 60 plain; "..."];
+		flatten ["sum: "; string (sum plain)]
+	] > map write > eval

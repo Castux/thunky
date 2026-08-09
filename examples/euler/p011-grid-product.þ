@@ -1,0 +1,37 @@
+-- Project Euler 11: Largest product in a grid
+-- The greatest product of four adjacent numbers in the 20x20 grid, in any
+-- direction. Answer: 70600674
+--
+--   thunky examples/euler/p011-grid-product.þ < examples/euler/data/p011-grid.txt
+--
+-- The grid goes into a hashmap keyed by [x, y] so a neighbour lookup is
+-- O(log n) instead of O(n) down a cons list, and `getOr 0` handles the edges:
+-- a run that leaves the grid multiplies by zero and loses.
+
+import core, list, math, text, hashmap in
+
+let
+	rows = stdin
+		> split [lf;]
+		> map (line -> line > split " " > filter (isEmpty *> not) > map stringToInt)
+		> filter (isEmpty *> not),
+
+	size  = length rows,
+	cells = rows
+		> mapIndex (y -> row -> mapIndex (x -> value -> [[x, y], value]) row)
+		> flatten
+		> hashmap.fromList,
+
+	at = x -> y -> hashmap.getOr 0 [x, y] cells,
+
+	directions = [[1, 0]; [0, 1]; [1, 1]; [1, negate 1]],
+
+	runProduct = x -> y -> [dx, dy] -> rangeIncl 0 3
+		> map (k -> at (add x (mul k dx)) (add y (mul k dy)))
+		> product
+in
+	range 0 size
+	> flatMap (y -> range 0 size
+		> flatMap (x -> directions > map (runProduct x y)))
+	> maximum
+	> show

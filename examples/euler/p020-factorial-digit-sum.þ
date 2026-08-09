@@ -1,0 +1,20 @@
+-- Project Euler 20: Factorial digit sum
+-- The sum of the digits of 100!.
+-- Answer: 648
+
+import core, list, math in
+
+let
+	fromInt = n -> if (lt 10 n) [n;] (prepend [mod 10 n;] (fromInt (div 10 n))),
+
+	carry = c -> {
+		[] -> if (eq c 0) [] (fromInt c),
+		[d, rest] -> let s = add d c in [mod 10 s, carry (div 10 s) rest]
+	},
+
+	multiplySmall = k -> digits -> carry 0 (map (mul k) digits)
+in
+	rangeIncl 2 100
+	> foldl (product -> k -> multiplySmall k product) [1;]
+	> sum
+	> show

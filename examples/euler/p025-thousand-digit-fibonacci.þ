@@ -1,0 +1,34 @@
+-- Project Euler 25: 1000-digit Fibonacci number
+-- The index of the first Fibonacci term with 1000 digits.
+-- Answer: 4782
+--
+-- Written as a recursion carrying the pair (F(n), F(n+1)) rather than as
+-- `findIndex` over `iterate`, on purpose: naming the stream would keep every
+-- one of the 4782 terms — each a list of up to 1000 digits — alive to the end.
+-- Unnamed and consumed as it goes, the search holds two numbers at a time.
+
+import core, list, math in
+
+let
+	fromInt = n -> if (lt 10 n) [n;] (prepend [mod 10 n;] (fromInt (div 10 n))),
+
+	carry = c -> {
+		[] -> if (eq c 0) [] (fromInt c),
+		[d, rest] -> let s = add d c in [mod 10 s, carry (div 10 s) rest]
+	},
+
+	zipLong = {
+		[] -> b -> b,
+		[x, xs] -> {
+			[] -> [x, xs],
+			[y, ys] -> [add x y, zipLong xs ys]
+		}
+	},
+
+	bigAdd = a -> b -> carry 0 (zipLong a b),
+
+	search = index -> a -> b -> if (gte 1000 (length a))
+		index
+		(search (succ index) b (bigAdd a b))
+in
+	search 1 [1;] [1;] > show

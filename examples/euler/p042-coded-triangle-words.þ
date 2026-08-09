@@ -1,0 +1,22 @@
+-- Project Euler 42: Coded triangle numbers
+-- How many words have an alphabetical value that is a triangle number.
+-- Answer: 162
+--
+--   thunky examples/euler/p042-coded-triangle-words.þ < examples/euler/data/p042-words.txt
+--
+-- n is triangular when 8n+1 is a perfect square, so the test is one inversion
+-- of the quadratic rather than a search.
+
+import core, list, math, text in
+
+let
+	words = stdin
+		> split ","
+		> map (filter (c -> neq c dquote))
+		> filter (isEmpty *> not),
+
+	alphabeticalValue = word -> word > map (c -> succ (sub (char 'A') c)) > sum,
+
+	isTriangle = n -> isInteger (fdiv 2 (sub 1 (sqrt (succ (mul 8 n)))))
+in
+	words > count (alphabeticalValue *> isTriangle) > show
