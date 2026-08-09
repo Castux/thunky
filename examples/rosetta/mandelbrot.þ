@@ -1,0 +1,38 @@
+-- Rosetta Code: Mandelbrot set
+-- ASCII rendering of the set: for each point c, iterate z = z^2 + c and shade
+-- by how long it takes to escape.
+--
+-- Complex arithmetic is two numbers carried side by side, which is all the
+-- language needs for it. Escape is tested against |z|^2 > 4 rather than |z| > 2
+-- so that no square root is taken per iteration.
+
+import core, list, math, text in
+
+let
+	width = 78, height = 30, maxIterations = 60,
+
+	left = negate 2.2, right = 0.8, top = 1.2, bottom = negate 1.2,
+
+	-- Iterations before escape, or maxIterations if it never does.
+	escapeTime = cx -> cy ->
+		let go = n -> zx -> zy -> case
+			(gte maxIterations n)                n     -- n >= maxIterations
+			(gt 4 (add (mul zx zx) (mul zy zy))) n     -- |z|^2 > 4
+			else (go (succ n)
+				(add cx (sub (mul zy zy) (mul zx zx)))
+				(add cy (mul 2 (mul zx zy))))
+		in
+			go 0 0 0,
+
+	shades = " .:-=+*#%@",
+
+	shadeFor = n -> if (gte maxIterations n)
+		(char "@")
+		(nth (mod (pred (length shades)) (div 6 n)) shades),
+
+	scale = lo -> hi -> steps -> i -> add lo (mul (fdiv (pred steps) (sub lo hi)) i),
+
+	row = j -> let cy = scale top bottom height j in
+		range 0 width > map (i -> shadeFor (escapeTime (scale left right width i) cy))
+in
+	range 0 height > map row > map write > eval

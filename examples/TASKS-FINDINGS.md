@@ -219,7 +219,32 @@ that spans both kinds of number: every plain-number parameter is a range limit
 that the type system cannot state and the caller cannot see, and the failure
 lands far from the cause.
 
-## 14. Nothing says what a long program is doing
+## 14. The `,` / `;` distinction fails at run time, in pattern position
+
+Known and documented, but worth recording what it actually costs. Writing
+`rosetta/zebra-puzzle.þ` cost three debugging cycles to two instances of it:
+
+- `flatMap ([red, green, ivory, yellow, blue] -> …)` over `comb.permutations`.
+  A permutation of five things is a five-element *list*; that pattern is a
+  five-*tuple*. It matches nothing, so the failure is `no pattern matched value
+  [1; 2; 3; 4; 5]` at run time, pointing at the lambda rather than at the
+  mistake.
+- `guardAll [rightOf green ivory]` — a one-element tuple where a one-element
+  list was meant, written one line below a comment warning about exactly this.
+  It failed inside `foldr` in the standard library, three frames from the
+  typo.
+
+Both are the same root cause: the two shapes share a syntax, differing only in
+a separator, and nothing checks the intent before the value is used. The
+error message names the value's shape but nothing can name the *expected* one,
+because a pattern that matches nothing is not itself illegal.
+
+An accessor note in the same file: `core.first` and `core.second` read 2-tuples
+only, and there is no generic tuple indexing, so a 7-tuple has to be
+destructured by pattern. Reasonable, and worth knowing before reaching for
+`first` on something wider.
+
+## 15. Nothing says what a long program is doing
 
 Problem 14 runs for four minutes. Nothing in the language reports progress: no
 clock, no counter, no logging that is not also a value. What works is `seq` on a
@@ -235,7 +260,7 @@ something forces it — writing it as an unused `let` binding does nothing at al
 `peek` is the nearest thing to a debugger here, and it prints a value rather
 than a message about one.
 
-## 15. The performance ceiling
+## 16. The performance ceiling
 
 Native build on an Intel Core i7-6700K (4 GHz, 4 cores), 16 GB RAM. The slowest
 so far: problem 14 at 4 min 15 s, problem 29 at 44 s, problem 36 at 16 s,
@@ -276,6 +301,12 @@ primes below two million).
   strings and the other by numbers, in the same program.
 - **The `bit` library survived CRC-32.** Four published checksums, all exact —
   a real-world check on arithmetic-built bitwise operations, not a self-test.
+- **Self-reference instead of mutation.** `euler/p031-coin-sums.þ` is the
+  textbook coin-counting table, whose defining move is that the row being
+  written is also being read: `ways[i] += ways[i - coin]`. Here the row is
+  simply defined in terms of itself, and laziness resolves the elements in the
+  order the imperative loop would have. The construct that usually forces
+  mutation is the one the language is best at.
 - **`flatMap` as backtracking.** `rosetta/n-queens.þ` builds each next row by
   flat-mapping the partial solutions, which makes the 92 solutions a lazy list:
   asking for the first costs one solution's worth of work.

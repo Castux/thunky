@@ -33,5 +33,9 @@ thunky examples/rosetta/fizzbuzz.þ
 | Y combinator | `y-combinator.þ` | works verbatim: no types to reject `x x`, and lazy enough not to diverge |
 | Word wrap | `word-wrap.þ` | `text.words`, so the input's own breaks do not survive |
 | RSA code | `rsa-code.þ` | `big.intPowModBig`: a private exponent is far past 2^53 |
+| Tree traversal | `binary-tree-traversal.þ` | three depth-first orders as one lambda each; level order needs a queue |
+| Priority queue | `priority-queue.þ` | the `heap` module; the comparator is the only thing to get right |
+| Mandelbrot set | `mandelbrot.þ` | floats, and complex numbers as two numbers side by side |
+| Zebra puzzle | `zebra-puzzle.þ` | constraint search: `flatMap` prunes, so 120^5 never happens |
 
 See `../TASKS-FINDINGS.md` for what these revealed about the standard library.

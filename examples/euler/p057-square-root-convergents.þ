@@ -1,0 +1,22 @@
+-- Project Euler 57: Square root convergents
+-- In the first thousand expansions of the continued fraction for sqrt 2, how
+-- many have a numerator with more digits than the denominator.
+-- Answer: 153
+--
+-- Each expansion follows from the last: n/d becomes (n + 2d)/(n + d). By the
+-- thousandth the numerator has over 400 digits, so the pair is kept as `big`
+-- integers and the comparison is on their decimal lengths.
+
+import core, list, math, big in
+
+let
+	nextConvergent = [n, d] -> [big.intAdd n (big.intMulSmall 2 d), big.intAdd n d],
+
+	digitCount = big.intToString *> length,
+
+	moreDigitsOnTop = [n, d] -> gt (digitCount d) (digitCount n)
+in
+	iterate nextConvergent [big.intFromNumber 3, big.intFromNumber 2]
+	> take 1000
+	> count moreDigitsOnTop
+	> show

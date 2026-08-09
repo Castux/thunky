@@ -47,19 +47,31 @@ with 16 GB of RAM.
 | 25 | `p025-thousand-digit-fibonacci.þ` | | 4782 | 5.3 s |
 | 29 | `p029-distinct-powers.þ` | | 9183 | 44 s |
 | 30 | `p030-digit-fifth-powers.þ` | | 443839 | 30 s |
+| 31 | `p031-coin-sums.þ` | | 73682 | 0.2 s |
 | 34 | `p034-digit-factorials.þ` | | 40730 | 4.1 s |
+| 37 | `p037-truncatable-primes.þ` | | 748317 | 101 s |
 | 36 | `p036-double-base-palindromes.þ` | | 872187 | 16 s |
 | 40 | `p040-champernowne.þ` | | 210 | 5.5 s |
+| 41 | `p041-pandigital-prime.þ` | | 7652413 | 132 s |
 | 42 | `p042-coded-triangle-words.þ` | `data/p042-words.txt` | 162 | 0.6 s |
 | 48 | `p048-self-powers.þ` | | 9110846700 | 14 s |
 | 52 | `p052-permuted-multiples.þ` | | 142857 | 94 s |
+| 55 | `p055-lychrel-numbers.þ` | | 249 | 56 s |
+| 57 | `p057-square-root-convergents.þ` | | 153 | 74 s |
 | 97 | `p097-large-non-mersenne.þ` | | 8739992577 | 0.2 s |
 | 59 | `p059-xor-decryption.þ` | `data/p059-cipher.txt` | 129448 | 5.6 s |
+| 63 | `p063-powerful-digit-counts.þ` | | 49 | 0.3 s |
 | 67 | `p018-maximum-path-sum.þ` | `data/p067-triangle.txt` | 7273 | 4.8 s |
 
 Problem 67 is problem 18 with a bigger triangle and no change to the program:
 the bottom-up `foldr` never sees the combinatorial explosion the problem warns
 about.
+
+Problem 31 is the one to read for elegance. The textbook coin-counting table is
+updated in place — `ways[i] += ways[i - coin]`, read from the row being written
+— and here the row simply refers to itself: `current` is defined partly in terms
+of `nth (i - coin) current`, which laziness resolves in exactly the order the
+imperative loop would.
 
 Problem 34 is the one to read for method rather than answer. Scanning its
 2.5-million range did not finish in ten minutes; searching digit *multisets*

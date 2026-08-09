@@ -1,0 +1,22 @@
+-- Project Euler 41: Pandigital prime
+-- The largest n-digit pandigital prime.
+-- Answer: 7652413
+--
+-- Nine- and eight-digit pandigitals are all divisible by three — their digit
+-- sums are 45 and 36 — so the search starts at seven digits, and only 5040
+-- permutations have to be considered at all.
+
+import core, list, math, comb, maybe, euler in
+
+let
+	toNumber = foldl (acc -> d -> add d (mul 10 acc)) 0,
+
+	pandigitalsOfLength = n -> comb.permutations (rangeIncl 1 n)
+		> map toNumber
+		> sortWith gt                      -- largest first
+in
+	[7; 4]                                 -- the only lengths whose digit sum is not a multiple of 3
+	> flatMap pandigitalsOfLength
+	> find euler.isPrime
+	> maybe.value
+	> show
