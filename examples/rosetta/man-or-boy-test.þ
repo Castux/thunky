@@ -1,0 +1,71 @@
+-- Rosetta Code: Man or boy test
+--
+-- Knuth's 1964 test of whether a language implements recursion and non-local
+-- references properly. For k = 10 the answer is -67.
+--
+-- This one cannot be transcribed, only re-expressed, and that is what makes it
+-- worth having. The Algol 60 original turns on two things Thunky does not have:
+-- call-by-name arguments, which are re-evaluated at every mention, and a inner
+-- procedure B that *assigns to the k of its enclosing A* between those
+-- mentions. The result depends entirely on the order those assignments happen.
+--
+-- Call-by-name is the easy half: a lazy language gets it for free, and an
+-- argument here is simply a function. The mutation is the hard half. With no
+-- mutable state, each A activation allocates a cell in an explicit store, and
+-- every argument becomes `state -> [value, state]` so the store is threaded
+-- through in evaluation order. x4 must be evaluated before x5 because each may
+-- move the cell that the other reads.
+--
+-- So the test still tests something real here — that closures capture their own
+-- activation's cell and not a later one — but the property it was written to
+-- check is one the language cannot get wrong, because it cannot express it.
+
+import core, list, math, text, hashmap in
+
+let
+	-- The store: fresh cells, read and write. state = [nextId, cells].
+	-- Named newCell/readCell/writeCell rather than the obvious new/read/write:
+	-- a binding called `write` shadows the output builtin, and the first
+	-- version of this file did exactly that — `map write` at the end then
+	-- mapped the store function over the report and printed nothing at all.
+	newCell   = value -> [nextId, cells] ->
+		[nextId, [succ nextId, hashmap.set nextId value cells]],
+	readCell  = id -> [nextId, cells] -> hashmap.getOr 0 id cells,
+	writeCell = id -> value -> [nextId, cells] -> [nextId, hashmap.set id value cells],
+
+	a = k -> x1 -> x2 -> x3 -> x4 -> x5 -> state ->
+		let
+			allocated = newCell k state,
+			cell      = first allocated,
+
+			-- B: decrement this activation's k, then re-enter A with B itself
+			-- in the first argument position.
+			b = s -> let k2 = pred (readCell cell s) in
+				a k2 b x1 x2 x3 x4 (writeCell cell k2 s),
+
+			body = s -> if (lte 0 (readCell cell s))
+				(let
+					fourth = x4 s,
+					fifth  = x5 (second fourth)       -- threaded: order matters
+				in
+					[add (first fourth) (first fifth), second fifth])
+				(b s)
+		in
+			body (second allocated),
+
+	constant = n -> s -> [n, s],
+
+	manOrBoy = k -> a k
+		(constant 1) (constant (negate 1)) (constant (negate 1))
+		(constant 1) (constant 0)
+		[0, hashmap.empty]
+		> first,
+
+	expected = [1; 0; negate 2; 0; 1; 0; 1; negate 1; negate 10; negate 30; negate 67]
+in
+	rangeIncl 0 10
+	> map (k -> let got = manOrBoy k in flatten [
+		"k = "; padLeft 2 space (string k); " -> "; padLeft 4 space (string got);
+		if (eq got (nth k expected)) "" (flatten ["  EXPECTED "; string (nth k expected)])])
+	> map write
+	> eval

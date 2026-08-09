@@ -500,5 +500,15 @@ runTests [
 	assert "big.intDiv-equal" (big.intToString (big.intDiv
 		(big.intFromString "999999999999999999999") (big.intFromString "999999999999999999999"))) "1";
 	assert "big.intDiv-smaller" (big.intToString (big.intDiv
-		(big.intFromString "1000000000000000000000") (big.intFromNumber 5))) "0"
+		(big.intFromString "1000000000000000000000") (big.intFromNumber 5))) "0";
+	assert "big.intPowMod" (big.intToString (big.intPowMod (big.intFromNumber 1000) 10 (big.intFromNumber 2))) "24";
+	assert "big.intPowModBig" (big.intToString (big.intPowModBig
+		(big.intFromString "42624019009292739230206733555419")
+		(big.intFromString "29914924063527903464199429327425")
+		(big.intFromString "629679949333213980003493676590"))) "23203489504326753";
+	assert "big.intLt" (big.intFromNumber 5 > big.intLt (big.intFromNumber 9)) 1;
+	assert "big.intGte" (big.intFromNumber 9 > big.intGte (big.intFromNumber 9)) 1;
+	assert "big.pipe-mod" (big.intToString (big.intFromNumber 100 > big.intMod (big.intFromNumber 7))) "2";
+	assert "big.pipe-sub" (big.intToString (big.intFromNumber 100 > big.intSub (big.intFromNumber 30))) "70";
+	assert "big.pipe-pow" (big.intToString (big.intFromNumber 2 > big.intPow 10)) "1024"
 ]

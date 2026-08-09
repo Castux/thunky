@@ -182,7 +182,44 @@ everywhere is load-bearing: code written against it *reads* correct, so a
 library that breaks it produces a wrong answer that looks right, and the
 suspicion lands anywhere but the argument order.
 
-## 12. Nothing says what a long program is doing
+## 12. Builtins have no namespace, so a `let` can hide one
+
+`rosetta/man-or-boy-test.þ` needs a store, and its three obvious operations are
+`new`, `read` and `write`. Naming one of them `write` shadowed the output
+builtin for the whole program, so the report at the end —
+
+```
+… > map write > eval
+```
+
+— mapped the *store* function over the lines and printed nothing at all. No
+error: `write` is a perfectly good function of three arguments, `map` applied it
+to one, and `eval` forced the resulting closures, which is a no-op. Exit code 0,
+empty output.
+
+This is §5's problem without the import: a name in scope wins, and a builtin has
+no qualified form to fall back on. `list.map` can be reached past a shadowing
+`map`, but there is no `builtin.write`.
+
+Cheap to avoid once known — the file now uses `newCell`/`readCell`/`writeCell`
+and says why — but "your program silently produces no output" is a poor first
+symptom.
+
+## 13. Mixing plain numbers and bignums makes a silent range cliff
+
+`intPowMod m e b` took its exponent as a plain number, which is convenient and
+correct up to 2^53. `rosetta/rsa-code.þ` then wanted to decrypt, where the
+exponent is the size of the modulus — 32 digits here. Passing it as a number
+made `pred e` a no-op, since a float64 that large cannot represent e - 1, and
+the recursion never terminated. Not an error, not a wrong answer: a hang.
+
+`intPowModBig` now takes the exponent as an arbitrary-precision integer and
+walks its bits. The general shape is worth remembering when designing an API
+that spans both kinds of number: every plain-number parameter is a range limit
+that the type system cannot state and the caller cannot see, and the failure
+lands far from the cause.
+
+## 14. Nothing says what a long program is doing
 
 Problem 14 runs for four minutes. Nothing in the language reports progress: no
 clock, no counter, no logging that is not also a value. What works is `seq` on a
@@ -198,12 +235,19 @@ something forces it — writing it as an unused `let` binding does nothing at al
 `peek` is the nearest thing to a debugger here, and it prints a value rather
 than a message about one.
 
-## 13. The performance ceiling
+## 15. The performance ceiling
 
 Native build on an Intel Core i7-6700K (4 GHz, 4 cores), 16 GB RAM. The slowest
 so far: problem 14 at 4 min 15 s, problem 29 at 44 s, problem 36 at 16 s,
 problem 48 at 14 s, problem 7 at 9.7 s, problem 4 at 9.4 s. Most are under a
 second.
+
+It also changes which algorithms are worth writing. Problem 34's range scan —
+2.5 million candidates, the standard approach — did not finish in ten minutes;
+searching digit multisets instead, 11440 of them, takes four seconds. The
+reformulation is better on any machine, but here it is the difference between
+an answer and no answer, so the interpreter's speed keeps pushing the solutions
+toward the sharper method rather than the obvious one.
 
 This is fine for a toy language and it is *not* a complaint, but it bounds the
 exercise. Problem 14 only finishes at all because three observations cut a

@@ -335,6 +335,24 @@ intPowMod = m -> e -> b -> case
 	(even e)  (let half = intPowMod m (div 2 e) b in intMod m (intMul half half))
 	else      (intMod m (intMul b (intPowMod m (pred e) b))),
 
+-- intPowModBig m e b: b^e mod m with the exponent itself an arbitrary-precision
+-- integer. `intPowMod` takes a plain number, which caps the exponent at 2^53 —
+-- and that is exactly where the interesting uses start: an RSA private exponent
+-- is the size of the modulus, and passing it as a number makes `pred e` a no-op
+-- and the recursion endless. This walks the exponent's bits instead, most
+-- significant first, squaring at each step and multiplying where the bit is set.
+intPowModBig = m -> e -> b ->
+	let
+		mag = intMagnitude e,
+		go = i -> acc -> if (lt 0 i)
+			acc
+			(let squared = intMod m (intMul acc acc) in
+				go (pred i) (if (eq 1 (magTestBit i mag))
+					(intMod m (intMul squared b))
+					squared))
+	in
+		if (intIsZero e) (intMod m intOne) (go (pred (magBitLength mag)) intOne),
+
 -- Threshold-first predicates, matching the lt/lte/gt/gte builtins: the
 -- reference value comes first and the value under test last, so
 -- `n > intLt limit` reads as "is n less than limit". intCompare is deliberately

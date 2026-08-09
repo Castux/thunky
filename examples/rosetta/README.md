@@ -29,5 +29,9 @@ thunky examples/rosetta/fizzbuzz.þ
 | CRC-32 | `crc-32.þ` | `bit` against four published checksums — the library's real-world test |
 | LZW compression | `lzw-compression.þ` | both dictionaries as hashmaps; includes the cScSc case |
 | Sieve of Eratosthenes | `sieve-of-eratosthenes.þ` | a real sieve, but O(n log n) without arrays |
+| Man or boy test | `man-or-boy-test.þ` | Knuth's test; needs an explicit store, since it is *about* mutating an enclosing scope |
+| Y combinator | `y-combinator.þ` | works verbatim: no types to reject `x x`, and lazy enough not to diverge |
+| Word wrap | `word-wrap.þ` | `text.words`, so the input's own breaks do not survive |
+| RSA code | `rsa-code.þ` | `big.intPowModBig`: a private exponent is far past 2^53 |
 
 See `../TASKS-FINDINGS.md` for what these revealed about the standard library.

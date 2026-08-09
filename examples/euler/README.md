@@ -46,9 +46,13 @@ with 16 GB of RAM.
 | 24 | `p024-lexicographic-permutation.þ` | | 2783915460 | 0.1 s |
 | 25 | `p025-thousand-digit-fibonacci.þ` | | 4782 | 5.3 s |
 | 29 | `p029-distinct-powers.þ` | | 9183 | 44 s |
+| 30 | `p030-digit-fifth-powers.þ` | | 443839 | 30 s |
+| 34 | `p034-digit-factorials.þ` | | 40730 | 4.1 s |
 | 36 | `p036-double-base-palindromes.þ` | | 872187 | 16 s |
+| 40 | `p040-champernowne.þ` | | 210 | 5.5 s |
 | 42 | `p042-coded-triangle-words.þ` | `data/p042-words.txt` | 162 | 0.6 s |
 | 48 | `p048-self-powers.þ` | | 9110846700 | 14 s |
+| 52 | `p052-permuted-multiples.þ` | | 142857 | 94 s |
 | 97 | `p097-large-non-mersenne.þ` | | 8739992577 | 0.2 s |
 | 59 | `p059-xor-decryption.þ` | `data/p059-cipher.txt` | 129448 | 5.6 s |
 | 67 | `p018-maximum-path-sum.þ` | `data/p067-triangle.txt` | 7273 | 4.8 s |
@@ -56,6 +60,11 @@ with 16 GB of RAM.
 Problem 67 is problem 18 with a bigger triangle and no change to the program:
 the bottom-up `foldr` never sees the combinatorial explosion the problem warns
 about.
+
+Problem 34 is the one to read for method rather than answer. Scanning its
+2.5-million range did not finish in ten minutes; searching digit *multisets*
+instead — 11440 of them — takes four seconds, because the digit-factorial sum
+does not depend on the order of the digits.
 
 Problem 14 prints progress as it goes: four minutes of silence is not a
 readable program, and `seq` on a `write` is how a pure fold says where it is.

@@ -1127,7 +1127,8 @@ makes the estimate safe rather than hopeful.
 | `intMulSmall k n` | multiply by a plain number, cheaper than a full multiply |
 | `intDivMod d n`, `intDiv d n`, `intMod d n` | truncating division of `n` by `d` (schoolbook, one pass per limb); the remainder takes the sign of `n` |
 | `intPow e b` | `b^e` by squaring, non-negative `e` |
-| `intPowMod m e b` | `b^e mod m`, reducing at every step so the operands stay the size of `m` |
+| `intPowMod m e b` | `b^e mod m` for a plain-number `e`, reducing at every step so the operands stay the size of `m` |
+| `intPowModBig m e b` | the same with `e` an arbitrary-precision integer — a plain `e` cannot exceed 2^53 |
 | `intNegate n`, `intAbs n`, `intSign n`, `intIsZero n` | sign handling |
 | `intCompare a b` | `-1`, `0` or `1` as `a` is less than, equal to, or greater than `b` |
 | `intLt t n`, `intLte t n`, `intGt t n`, `intGte t n` | threshold-first predicates, like the builtins |

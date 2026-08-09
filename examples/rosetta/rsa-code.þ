@@ -1,0 +1,50 @@
+-- Rosetta Code: RSA code
+-- Encrypt and decrypt a message with textbook RSA.
+--
+-- The arithmetic is the point: c = m^e mod n and m = c^d mod n, on numbers far
+-- past what a float64 holds. `big.intPowMod` reduces at every squaring, so a
+-- 30-digit modulus never grows into a 30-digit exponentiation.
+--
+-- Textbook in the precise sense — no padding, no random key generation, a
+-- modulus small enough to factor over lunch. It demonstrates the arithmetic and
+-- nothing about security.
+
+import core, list, math, text, big in
+
+let
+	-- p and q are primes; n = pq, and d is the inverse of e modulo (p-1)(q-1).
+	p = big.intFromString "4933908338512403",
+	q = big.intFromString "8638996934050073",
+	n = big.intMul p q,
+
+	-- e is small enough to be a plain number; d is not, and that is the point.
+	-- Passing an exponent this size to `intPowMod` would silently never
+	-- terminate, since `pred d` cannot change a float64 that large.
+	publicExponent  = 65537,
+	privateExponent = big.intFromString "29914924063527903464199429327425",
+
+	encrypt = big.intPowMod n publicExponent,
+	decrypt = big.intPowModBig n privateExponent,
+
+	-- A message becomes one number, base 256, most significant character first.
+	toNumber = foldl (acc -> c -> big.intAdd (big.intMulSmall 256 acc) (big.intFromNumber c))
+		big.intZero,
+
+	toText = value -> if (big.intIsZero value) ""
+		(let divided = big.intDivMod (big.intFromNumber 256) value in
+			append [big.intToNumber (second divided);] (toText (first divided))),
+
+	message   = "Rosetta",
+	plain     = toNumber message,
+	cipher    = encrypt plain,
+	recovered = decrypt cipher
+in
+	[
+		flatten ["modulus n:  "; big.intToString n];
+		flatten ["message:    "; message];
+		flatten ["as number:  "; big.intToString plain];
+		flatten ["encrypted:  "; big.intToString cipher];
+		flatten ["decrypted:  "; big.intToString recovered];
+		flatten ["recovered:  "; toText recovered];
+		flatten ["round trip: "; string (equal (toText recovered) message)]
+	] > map write > eval

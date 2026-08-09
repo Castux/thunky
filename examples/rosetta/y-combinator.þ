@@ -1,0 +1,37 @@
+-- Rosetta Code: Y combinator
+--
+-- The fixed-point combinator that gives recursion to a language without it:
+--
+--     Y = f -> (x -> f (x x)) (x -> f (x x))
+--
+-- Two properties of Thunky make it work verbatim. There are no types, so the
+-- self-application `x x` is legal — in a typed language it needs a recursive
+-- type to state at all. And evaluation is lazy, so `f (x x)` hands `f` an
+-- argument it has not built yet; under call-by-value this expression diverges
+-- before `f` ever runs, which is why strict languages need the Z variant with
+-- an extra lambda.
+--
+-- The standard library's `core.fix` is the same fixed point taken the other
+-- way, `fix f = let x = f x in x`, which laziness makes legal directly.
+
+import core, list, math, text in
+
+let
+	y = f -> (x -> f (x x)) (x -> f (x x)),
+
+	factorialStep = self -> n -> if (eq n 0) 1 (mul n (self (pred n))),
+	fibonacciStep = self -> n -> if (lt 2 n) n (add (self (sub 1 n)) (self (sub 2 n))),
+
+	factorial = y factorialStep,
+	fibonacci = y fibonacciStep,
+
+	-- The same steps taken through core.fix, to show they agree.
+	factorialFix = core.fix factorialStep
+in
+	[
+		flatten ["Y factorial 0..10:  "; rangeIncl 0 10 > map factorial > string];
+		flatten ["Y fibonacci 0..10:  "; rangeIncl 0 10 > map fibonacci > string];
+		flatten ["fix factorial 0..10: "; rangeIncl 0 10 > map factorialFix > string];
+		flatten ["Y and fix agree:    "; string (rangeIncl 0 12
+			> allMatch (n -> eq (factorial n) (factorialFix n)))]
+	] > map write > eval

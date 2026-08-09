@@ -1,0 +1,39 @@
+-- Rosetta Code: Word wrap
+-- Greedy wrapping: put each word on the current line if it fits, else start a
+-- new one.
+--
+-- `text.words` splits on runs of whitespace and discards the empties, so the
+-- input's own line breaks and double spaces do not survive into the output —
+-- which is what wrapping means. The fold carries the finished lines and the
+-- line being built.
+
+import core, list, math, text in
+
+let
+	wrap = width -> content ->
+		let
+			place = [done, current] -> word -> case
+				(isEmpty current)                              [done, word]
+				-- `lte width n` is "n fits in width"; `gte` here reads the same
+				-- in English and means the opposite.
+				(lte width (add (length current) (succ (length word))))
+					[done, flatten [current; " "; word]]
+				else                                           [append [current;] done, word]
+		in
+			words content
+			> foldl place [[], ""]
+			> ([done, current] -> if (isEmpty current) done (append [current;] done)),
+
+	sample = flatten [
+		"In olden times when wishing still helped one, there lived a king whose ";
+		"daughters were all beautiful, but the youngest was so beautiful that the ";
+		"sun itself, which has seen so much, was astonished whenever it shone in ";
+		"her face."
+	],
+
+	show = width -> flatten [
+		[flatten ["-- wrapped at "; string width; " --"];];
+		wrap width sample
+	]
+in
+	flatten [show 72; show 40] > map write > eval
