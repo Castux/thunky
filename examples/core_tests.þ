@@ -470,5 +470,35 @@ runTests [
 	assert "json.roundtrip" (let d = json.parse '{"a":[1,{"b":null}],"c":"x"}' > maybe.value in
 		equal (json.parse (json.stringify d) > maybe.value) d) 1;
 	assert "json.stringify-escape" (json.stringify (json.jsonString (flatten ["a"; [lf;]; "b"])))
-		(flatten [[dquote;]; "a"; [backslash;]; "n"; "b"; [dquote;]])
+		(flatten [[dquote;]; "a"; [backslash;]; "n"; "b"; [dquote;]]);
+
+	-- text.þ line and word splitting
+	assert "text.lines" (lines (flatten ["a"; [lf;]; "b"; [lf;]; "c"])) ["a"; "b"; "c"];
+	assert "text.lines-trailing" (lines (flatten ["a"; [lf;]; "b"; [lf;]])) ["a"; "b"];
+	assert "text.lines-empty" (lines "") [];
+	assert "text.lines-blank" (lines (flatten ["a"; [lf;]; [lf;]; "b"])) ["a"; ""; "b"];
+	assert "text.unlines" (unlines ["a"; "b"]) (flatten ["a"; [lf;]; "b"]);
+	assert "text.words" (words "  one   two three ") ["one"; "two"; "three"];
+	assert "text.words-mixed" (words (flatten ["a"; [tab;]; "b"; [lf;]; "c"])) ["a"; "b"; "c"];
+	assert "text.words-blank" (words "   ") [];
+	assert "text.unwords" (unwords ["a"; "b"; "c"]) "a b c";
+
+	-- big.þ division: checked by the identity a = q*b + r, 0 <= r < b
+	assert "big.intDiv-large" (big.intToString (big.intDiv
+		(big.intFromString "123456789012345678901234567890") (big.intFromString "987654321098765432")))
+		"124999998860";
+	assert "big.intMod-large" (big.intToString (big.intMod
+		(big.intFromString "123456789012345678901234567890") (big.intFromString "987654321098765432")))
+		"925925953827160370";
+	assert "big.divMod-identity" (let
+			a = big.intFromString "99999999999999999999999999999999999999",
+			b = big.intFromString "100000000000000000001",
+			q = big.intDiv a b,
+			r = big.intMod a b
+		in
+			and (equal (big.intAdd (big.intMul q b) r) a) (eq (negate 1) (big.intCompare r b))) 1;
+	assert "big.intDiv-equal" (big.intToString (big.intDiv
+		(big.intFromString "999999999999999999999") (big.intFromString "999999999999999999999"))) "1";
+	assert "big.intDiv-smaller" (big.intToString (big.intDiv
+		(big.intFromNumber 5) (big.intFromString "1000000000000000000000"))) "0"
 ]

@@ -1104,6 +1104,13 @@ Base 2^32 is the largest that keeps a limb, and the sum of two limbs, exactly
 representable. Multiplication splits limbs into 16-bit halves, whose products
 stay under 2^32, because a full limb product would reach 2^64.
 
+Division is Knuth's Algorithm D: the dividend is consumed a limb at a time into
+a running remainder, and each quotient limb is estimated from the top two limbs
+of the remainder over the top limb of the divisor, then corrected downward.
+Normalising both operands so the divisor's top limb has its high bit set — which
+cannot change the quotient — bounds that correction at two steps, which is what
+makes the estimate safe rather than hopeful.
+
 | Name | Description |
 |------|-------------|
 | `intZero`, `intOne` | constants |
@@ -1111,7 +1118,7 @@ stay under 2^32, because a full limb product would reach 2^64.
 | `intToString n`, `intToNumber n`, `intDigits n` | conversion out (`intDigits` is decimal, most significant first) |
 | `intAdd a b`, `intSub a b`, `intMul a b` | arithmetic |
 | `intMulSmall k n` | multiply by a plain number, cheaper than a full multiply |
-| `intDivMod a b`, `intDiv a b`, `intMod a b` | truncating division; the remainder takes the sign of `a` |
+| `intDivMod a b`, `intDiv a b`, `intMod a b` | truncating division (schoolbook, one pass per limb); the remainder takes the sign of `a` |
 | `intPow b e` | exponentiation by squaring, non-negative `e` |
 | `intNegate n`, `intAbs n`, `intSign n`, `intIsZero n` | sign handling |
 | `intCompare a b` | `-1`, `0` or `1` as `a` is less than, equal to, or greater than `b` |
@@ -1219,6 +1226,10 @@ The named constants cover the characters that cannot be written literally:
 | Name | Description |
 |------|-------------|
 | `join sep strings` | intercalate `sep` between each string in the list |
+| `lines s` | split on line feeds; a single trailing newline does not add an empty last line, so `lines ""` is `[]` |
+| `unlines ls` | join with line feeds, without a trailing one — `unlines (lines s)` returns `s` when `s` does not end in a newline |
+| `words s` | split on runs of whitespace, discarding the empty pieces around them |
+| `unwords ws` | join with single spaces |
 | `trim s` | remove leading/trailing whitespace |
 | `padLeft n fill s` | left-pad `s` with code point `fill` to minimum width `n` |
 | `padRight n fill s` | right-pad `s` with code point `fill` to minimum width `n` |
