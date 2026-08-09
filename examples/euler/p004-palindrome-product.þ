@@ -1,0 +1,17 @@
+-- Project Euler 4: Largest palindrome product
+-- The largest palindrome made from the product of two 3-digit numbers.
+-- Answer: 906609
+--
+-- `string` renders a number as a list of code points, so "is it a palindrome"
+-- is a structural comparison against its own reverse — no digit extraction.
+
+import core, list, math, text in
+
+let
+	isPalindrome = n -> let digits = string n in equal digits (reverse digits)
+in
+	rangeIncl 100 999
+	> flatMap (a -> rangeIncl a 999 > map (mul a))
+	> filter isPalindrome
+	> maximum
+	> show

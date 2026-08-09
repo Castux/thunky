@@ -1,0 +1,11 @@
+-- Project Euler 1: Multiples of 3 and 5
+-- Sum of all naturals below 1000 that are multiples of 3 or 5.
+-- Answer: 233168
+
+import core, list, math in
+
+let divisibleBy = d -> n -> eq 0 (mod d n) in
+	range 1 1000
+	> filter (n -> or (divisibleBy 3 n) (divisibleBy 5 n))
+	> sum
+	> show

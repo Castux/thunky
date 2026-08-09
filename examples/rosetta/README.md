@@ -1,0 +1,25 @@
+# Rosetta Code tasks in Thunky
+
+One file per task, chosen to stress different parts of the language rather than
+to be easy. Run one with:
+
+```sh
+thunky examples/rosetta/fizzbuzz.þ
+```
+
+| Task | File | Notes |
+|------|------|-------|
+| FizzBuzz | `fizzbuzz.þ` | `case` chain over divisibility |
+| 100 doors | `100-doors.þ` | simulated, not reasoned: a fold of passes over the door list |
+| Happy numbers | `happy-numbers.þ` | `math.digits`; the unhappy cycle is detected by its fixed point 4 |
+| Towers of Hanoi | `towers-of-hanoi.þ` | the recursive definition, verbatim |
+| Roman numerals | `roman-numerals.þ` | encode and decode; decode negates a letter when a larger one follows |
+| Ackermann | `ackermann.þ` | direct transcription; A(3,4) = 125 |
+| Sorting algorithms | `sorting-algorithms.þ` | quick, insertion, merge, bubble, all over cons cells |
+| Pascal's triangle | `pascals-triangle.þ` | one `iterate`; the triangle is an infinite lazy list |
+| Hailstone (Collatz) | `hailstone.þ` | longest start below 10000 is 6171, 262 elements |
+| Binary search | `binary-search.þ` | a **negative result** — see the file, and the findings |
+| Caesar cipher | `caesar-cipher.þ` | strings are code-point lists, so this is one `map` |
+| 99 bottles | `99-bottles.þ` | |
+
+See `../TASKS-FINDINGS.md` for what these revealed about the standard library.

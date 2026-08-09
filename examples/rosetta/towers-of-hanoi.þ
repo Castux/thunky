@@ -1,0 +1,21 @@
+-- Rosetta Code: Towers of Hanoi
+-- Move n disks from A to C using B, one at a time, never a larger onto a
+-- smaller. The solution is the definition: move n-1 aside, move the big one,
+-- move n-1 back.
+
+import core, list, math, text in
+
+let
+	moves = n -> from -> to -> via -> if (eq n 0)
+		[]
+		(flatten [
+			moves (pred n) from via to;
+			[flatten ["disk "; string n; ": "; from; " -> "; to];];
+			moves (pred n) via to from
+		]),
+
+	solution = moves 4 "A" "C" "B"
+in
+	flatten [solution; [flatten [string (length solution); " moves"];]]
+	> map write
+	> eval

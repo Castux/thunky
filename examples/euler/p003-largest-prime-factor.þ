@@ -1,0 +1,16 @@
+-- Project Euler 3: Largest prime factor
+-- The largest prime factor of 600851475143.
+-- Answer: 6857
+--
+-- Trial division that divides the number down as it goes, so the candidate
+-- never has to pass sqrt of the *original* number — only of what is left.
+
+import core, list, math in
+
+let
+	largestFactor = n -> d -> case
+		(gt n (mul d d))      n                          -- d*d > n: what remains is prime
+		(eq 0 (mod d n))      (largestFactor (div d n) d)
+		else                  (largestFactor n (succ d))
+in
+	largestFactor 600851475143 2 > show

@@ -1,0 +1,12 @@
+-- Project Euler 6: Sum square difference
+-- (sum of 1..100)^2 minus the sum of the squares of 1..100.
+-- Answer: 25164150
+
+import core, list, math in
+
+let
+	numbers    = rangeIncl 1 100,
+	sumSquares = numbers > map (pow 2) > sum,
+	squareSum  = numbers > sum > pow 2
+in
+	sub sumSquares squareSum > show      -- sub a b is b - a

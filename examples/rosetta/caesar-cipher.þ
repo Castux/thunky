@@ -1,0 +1,23 @@
+-- Rosetta Code: Caesar cipher
+-- Rotate letters by a key, leaving everything else alone. Strings are lists of
+-- code points, so this is one `map` over an arithmetic function.
+
+import core, list, math, text in
+
+let
+	rotate = key -> c -> case
+		(isUpper c) (add (char 'A') (mod 26 (add key (sub (char 'A') c))))
+		(isLower c) (add (char 'a') (mod 26 (add key (sub (char 'a') c))))
+		else        c,
+
+	encode = key -> map (rotate key),
+	decode = key -> map (rotate (sub key 26)),
+
+	message = "The Quick Brown Fox Jumps Over The Lazy Dog!",
+	secret  = encode 3 message
+in
+	[
+		prepend "plain:   " message;
+		prepend "cipher:  " secret;
+		prepend "back:    " (decode 3 secret)
+	] > map write > eval

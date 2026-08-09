@@ -1,0 +1,21 @@
+-- Project Euler 9: Special Pythagorean triplet
+-- The product abc of the Pythagorean triplet with a + b + c = 1000.
+-- Answer: 31875000
+--
+-- a < b < c and a + b + c = 1000 bound the search: a stays under a third of the
+-- sum, and c follows from a and b, so only b has to be searched.
+
+import core, list, math, maybe in
+
+let
+	triplets = rangeIncl 1 333 > flatMap (a ->
+		rangeIncl (succ a) (div 2 (sub a 1000))
+		> map (b -> [a, b, sub (add a b) 1000])),
+
+	isRight = [a, b, c] -> eq (add (pow 2 a) (pow 2 b)) (pow 2 c)
+in
+	triplets
+	> find isRight
+	> maybe.value
+	> ([a, b, c] -> mul a (mul b c))
+	> show

@@ -1,0 +1,17 @@
+-- Rosetta Code: Happy numbers
+-- A happy number reaches 1 when repeatedly replaced by the sum of the squares
+-- of its digits; an unhappy one falls into a cycle. The first eight are
+-- 1, 7, 10, 13, 19, 23, 28, 31.
+
+import core, list, math, text in
+
+let
+	step = n -> digits n > map (pow 2) > sum,
+
+	-- The unhappy cycle always passes through 4, so no seen-set is needed.
+	isHappy = n -> case
+		(eq n 1) 1
+		(eq n 4) 0
+		else     (isHappy (step n))
+in
+	upFrom 1 > filter isHappy > take 8 > string > write
