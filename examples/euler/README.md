@@ -32,12 +32,14 @@ Timings are from a 2024 laptop, native build.
 | 8 | `p008-largest-product.þ` | `data/p008-number.txt` | 23514624000 | 0.4 s |
 | 9 | `p009-pythagorean-triplet.þ` | | 31875000 | 1.4 s |
 | 11 | `p011-grid-product.þ` | `data/p011-grid.txt` | 70600674 | 0.5 s |
-| 13 | `p013-large-sum.þ` | `data/p013-numbers.txt` | 5537376230 | 0.7 s |
-| 16 | `p016-power-digit-sum.þ` | | 1366 | 0.8 s |
+| 12 | `p012-triangle-divisors.þ` | | 76576500 | 3.7 s |
+| 13 | `p013-large-sum.þ` | `data/p013-numbers.txt` | 5537376230 | 1.4 s |
+| 16 | `p016-power-digit-sum.þ` | | 1366 | 0.15 s |
 | 18 | `p018-maximum-path-sum.þ` | `data/p018-triangle.txt` | 1074 | 0.1 s |
 | 20 | `p020-factorial-digit-sum.þ` | | 648 | 0.1 s |
+| 21 | `p021-amicable-numbers.þ` | | 31626 | 2.8 s |
 | 22 | `p022-names-scores.þ` | `data/p022-names.txt` | 871198282 | 3.9 s |
-| 25 | `p025-thousand-digit-fibonacci.þ` | | 4782 | 14.6 s |
+| 25 | `p025-thousand-digit-fibonacci.þ` | | 4782 | 5.3 s |
 | 42 | `p042-coded-triangle-words.þ` | `data/p042-words.txt` | 162 | 0.6 s |
 | 59 | `p059-xor-decryption.þ` | `data/p059-cipher.txt` | 129448 | 5.6 s |
 | 67 | `p018-maximum-path-sum.þ` | `data/p067-triangle.txt` | 7273 | 4.8 s |
@@ -46,8 +48,10 @@ Problem 67 is problem 18 with a bigger triangle and no change to the program:
 the bottom-up `foldr` never sees the combinatorial explosion the problem warns
 about.
 
-Problems 13, 16, 20 and 25 each carry their own copy of a decimal-digit
-bignum, because there is no such type in the library and nowhere shared to put
-one — see `../TASKS-FINDINGS.md` §1 and §4.
+Problems 13, 16, 20 and 25 use the `big` library for arbitrary-precision
+arithmetic, and 12 and 21 use `euler.th` — the local module beside them holding
+the number theory these problems keep needing (`primes`, `factorise`,
+`divisorCount`, `divisorSum`, `totient`, …). Both of those exist because of what
+this exercise turned up; see `../TASKS-FINDINGS.md`.
 
 See `../TASKS-FINDINGS.md` for the full list of what these exposed.

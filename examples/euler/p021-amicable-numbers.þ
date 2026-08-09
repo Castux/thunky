@@ -1,0 +1,13 @@
+-- Project Euler 21: Amicable numbers
+-- The sum of all amicable numbers under 10000.
+-- Answer: 31626
+--
+-- The divisor sum comes from the prime factorisation rather than from trial
+-- division, which is what makes ten thousand of them cheap.
+
+import core, list, math, euler in
+
+	range 2 10000
+	> filter (n -> neq 0 (euler.amicable n))
+	> sum
+	> show

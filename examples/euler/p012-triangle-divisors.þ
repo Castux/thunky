@@ -1,0 +1,21 @@
+-- Project Euler 12: Highly divisible triangular number
+-- The first triangle number with more than 500 divisors.
+-- Answer: 76576500
+--
+-- Factorising each triangle number directly would mean trial division up to
+-- sqrt(76 million). But T(n) = n(n+1)/2 and n, n+1 are coprime, so the divisor
+-- count is multiplicative across the halved pair: only numbers up to n itself
+-- ever get factorised, and n stops at 12375.
+
+import core, list, math, euler in
+
+let
+	divisorCountOfTriangle = n -> if (even n)
+		(mul (euler.divisorCount (div 2 n)) (euler.divisorCount (succ n)))
+		(mul (euler.divisorCount n) (euler.divisorCount (div 2 (succ n))))
+in
+	upFrom 1
+	> filter (n -> gt 500 (divisorCountOfTriangle n))
+	> head
+	> euler.triangle
+	> show
