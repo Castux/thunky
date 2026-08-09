@@ -12,7 +12,7 @@
 import core, list, math, big in
 
 let
-	limit = big.intPow (big.intFromNumber 10) 999,
+	limit = big.intPow 999 (big.intFromNumber 10),
 
 	search = index -> a -> b -> if (gte 0 (big.intCompare a limit))
 		index

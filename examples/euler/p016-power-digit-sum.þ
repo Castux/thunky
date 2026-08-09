@@ -4,4 +4,4 @@
 
 import core, list, math, big in
 
-	big.intPow (big.intFromNumber 2) 1000 > big.intDigits > sum > show
+	big.intPow 1000 (big.intFromNumber 2) > big.intDigits > sum > show

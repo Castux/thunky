@@ -1,0 +1,22 @@
+-- Project Euler 24: Lexicographic permutations
+-- The millionth permutation of the digits 0 to 9, in order.
+-- Answer: 2783915460
+--
+-- Generating a million permutations to take the last one is unnecessary: the
+-- index written in the factorial number system *is* the answer. With n digits
+-- left, each choice of leading digit accounts for (n-1)! permutations, so the
+-- quotient picks the digit and the remainder is the index into what remains.
+
+import core, list, math, text in
+
+let
+	choose = index -> digits -> digits > {
+		[] -> [],
+		_ -> let
+			block     = factorial (pred (length digits)),
+			position  = div block index
+		in
+			[nth position digits, choose (mod block index) (removeAt position digits)]
+	}
+in
+	choose 999999 (rangeIncl 0 9) > map intToDigit > write

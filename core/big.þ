@@ -287,15 +287,20 @@ intAdd = a -> b -> a > ([sa, ma] -> b > ([sb, mb] ->
 			(eq c 1)  [sa, magSub ma mb]                -- |a| > |b|
 			else      [sb, magSub mb ma]))),
 
-intSub = a -> b -> intAdd a (intNegate b),
+-- intSub k n: n - k. The operand comes first and the value it applies to last,
+-- exactly as the `sub` builtin does, so `n > intSub k` reads as "subtract k"
+-- and the partial application is the useful one. The same holds for intDiv,
+-- intMod, intDivMod, intPow and intPowMod below: a library that ordered these
+-- mathematically would silently compute the reverse when piped into.
+intSub = k -> n -> intAdd n (intNegate k),
 
 intMul = a -> b -> a > ([sa, ma] -> b > ([sb, mb] ->
 	let mag = magMul ma mb in
 		if (magIsZero mag) intZero [mul sa sb, mag])),
 
--- intDivMod a b: truncating division, remainder taking the sign of a — the
--- same convention as the div and mod builtins.
-intDivMod = a -> b -> a > ([sa, ma] -> b > ([sb, mb] ->
+-- intDivMod d n: [n / d, n mod d], truncating, the remainder taking the sign
+-- of n — the convention of the div and mod builtins.
+intDivMod = d -> n -> n > ([sa, ma] -> d > ([sb, mb] ->
 	let
 		divided   = magDivMod ma mb,
 		quotient  = first divided,
@@ -306,28 +311,39 @@ intDivMod = a -> b -> a > ([sa, ma] -> b > ([sb, mb] ->
 			if (magIsZero remainder) intZero [sa, remainder]
 		])),
 
--- intDiv a b, intMod a b: the two halves of intDivMod.
-intDiv = a -> intDivMod a *> first,
-intMod = a -> intDivMod a *> second,
+-- intDiv d n, intMod d n: the two halves of intDivMod.
+intDiv = d -> intDivMod d *> first,
+intMod = d -> intDivMod d *> second,
 
 intMulSmall = k -> [sign, mag] -> if (lt 0 k)
 	[negate sign, magMulSmall (negate k) mag]
 	(let m = magMulSmall k mag in if (magIsZero m) intZero [sign, m]),
 
--- intPow base exponent: exponentiation by squaring, for a non-negative exponent.
-intPow = b -> e -> case
+-- intPow e b: b^e for a non-negative e, by squaring — the argument order of the
+-- `pow` builtin, where `pow 2 x` is x squared.
+intPow = e -> b -> case
 	(eq e 0)  intOne
-	(even e)  (let half = intPow b (div 2 e) in intMul half half)
-	else      (intMul b (intPow b (pred e))),
+	(even e)  (let half = intPow (div 2 e) b in intMul half half)
+	else      (intMul b (intPow (pred e) b)),
 
--- intPowMod b e m: b^e mod m, for a non-negative exponent. Square-and-multiply
+-- intPowMod m e b: b^e mod m, for a non-negative exponent. Square-and-multiply
 -- with a reduction at every step, so the operands stay the size of m instead of
 -- growing to the size of b^e. Computing the power first and reducing afterwards
 -- is the same answer and a different order of cost: 1000^1000 has 3001 digits.
-intPowMod = b -> e -> m -> case
-	(eq e 0)  (intMod intOne m)
-	(even e)  (let half = intPowMod b (div 2 e) m in intMod (intMul half half) m)
-	else      (intMod (intMul b (intPowMod b (pred e) m)) m),
+intPowMod = m -> e -> b -> case
+	(eq e 0)  (intMod m intOne)
+	(even e)  (let half = intPowMod m (div 2 e) b in intMod m (intMul half half))
+	else      (intMod m (intMul b (intPowMod m (pred e) b))),
+
+-- Threshold-first predicates, matching the lt/lte/gt/gte builtins: the
+-- reference value comes first and the value under test last, so
+-- `n > intLt limit` reads as "is n less than limit". intCompare is deliberately
+-- *not* of this shape — a three-way result is not a predicate, and it answers
+-- "how does a compare to b" in the usual order.
+intLt  = threshold -> value -> eq (negate 1) (intCompare value threshold),
+intLte = threshold -> value -> neq 1 (intCompare value threshold),
+intGt  = threshold -> value -> eq 1 (intCompare value threshold),
+intGte = threshold -> value -> neq (negate 1) (intCompare value threshold),
 
 -- intToNumber: back to a plain number, losing exactness past 2^53.
 intToNumber = [sign, mag] -> mul sign
@@ -382,7 +398,7 @@ floatRound = [m, e, p] ->
 	let excess = sub p (magBitLength (intMagnitude m)) in
 		if (lt 1 excess)
 			[m, e, p]
-			(let shifted = first (intDivMod m (intPow (intFromNumber 2) excess)) in
+			(let shifted = first (intDivMod (intPow excess (intFromNumber 2)) m) in
 				[shifted, add e excess, p]),
 
 floatFromInt = precision -> n -> floatRound [n, 0, precision],
@@ -407,14 +423,16 @@ floatAlign = a -> b ->
 		ea = floatExponent a, eb = floatExponent b,
 		low = min ea eb,
 		lift = value -> exponent -> intMul (floatMantissa value)
-			(intPow (intFromNumber 2) (sub low exponent))
+			(intPow (sub low exponent) (intFromNumber 2))
 	in
 		[lift a ea, lift b eb, low],
 
 floatAdd = a -> b -> floatAlign a b > ([ma, mb, e] ->
 	floatRound [intAdd ma mb, e, max (floatPrecision a) (floatPrecision b)]),
 
-floatSub = a -> b -> floatAdd a (floatNegate b),
+-- floatSub k x: x - k, and floatDiv d x: x / d, ordered like their integer
+-- counterparts and like the builtins.
+floatSub = k -> x -> floatAdd x (floatNegate k),
 
 floatNegate = [m, e, p] -> [intNegate m, e, p],
 
@@ -426,15 +444,16 @@ floatMul = a -> b -> floatRound [
 
 -- floatDiv: shift the numerator up by enough bits that the quotient lands with
 -- the requested precision, then divide the mantissas.
-floatDiv = a -> b ->
+floatDiv = d -> a ->
 	let
+		b     = d,
 		p     = max (floatPrecision a) (floatPrecision b),
 		shift = add p (add 2 (sub (magBitLength (intMagnitude (floatMantissa a)))
 			(magBitLength (intMagnitude (floatMantissa b))))),
-		lifted = intMul (floatMantissa a) (intPow (intFromNumber 2) (max 0 shift))
+		lifted = intMul (floatMantissa a) (intPow (max 0 shift) (intFromNumber 2))
 	in
 		floatRound [
-			first (intDivMod lifted (floatMantissa b)),
+			first (intDivMod (floatMantissa b) lifted),
 			sub (max 0 shift) (sub (floatExponent b) (floatExponent a)),
 			p
 		],
@@ -443,15 +462,21 @@ floatCompare = a -> b -> floatAlign a b > ([ma, mb, e] -> intCompare ma mb),
 
 floatIsZero = [m, e, p] -> intIsZero m,
 
+-- The same threshold-first predicates for floats.
+floatLt  = threshold -> value -> eq (negate 1) (floatCompare value threshold),
+floatLte = threshold -> value -> neq 1 (floatCompare value threshold),
+floatGt  = threshold -> value -> eq 1 (floatCompare value threshold),
+floatGte = threshold -> value -> neq (negate 1) (floatCompare value threshold),
+
 -- floatToString digits: a decimal rendering with that many places after the
 -- point, truncated. The value is scaled by 10^digits as an exact integer first,
 -- so the printed digits are the true ones rather than a repeated conversion.
 floatToString = digits -> [m, e, p] ->
 	let
-		scaled  = intMul m (intPow (intFromNumber 10) digits),
+		scaled  = intMul m (intPow digits (intFromNumber 10)),
 		shifted = if (lt 0 e)
-			(first (intDivMod scaled (intPow (intFromNumber 2) (negate e))))
-			(intMul scaled (intPow (intFromNumber 2) e)),
+			(first (intDivMod (intPow (negate e) (intFromNumber 2)) scaled))
+			(intMul scaled (intPow e (intFromNumber 2))),
 		negative = eq (negate 1) (intSign shifted),
 		text     = intToString (intAbs shifted),
 		padded   = padLeft (succ digits) (char '0') text,
@@ -470,7 +495,8 @@ floatSqrt = value ->
 	let
 		p    = floatPrecision value,
 		two  = floatFromNumber p 2,
-		step = x -> floatDiv (floatAdd x (floatDiv value x)) two,
+		-- floatDiv is divisor-first: `floatDiv x value` is value / x.
+		step = x -> floatDiv two (floatAdd x (floatDiv x value)),
 		go   = x -> let next = step x in
 			if (eq 0 (floatCompare next x)) x (go next)
 	in

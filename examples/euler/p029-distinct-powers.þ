@@ -10,7 +10,7 @@
 import core, list, math, comb, hashmap, big in
 
 	comb.crossPairs (rangeIncl 2 100) (rangeIncl 2 100)
-	> map ([a, b] -> big.intPow (big.intFromNumber a) b)
+	> map ([a, b] -> big.intPow b (big.intFromNumber a))
 	> foldl (seen -> value -> hashmap.set value 1 seen) hashmap.empty
 	> hashmap.keys
 	> length

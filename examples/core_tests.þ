@@ -432,12 +432,12 @@ runTests [
 	assert "big.intSub-to-zero" (big.intToString (big.intSub (big.intFromNumber 7) (big.intFromNumber 7))) "0";
 	assert "big.intMul" (big.intToString (big.intMul (big.intFromNumber 123456789) (big.intFromNumber 987654321)))
 		"121932631112635269";
-	assert "big.intPow" (big.intToString (big.intPow (big.intFromNumber 2) 64)) "18446744073709551616";
-	assert "big.intDiv" (big.intToString (big.intDiv (big.intFromNumber 1000000007) (big.intFromNumber 3))) "333333335";
-	assert "big.intMod" (big.intToString (big.intMod (big.intFromNumber 1000000007) (big.intFromNumber 3))) "2";
+	assert "big.intPow" (big.intToString (big.intPow 64 (big.intFromNumber 2))) "18446744073709551616";
+	assert "big.intDiv" (big.intToString (big.intDiv (big.intFromNumber 3) (big.intFromNumber 1000000007))) "333333335";
+	assert "big.intMod" (big.intToString (big.intMod (big.intFromNumber 3) (big.intFromNumber 1000000007))) "2";
 	assert "big.intCompare" (big.intCompare (big.intFromNumber 5) (big.intFromNumber 9)) (negate 1);
-	assert "big.intDigits-sum" (big.intDigits (big.intPow (big.intFromNumber 2) 100) > sum) 115;
-	assert "big.floatDiv" (big.floatToString 20 (big.floatDiv (big.floatFromNumber 200 1) (big.floatFromNumber 200 3)))
+	assert "big.intDigits-sum" (big.intDigits (big.intPow 100 (big.intFromNumber 2)) > sum) 115;
+	assert "big.floatDiv" (big.floatToString 20 (big.floatFromNumber 200 1 > big.floatDiv (big.floatFromNumber 200 3)))
 		"0.33333333333333333333";
 	assert "big.floatAdd" (big.floatToString 5 (big.floatAdd (big.floatFromNumber 100 1.5) (big.floatFromNumber 100 2.25)))
 		"3.75000";
@@ -485,20 +485,20 @@ runTests [
 
 	-- big.þ division: checked by the identity a = q*b + r, 0 <= r < b
 	assert "big.intDiv-large" (big.intToString (big.intDiv
-		(big.intFromString "123456789012345678901234567890") (big.intFromString "987654321098765432")))
+		(big.intFromString "987654321098765432") (big.intFromString "123456789012345678901234567890")))
 		"124999998860";
 	assert "big.intMod-large" (big.intToString (big.intMod
-		(big.intFromString "123456789012345678901234567890") (big.intFromString "987654321098765432")))
+		(big.intFromString "987654321098765432") (big.intFromString "123456789012345678901234567890")))
 		"925925953827160370";
 	assert "big.divMod-identity" (let
 			a = big.intFromString "99999999999999999999999999999999999999",
 			b = big.intFromString "100000000000000000001",
-			q = big.intDiv a b,
-			r = big.intMod a b
+			q = big.intDiv b a,
+			r = big.intMod b a
 		in
 			and (equal (big.intAdd (big.intMul q b) r) a) (eq (negate 1) (big.intCompare r b))) 1;
 	assert "big.intDiv-equal" (big.intToString (big.intDiv
 		(big.intFromString "999999999999999999999") (big.intFromString "999999999999999999999"))) "1";
 	assert "big.intDiv-smaller" (big.intToString (big.intDiv
-		(big.intFromNumber 5) (big.intFromString "1000000000000000000000"))) "0"
+		(big.intFromString "1000000000000000000000") (big.intFromNumber 5))) "0"
 ]

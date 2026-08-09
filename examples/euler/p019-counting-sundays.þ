@@ -1,0 +1,27 @@
+-- Project Euler 19: Counting Sundays
+-- How many first-of-the-month fell on a Sunday in the 20th century.
+-- Answer: 171
+--
+-- No calendar library and none needed: walk the months from a known anchor
+-- (1 Jan 1900 was a Monday), carrying the day of the week, and advance it by
+-- the length of each month modulo 7.
+
+import core, list, math, comb in
+
+let
+	isLeapYear = y -> and (eq 0 (mod 4 y)) (or (neq 0 (mod 100 y)) (eq 0 (mod 400 y))),
+
+	monthLength = y -> m -> case
+		(eq m 2)              (if (isLeapYear y) 29 28)
+		(contains m [4; 6; 9; 11]) 30
+		else                  31,
+
+	months = comb.crossPairs (rangeIncl 1900 2000) (rangeIncl 1 12),
+
+	-- 0 is Sunday; 1 Jan 1900 was a Monday.
+	step = [dayOfWeek, sundays] -> [year, month] -> [
+		mod 7 (add dayOfWeek (monthLength year month)),
+		if (and (eq dayOfWeek 0) (lt 1901 year > not)) (succ sundays) sundays
+	]
+in
+	months > foldl step [1, 0] > second > show

@@ -39,14 +39,17 @@ with 16 GB of RAM.
 | 16 | `p016-power-digit-sum.þ` | | 1366 | 0.15 s |
 | 17 | `p017-number-letters.þ` | | 21124 | 0.2 s |
 | 18 | `p018-maximum-path-sum.þ` | `data/p018-triangle.txt` | 1074 | 0.1 s |
+| 19 | `p019-counting-sundays.þ` | | 171 | 0.2 s |
 | 20 | `p020-factorial-digit-sum.þ` | | 648 | 0.1 s |
 | 21 | `p021-amicable-numbers.þ` | | 31626 | 2.8 s |
 | 22 | `p022-names-scores.þ` | `data/p022-names.txt` | 871198282 | 3.9 s |
+| 24 | `p024-lexicographic-permutation.þ` | | 2783915460 | 0.1 s |
 | 25 | `p025-thousand-digit-fibonacci.þ` | | 4782 | 5.3 s |
 | 29 | `p029-distinct-powers.þ` | | 9183 | 44 s |
 | 36 | `p036-double-base-palindromes.þ` | | 872187 | 16 s |
 | 42 | `p042-coded-triangle-words.þ` | `data/p042-words.txt` | 162 | 0.6 s |
 | 48 | `p048-self-powers.þ` | | 9110846700 | 14 s |
+| 97 | `p097-large-non-mersenne.þ` | | 8739992577 | 0.2 s |
 | 59 | `p059-xor-decryption.þ` | `data/p059-cipher.txt` | 129448 | 5.6 s |
 | 67 | `p018-maximum-path-sum.þ` | `data/p067-triangle.txt` | 7273 | 4.8 s |
 

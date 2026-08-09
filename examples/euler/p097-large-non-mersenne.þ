@@ -1,0 +1,20 @@
+-- Project Euler 97: Large non-Mersenne prime
+-- The last ten digits of 28433 * 2^7830457 + 1.
+-- Answer: 8739992577
+--
+-- 2^7830457 has over two million digits. `intPowMod` never builds it: reducing
+-- modulo 10^10 at every squaring keeps every operand to ten digits, so the
+-- whole thing is about two dozen multiplications of one-limb numbers.
+
+import core, list, math, text, big in
+
+let
+	modulus = big.intPow 10 (big.intFromNumber 10),
+
+	power = big.intPowMod modulus 7830457 (big.intFromNumber 2),
+
+	answer = big.intMul (big.intFromNumber 28433) power
+		> big.intAdd big.intOne
+		> big.intMod modulus
+in
+	big.intToString answer > padLeft 10 (char '0') > write

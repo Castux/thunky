@@ -1100,6 +1100,12 @@ precision]`, meaning `mantissa * 2^exponent` held to `precision` significand
 bits — precision travels with the value, so a computation inherits it instead of
 consulting a global setting. Results are truncated toward zero.
 
+The non-commutative operations put the operand first and the value last —
+`intSub k n` is `n - k`, `intMod d n` is `n mod d`, `intPow e b` is `b^e` — for
+the same reason the `sub`, `div`, `mod` and `pow` builtins do: it is the order
+that makes partial application and piping work. `n > intMod m` reduces n; had
+the library used mathematical order it would silently have reduced m by n.
+
 Base 2^32 is the largest that keeps a limb, and the sum of two limbs, exactly
 representable. Multiplication splits limbs into 16-bit halves, whose products
 stay under 2^32, because a full limb product would reach 2^64.
@@ -1116,17 +1122,21 @@ makes the estimate safe rather than hopeful.
 | `intZero`, `intOne` | constants |
 | `intFromNumber n`, `intFromString s` | conversion in; exact below 2^53 for a number |
 | `intToString n`, `intToNumber n`, `intDigits n` | conversion out (`intDigits` is decimal, most significant first) |
-| `intAdd a b`, `intSub a b`, `intMul a b` | arithmetic |
+| `intAdd a b`, `intMul a b` | arithmetic |
+| `intSub k n` | `n - k` |
 | `intMulSmall k n` | multiply by a plain number, cheaper than a full multiply |
-| `intDivMod a b`, `intDiv a b`, `intMod a b` | truncating division (schoolbook, one pass per limb); the remainder takes the sign of `a` |
-| `intPow b e` | exponentiation by squaring, non-negative `e` |
-| `intPowMod b e m` | `b^e mod m`, reducing at every step so the operands stay the size of `m` |
+| `intDivMod d n`, `intDiv d n`, `intMod d n` | truncating division of `n` by `d` (schoolbook, one pass per limb); the remainder takes the sign of `n` |
+| `intPow e b` | `b^e` by squaring, non-negative `e` |
+| `intPowMod m e b` | `b^e mod m`, reducing at every step so the operands stay the size of `m` |
 | `intNegate n`, `intAbs n`, `intSign n`, `intIsZero n` | sign handling |
 | `intCompare a b` | `-1`, `0` or `1` as `a` is less than, equal to, or greater than `b` |
+| `intLt t n`, `intLte t n`, `intGt t n`, `intGte t n` | threshold-first predicates, like the builtins |
 | `floatFromNumber p n`, `floatFromInt p n` | build at precision `p` (bits) |
 | `floatWithPrecision p x` | the same value carried at another precision |
-| `floatAdd a b`, `floatSub a b`, `floatMul a b`, `floatDiv a b` | arithmetic; the result takes the larger precision |
+| `floatAdd a b`, `floatMul a b` | arithmetic; the result takes the larger precision |
+| `floatSub k x`, `floatDiv d x` | `x - k` and `x / d` |
 | `floatNegate x`, `floatIsZero x`, `floatCompare a b` | as for integers |
+| `floatLt t x`, `floatLte t x`, `floatGt t x`, `floatGte t x` | threshold-first predicates |
 | `floatSqrt x` | Newton's method to the working precision |
 | `floatToString digits x` | decimal rendering with that many places, truncated |
 

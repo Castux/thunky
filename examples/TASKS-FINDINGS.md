@@ -150,7 +150,39 @@ boundary: algorithms whose cost model assumes arrays do not transfer.
   `isInteger` on a float square root, which is exact enough here but is luck,
   not design.
 
-## 11. Nothing says what a long program is doing
+## 11. A library that ignores the argument convention breaks piping, silently
+
+Self-inflicted, and the best finding of the batch. `big` was written with
+mathematical argument order — `intMod a b` meaning a mod b — while every
+builtin puts the operand first and the value last, so that `mod 10 x` is
+"reduce x modulo ten" and partial application works.
+
+Problem 97 then read:
+
+```
+total > big.intMod modulus          -- means: modulus mod total
+```
+
+which is `modulus mod total`, not `total mod modulus`. The answer came back as
+exactly 10^10 — a remainder equal to its own modulus, which is impossible — and
+the first suspicion fell on the freshly written schoolbook division. The
+division was fine. Two rounds of probing, and two more of my own "expected"
+values turning out to be the wrong ones, before the argument order was the
+remaining explanation.
+
+Every non-commutative operation in `big` now matches the builtins: `intSub k n`
+is n - k, `intMod d n` is n mod d, `intPow e b` is b^e. The library also gained
+`intLt`/`intLte`/`intGt`/`intGte` (and the float equivalents), which are
+threshold-first like the builtin comparators, so a bignum can be filtered and
+sorted the same way a number can. `intCompare` deliberately stays as "compare a
+to b": a three-way result is not a predicate.
+
+The general lesson is not about this library. A convention that holds
+everywhere is load-bearing: code written against it *reads* correct, so a
+library that breaks it produces a wrong answer that looks right, and the
+suspicion lands anywhere but the argument order.
+
+## 12. Nothing says what a long program is doing
 
 Problem 14 runs for four minutes. Nothing in the language reports progress: no
 clock, no counter, no logging that is not also a value. What works is `seq` on a
@@ -166,7 +198,7 @@ something forces it — writing it as an unused `let` binding does nothing at al
 `peek` is the nearest thing to a debugger here, and it prints a value rather
 than a message about one.
 
-## 12. The performance ceiling
+## 13. The performance ceiling
 
 Native build on an Intel Core i7-6700K (4 GHz, 4 cores), 16 GB RAM. The slowest
 so far: problem 14 at 4 min 15 s, problem 29 at 44 s, problem 36 at 16 s,
