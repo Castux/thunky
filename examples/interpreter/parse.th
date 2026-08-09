@@ -1,0 +1,263 @@
+-- parse.th: tokens to an abstract syntax tree.
+--
+-- Recursive descent over the grammar in docs/LANGUAGE.md §5, with every parser
+-- shaped `tokens -> result`, where a result is either
+--
+--     [resultOk,  value, remaining tokens]
+--     [resultErr, message, offset]
+--
+-- There are no exceptions, so failure is a value that every combinator has to
+-- pass along; `andThen` is what does the passing, and it is the reason this
+-- file reads as a chain rather than as a sequence of statements.
+--
+-- Three things are desugared here rather than in the evaluator, because they
+-- are defined as sugar and the evaluator is simpler for not knowing about them:
+--
+--   * list literals become nested 2-tuples, and list patterns nested 2-tuple
+--     patterns, so `[a; b]` and `[a, [b, []]]` are the same tree;
+--   * the pipe operators become plain application — `a > f` is `f a`;
+--   * the compose operators become a lambda over a name the lexer cannot
+--     produce (it contains a space), so it can never capture a user's variable.
+
+import core, list, math, text, maybe, lex in
+
+module
+
+-- --- results --------------------------------------------------------------
+
+resultOk  = 0,
+resultErr = 1,
+
+ok   = value -> rest -> [resultOk, value, rest],
+fail = message -> offset -> [resultErr, message, offset],
+
+isOk = [tag, a, b] -> eq tag resultOk,
+
+-- andThen f result: apply f to [value, rest] when the result is ok, and pass a
+-- failure through untouched.
+andThen = f -> [tag, a, b] -> if (eq tag resultOk) (f a b) [tag, a, b],
+
+-- fmapResult f result: rewrite the value of a successful result.
+fmapResult = f -> andThen (value -> rest -> ok (f value) rest),
+
+-- --- syntax tree ----------------------------------------------------------
+
+astNumber    = 0,        -- [astNumber, n]
+astString    = 1,        -- [astString, code points]
+astVar       = 2,        -- [astVar, name]
+astQualified = 3,        -- [astQualified, module, name]
+astTuple     = 4,        -- [astTuple, items]
+astLambda    = 5,        -- [astLambda, cases]   case = [pattern, body]
+astApply     = 6,        -- [astApply, function, argument]
+astLet       = 7,        -- [astLet, bindings, body]   binding = [name, expr]
+
+patVar    = 0,           -- [patVar, name]
+patNumber = 1,           -- [patNumber, n]
+patString = 2,           -- [patString, code points]
+patTuple  = 3,           -- [patTuple, subpatterns]
+
+emptyTuple = [astTuple, []],
+
+-- --- token helpers --------------------------------------------------------
+
+peek = head,
+
+atEnd = tokens -> eq lex.tokenEnd (lex.kindOf (peek tokens)),
+
+isSymbol = symbol -> token -> and (eq lex.tokenSymbol (lex.kindOf token))
+	(equal symbol (lex.valueOf token)),
+
+isKeyword = word -> token -> and (eq lex.tokenKeyword (lex.kindOf token))
+	(equal word (lex.valueOf token)),
+
+expectSymbol = symbol -> tokens -> if (isSymbol symbol (peek tokens))
+	(ok [] (tail tokens))
+	(fail (flatten ["expected " ; symbol]) (lex.offsetOf (peek tokens))),
+
+expectName = tokens -> if (eq lex.tokenName (lex.kindOf (peek tokens)))
+	(ok (lex.valueOf (peek tokens)) (tail tokens))
+	(fail "expected a name" (lex.offsetOf (peek tokens))),
+
+-- --- expressions ----------------------------------------------------------
+
+-- An expression is a let, or an operation which may turn out to be the left
+-- side of a lambda arrow.
+parseExpr = tokens -> if (isKeyword "let" (peek tokens))
+	(parseLet (tail tokens))
+	(parseOperation tokens > andThen (left -> rest ->
+		if (isSymbol "->" (peek rest))
+			(toPattern left > maybe.mapDefault
+				(fail "the left of -> is not a pattern" (lex.offsetOf (peek tokens)))
+				(pattern -> parseExpr (tail rest) > fmapResult (body ->
+					[astLambda, [[pattern, body];]])))
+			(ok left rest))),
+
+parseLet = tokens -> parseBindings tokens > andThen (bindings -> rest ->
+	if (isKeyword "in" (peek rest))
+		(parseExpr (tail rest) > fmapResult (body -> [astLet, bindings, body]))
+		(fail "expected in" (lex.offsetOf (peek rest)))),
+
+-- name = expr, comma separated.
+parseBindings = tokens -> expectName tokens > andThen (name -> afterName ->
+	expectSymbol "=" afterName > andThen (ignored -> afterEquals ->
+		parseExpr afterEquals > andThen (value -> rest ->
+			if (isSymbol "," (peek rest))
+				(parseBindings (tail rest) > fmapResult (more ->
+					prepend [[name, value];] more))
+				(ok [[name, value];] rest)))),
+
+-- The four operators do not mix and have no precedence, so a chain is a run of
+-- one operator, folded in its own direction.
+operators = [">"; "<"; "*>"; "<*"],
+
+parseOperation = tokens -> parseOperand tokens > andThen (first -> rest ->
+	operators > find (o -> isSymbol o (peek rest)) > {
+		[] -> ok first rest,
+		[operator] -> parseChain operator [first;] (tail rest)
+	}),
+
+parseChain = operator -> collected -> tokens ->
+	parseOperand tokens > andThen (next -> rest ->
+		let sofar = append [next;] collected in
+			if (isSymbol operator (peek rest))
+				(parseChain operator sofar (tail rest))
+				(ok (foldOperator operator sofar) rest)),
+
+-- a > b > c  is  c (b a);  a < b < c  is  a (b c).
+-- a *> b *> c is  x -> c (b (a x));  a <* b <* c is  x -> a (b (c x)).
+foldOperator = operator -> parts -> case
+	(equal operator ">")  (foldl (acc -> f -> [astApply, f, acc]) (head parts) (tail parts))
+	(equal operator "<")  (foldr (f -> acc -> [astApply, f, acc]) (last parts) (init parts))
+	(equal operator "*>") (composeAll parts)
+	else                  (composeAll (reverse parts)),
+
+-- composeAll [f; g; h] is  x -> h (g (f x)).
+composeAll = parts -> let hidden = "composed value" in
+	[astLambda, [[[patVar, hidden],
+		foldl (acc -> f -> [astApply, f, acc]) [astVar, hidden] parts];]],
+
+-- An operand is one or more atoms juxtaposed: application binds tightest.
+parseOperand = tokens -> parseAtom tokens > andThen (first -> rest ->
+	parseArguments first rest),
+
+parseArguments = applied -> tokens -> if (startsAtom (peek tokens))
+	(parseAtom tokens > andThen (argument -> rest ->
+		parseArguments [astApply, applied, argument] rest))
+	(ok applied tokens),
+
+startsAtom = token -> let kind = lex.kindOf token in
+	or (contains kind [lex.tokenNumber; lex.tokenName; lex.tokenString])
+		(contains (lex.valueOf token) ["("; "["; "{"]),
+
+parseAtom = tokens ->
+	let token = peek tokens, rest = tail tokens in case
+		(eq lex.tokenNumber (lex.kindOf token)) (ok [astNumber, lex.valueOf token] rest)
+		(eq lex.tokenString (lex.kindOf token)) (ok [astString, lex.valueOf token] rest)
+		(eq lex.tokenName (lex.kindOf token))   (parseNameOrQualified (lex.valueOf token) rest)
+		(isSymbol "(" token)                    (parseParenthesised rest)
+		(isSymbol "[" token)                    (parseBracketed rest)
+		(isSymbol "{" token)                    (parseBraceLambda rest)
+		else (fail "expected an expression" (lex.offsetOf token)),
+
+parseNameOrQualified = name -> tokens -> if (isSymbol "." (peek tokens))
+	(expectName (tail tokens) > fmapResult (field -> [astQualified, name, field]))
+	(ok [astVar, name] tokens),
+
+parseParenthesised = tokens -> parseExpr tokens > andThen (inner -> rest ->
+	expectSymbol ")" rest > fmapResult (ignored -> inner)),
+
+-- --- brackets: tuple, list, or empty --------------------------------------
+
+parseBracketed = tokens -> if (isSymbol "]" (peek tokens))
+	(ok emptyTuple (tail tokens))
+	(parseExpr tokens > andThen (first -> rest -> case
+		(isSymbol "," (peek rest)) (parseTupleRest [first;] (tail rest))
+		(isSymbol ";" (peek rest)) (parseListRest [first;] (tail rest))
+		(isSymbol "]" (peek rest)) (ok [astTuple, [first;]] (tail rest))
+		else (fail "expected , ; or ] in brackets" (lex.offsetOf (peek rest))))),
+
+parseTupleRest = collected -> tokens -> parseExpr tokens > andThen (item -> rest ->
+	let sofar = append [item;] collected in case
+		(isSymbol "," (peek rest)) (parseTupleRest sofar (tail rest))
+		(isSymbol "]" (peek rest)) (ok [astTuple, sofar] (tail rest))
+		else (fail "expected , or ] in a tuple" (lex.offsetOf (peek rest)))),
+
+-- A list is sugar for nested 2-tuples, so it is built as such here. `[a;]` is
+-- the one-element list, which is why a `]` right after `;` is allowed.
+parseListRest = collected -> tokens -> if (isSymbol "]" (peek tokens))
+	(ok (buildList collected) (tail tokens))
+	(parseExpr tokens > andThen (item -> rest ->
+		let sofar = append [item;] collected in case
+			(isSymbol ";" (peek rest)) (parseListRest sofar (tail rest))
+			(isSymbol "]" (peek rest)) (ok (buildList sofar) (tail rest))
+			else (fail "expected ; or ] in a list" (lex.offsetOf (peek rest))))),
+
+buildList = foldr (item -> rest -> [astTuple, [item; rest]]) emptyTuple,
+
+-- --- brace lambda ---------------------------------------------------------
+
+parseBraceLambda = tokens -> parseCases tokens > andThen (cases -> rest ->
+	expectSymbol "}" rest > fmapResult (ignored -> [astLambda, cases])),
+
+parseCases = tokens -> parseOperation tokens > andThen (left -> afterLeft ->
+	expectSymbol "->" afterLeft > andThen (ignored -> afterArrow ->
+		toPattern left > maybe.mapDefault
+			(fail "not a pattern" (lex.offsetOf (peek tokens)))
+			(pattern -> parseExpr afterArrow > andThen (body -> rest ->
+				if (isSymbol "," (peek rest))
+					(parseCases (tail rest) > fmapResult (more ->
+						prepend [[pattern, body];] more))
+					(ok [[pattern, body];] rest))))),
+
+-- --- patterns -------------------------------------------------------------
+--
+-- A pattern is a restricted expression, so it is parsed as one and converted
+-- here — exactly as the reference describes. Returns a maybe: `none` is "that
+-- expression is not a pattern".
+
+-- Only the 2-tuple nodes can be patterns; an application, a qualified name or
+-- a let has a different arity and falls through to the catch-all, which is how
+-- `f x -> …` is rejected without a special case for it.
+toPattern = {
+	[tag, a] -> case
+		(eq tag astVar)    (maybe.some [patVar, a])
+		(eq tag astNumber) (maybe.some [patNumber, a])
+		(eq tag astString) (maybe.some [patString, a])
+		(eq tag astTuple)  (let converted = map toPattern a in
+			if (allMatch maybe.isSome converted)
+				(maybe.some [patTuple, map maybe.value converted])
+				maybe.none)
+		else               maybe.none,
+	other -> maybe.none
+},
+
+-- --- programs and modules -------------------------------------------------
+
+-- imports: the names of an `import a, b in` clause, and what follows it.
+parseImports = tokens -> if (isKeyword "import" (peek tokens))
+	(parseImportNames (tail tokens))
+	(ok [] tokens),
+
+parseImportNames = tokens -> expectName tokens > andThen (name -> rest -> case
+	(isSymbol "," (peek rest)) (parseImportNames (tail rest)
+		> fmapResult (more -> prepend [name;] more))
+	(isKeyword "in" (peek rest)) (ok [name;] (tail rest))
+	else (fail "expected , or in after an import" (lex.offsetOf (peek rest)))),
+
+-- parseProgram source: [imports, expression] or a failure.
+parseProgram = source -> lex.tokens source > (tokens ->
+	parseImports tokens > andThen (imports -> afterImports ->
+		parseExpr afterImports > andThen (body -> rest ->
+			if (atEnd rest)
+				(ok [imports, body] rest)
+				(fail "unexpected trailing input" (lex.offsetOf (peek rest)))))),
+
+-- parseModule source: [imports, bindings] or a failure.
+parseModule = source -> lex.tokens source > (tokens ->
+	parseImports tokens > andThen (imports -> afterImports ->
+		if (isKeyword "module" (peek afterImports))
+			(parseBindings (tail afterImports) > andThen (bindings -> rest ->
+				if (atEnd rest)
+					(ok [imports, bindings] rest)
+					(fail "unexpected trailing input in a module" (lex.offsetOf (peek rest)))))
+			(fail "expected module" (lex.offsetOf (peek afterImports)))))

@@ -1,0 +1,103 @@
+-- interp.þ: Thunky, interpreted by Thunky.
+--
+--   bundle.sh program.þ | thunky examples/interpreter/interp.þ
+--
+-- The interpreter can only read standard input, so everything it needs arrives
+-- there as one bundle, in sections:
+--
+--     @@@ module list          the source of a module, one section each
+--     @@@ input                what the interpreted program should see as stdin
+--     @@@ main                 the program itself
+--
+-- Modules are parsed only if something imports them, because the table of
+-- module bindings is built lazily and never forced for a module nobody names.
+-- Bundling all twelve standard library files therefore costs nothing for a
+-- program that imports two of them.
+
+import core, list, math, text, maybe, hashmap, lex, parse, value, eval in
+
+let
+	sectionMark = "@@@ ",
+
+	-- --- the bundle -------------------------------------------------------
+
+	-- Sections are accumulated by folding the lines: a marker starts a new
+	-- section, anything else joins the current one.
+	addLine = [sections, name, body] -> line ->
+		if (startsWith sectionMark line)
+			[append [[name, unlines (reverse body)];] sections, trim (drop 4 line), []]
+			[sections, name, [line, body]],
+
+	finish = [sections, name, body] -> append [[name, unlines (reverse body)];] sections,
+
+	sections = lines stdin > foldl addLine [[], "", []] > finish,
+
+	sectionNamed = wanted -> sections
+		> find ([name, body] -> equal name wanted)
+		> maybe.mapDefault "" second,
+
+	moduleSections = sections
+		> filter ([name, body] -> startsWith "module " name)
+		> map ([name, body] -> [trim (drop 7 name), body]),
+
+	mainSource  = sectionNamed "main",
+	inputSource = sectionNamed "input",
+
+	-- --- modules ----------------------------------------------------------
+	--
+	-- moduleTable maps a module name to its own bindings, and is defined in
+	-- terms of itself: a module's bindings are evaluated in an environment
+	-- built from the tables of the modules it imports. Circular imports are
+	-- therefore fine, and nothing is parsed until it is asked for.
+
+	moduleTable = moduleSections
+		> foldl (acc -> [name, source] -> hashmap.set name (bindingsOf name source) acc)
+			hashmap.empty,
+
+	bindingsOf = name -> source -> parse.parseModule source > ([tag, a, b] ->
+		if (eq tag parse.resultErr)
+			(seq (write (flatten ["parse error in module "; name; ": "; a])) [])
+			(a > ([imports, bindings] ->
+				let
+					outer = environmentFor imports,
+					inner = bindings
+						> foldl (acc -> [bindingName, expr] ->
+							eval.bind bindingName (eval.expression inner expr) acc) outer
+				in
+					bindings > map ([bindingName, expr] ->
+						[bindingName, eval.expression inner expr])))),
+
+	-- The environment an import clause produces: the builtins, then each
+	-- module's bindings both unqualified and as `module.name`. A later import
+	-- shadows an earlier one, which is the documented rule.
+	environmentFor = imports -> imports > foldl (acc -> name ->
+		hashmap.getOr [] name moduleTable
+			> foldl (inner -> [bindingName, item] ->
+				eval.bind bindingName item
+					(eval.bind (flatten [name; "."; bindingName]) item inner)) acc)
+		builtinEnv,
+
+	-- --- builtins ---------------------------------------------------------
+
+	builtinEnv = eval.primitives
+		> foldl (acc -> [name, arity] ->
+			eval.bind name (eval.builtinValue name > maybe.value) acc) eval.emptyEnv
+		> eval.bind "stdin" (value.fromText inputSource)
+		-- The bundle carries one input section, as text. `bstdin` is the same
+		-- input as bytes, which coincides with the code points for ASCII and
+		-- would need the section carried as bytes to be right beyond it.
+		> eval.bind "bstdin" (value.fromText inputSource),
+
+	-- --- the program ------------------------------------------------------
+
+	run = parse.parseProgram mainSource > ([tag, a, b] ->
+		if (eq tag parse.resultErr)
+			(lex.lineColumn mainSource b > ([line, column] ->
+				write (flatten ["parse error at line "; string line; ", column "; string column;
+					": "; a])))
+			(a > ([imports, body] ->
+				-- Forcing the rendering is what runs the program: any output the
+				-- program produces on the way happens first, as it would natively.
+				seq (value.render (eval.expression (environmentFor imports) body)) [])))
+in
+	run > eval

@@ -282,6 +282,63 @@ primes below two million).
 
 ---
 
+## The self-interpreter
+
+`examples/interpreter/` is a Thunky interpreter in Thunky — 795 lines against
+the 3626 lines of Go it models — scored against the same `tests/cases/`
+corpus the compiler is. **56 of 77 pass**, and every failure is a diagnostic
+case: 20 test error messages the interpreter does not reproduce, and one tests
+`peek`'s truncation. No case testing language semantics fails.
+
+Two claims it settles, both of which had been guesses:
+
+**Laziness is inherited from the host.** The evaluator has no thunk type, no
+memo table and no forcing machinery. `apply (expression env f) (expression env
+arg)` does not evaluate the argument, so the object language is call-by-name for
+free; the host memoises the shared value, so it is call-by-*need*. An
+interpreted `take 5 (upFrom 1)` terminates and an interpreted self-referential
+`fibs` works. On a strict host the same interpreter needs explicit thunks and a
+mutable store.
+
+**The recursive knots tie themselves.** A `let` group's environment is defined
+in terms of itself, and the module table one level up likewise, so mutual
+recursion and circular imports need no fixup pass. Modules are also parsed only
+when named, so bundling all twelve standard library files costs nothing.
+
+And one it confirms the hard way: **diagnostics are the expensive part of a
+language implementation, and the part a pure language makes hardest.** Reaching
+56/77 took the evaluator; the remaining 21 need positions carried through every
+value and every application, plus a way to abort — which, with no exceptions, is
+a redesign rather than an addition.
+
+The bugs are in §17.
+
+## 17. What building the interpreter cost
+
+Four bugs, each a property of the language rather than a slip, all recorded in
+the source where they happened:
+
+- **Commutativity hid an argument-order bug.** `apply` appends arguments as they
+  arrive; `runPrimitive` reversed them again. `add 1 2` was therefore right and
+  `sub 1 n` computed `1 - n`, so an interpreted countdown ran away from its base
+  case. It appeared as 92,028 evaluations of a three-step recursion, and was
+  found by *counting evaluations* with a `seq`-and-`write` in the evaluator —
+  there is no debugger, and `peek` prints a value, not a trace.
+- **`eval` shadowed, twice.** The evaluator's main function was called `eval`,
+  which shadows the builtin for every importer, so the driver's `run > eval`
+  built a partial application and produced no output, no error, exit 0. After
+  renaming it, one missed call site left the *builtin* `eval` accepting an
+  environment and returning it. §12 with consequences.
+- **`[head, tail]` where `[head; tail]` was meant**, in the definition of a cons
+  cell — so every list was one element long and `write "hello"` printed `h`.
+  §14, in a data representation this time.
+- **Failure as a value, everywhere.** Every parser returns ok-or-error and every
+  combinator has to pass failures along. It reads well and it is honest work,
+  but it is also why the evaluator cannot abort, and therefore why a fifth of
+  the corpus is out of reach.
+
+---
+
 ## What worked well, and should not be lost
 
 - **`string` and `equal` on any value.** Palindrome detection in problem 4 is

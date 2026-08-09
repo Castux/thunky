@@ -1,0 +1,9 @@
+-- Dump the parsed program on stdin: a parser smoke test.
+import core, list, math, text, parse in
+
+let
+	render = [tag, a, b] -> case
+		(eq tag parse.resultOk)  (flatten ["ok: "; string a])
+		else                     (flatten ["parse error: "; a; " at offset "; string b])
+in
+	parse.parseProgram stdin > render > write

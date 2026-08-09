@@ -1,0 +1,97 @@
+-- value.th: runtime values, and rendering them the way the compiler does.
+--
+-- A value is one of
+--
+--     a plain number                      -- the host's own number
+--     [valTuple,   items]                 -- items is a host list of values
+--     [valClosure, cases, environment]
+--     [valBuiltin, primitive, arity, collected arguments]
+--
+-- Numbers are left as host numbers rather than tagged, so arithmetic in the
+-- interpreted program is arithmetic here too, with no wrapping in between. The
+-- other three are told apart by arity, which is why the tags never have to be
+-- compared to classify a value — matching `[tag, a]` already rules out a
+-- closure.
+--
+-- Nothing here forces anything it does not have to: the items of a tuple are
+-- whatever the evaluator put there, evaluated or not, and only `render` walks
+-- the whole structure.
+
+import core, list, math, text in
+
+module
+
+valTuple   = 0,
+valClosure = 1,
+valBuiltin = 2,
+
+emptyValue = [valTuple, []],
+
+tupleValue = items -> [valTuple, items],
+-- The items of a tuple value are a host *list*, so a cons cell's items are the
+-- two-element list [head; tail]. Written [head, tail] it is a two-tuple, which
+-- reads identically and makes every later `map` and `length` over the items
+-- see one element instead of two.
+consValue  = head -> tail -> [valTuple, [head; tail]],
+
+-- fromText: a string literal becomes a list of code points, which is what a
+-- string is.
+fromText = foldr consValue emptyValue,
+
+-- classify: the tag, or `valNumber` for a plain number. The order of the cases
+-- is the classification: a number matches no tuple pattern, so it falls to the
+-- catch-all.
+valNumber = 3,
+classify = {
+	[tag, a]          -> tag,
+	[tag, a, b]       -> tag,
+	[tag, a, b, c]    -> tag,
+	number            -> valNumber
+},
+
+isNumber = classify *> eq valNumber,
+isTuple  = classify *> eq valTuple,
+
+-- itemsOf: the elements of a tuple value.
+itemsOf = [tag, items] -> items,
+
+-- --- rendering ------------------------------------------------------------
+--
+-- This has to agree with the compiler's own output exactly, since that is what
+-- the conformance cases record. Numbers go through the host's `string`, which
+-- is the same renderer the compiler uses, so 1e+21 and 0.3333333333333333 come
+-- out right without any formatting code here.
+
+-- A tuple prints as a list when it is one: empty, or a pair whose second
+-- element is itself list-shaped.
+isListShaped = value -> value > {
+	[tag, items] -> and (eq tag valTuple) (items > {
+		[] -> 1,
+		[first, rest] -> rest > {
+			[] -> 0,                              -- a 1-tuple is not a list
+			[second, more] -> and (isEmpty more) (isListShaped second)
+		},
+		other -> 0
+	}),
+	other -> 0
+},
+
+-- listItems: the elements of a list-shaped value, in order.
+listItems = value -> value > {
+	[tag, items] -> items > {
+		[] -> [],
+		[first, rest] -> prepend [first;] (listItems (head rest)),
+		other -> []
+	},
+	other -> []
+},
+
+render = value -> value > {
+	[tag, contents] -> if (isListShaped value)
+		(flatten ["["; listItems value > map render > join "; ";
+			if (eq 1 (length (listItems value))) ";" ""; "]"])
+		(flatten ["["; contents > map render > join ", "; "]"]),
+	[tag, a, b]    -> "<function>",
+	[tag, a, b, c] -> "<function>",
+	number         -> string number
+}

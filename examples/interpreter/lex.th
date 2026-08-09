@@ -1,0 +1,103 @@
+-- lex.th: Thunky source text to a list of tokens.
+--
+-- A token is [kind, value, offset]: the kind is one of the small integers
+-- below, the value is a number for `tokenNumber` and a list of code points for
+-- everything else, and the offset is the index into the source where the token
+-- starts — enough to recover a line and column when something needs reporting.
+--
+-- Numeric kinds rather than string tags because every token is inspected
+-- several times by the parser, and `eq` on a number is one comparison where
+-- `equal` on a tag walks a list.
+
+import core, list, math, text in
+
+module
+
+tokenNumber = 0,
+tokenName   = 1,
+tokenString = 2,
+tokenSymbol = 3,
+tokenKeyword = 4,
+tokenEnd    = 5,
+
+kindOf   = [kind, value, offset] -> kind,
+valueOf  = [kind, value, offset] -> value,
+offsetOf = [kind, value, offset] -> offset,
+
+keywords = ["let"; "in"; "module"; "import"],
+
+-- The multi-character symbols come first: the language matches them before
+-- their prefixes, so `->` is never a `-` followed by a `>`.
+symbols = ["->"; "<*"; "*>"; ">"; "<"; "."; "="; ","; ";"; "("; ")"; "{"; "}"; "["; "]"],
+
+isIdentifierStart = c -> or (isAlpha c) (eq c (char '_')),
+isIdentifierPart  = c -> or (isAlphaNum c) (eq c (char '_')),
+
+-- tokens source: the token list, ending with a tokenEnd. `offset` counts code
+-- points from the start, so it survives the recursion without a second pass.
+tokens = source -> scan source 0,
+
+scan = rest -> offset -> rest > {
+	[] -> [[tokenEnd, "", offset];],
+	[c, more] -> case
+		(isSpace c)              (scan more (succ offset))
+		(startsWith "--" rest)   (let dropped = takeWhile (neq lf) rest in
+			scan (drop (length dropped) rest) (add offset (length dropped)))
+		(isDigit c)              (scanNumber rest offset)
+		(isIdentifierStart c)    (scanWord rest offset)
+		(or (eq c dquote) (eq c quote)) (scanString rest offset)
+		else                     (scanSymbol rest offset)
+},
+
+scanNumber = rest -> offset ->
+	let
+		whole    = takeWhile isDigit rest,
+		afterWhole = drop (length whole) rest,
+		-- A dot only continues the number when a digit follows it.
+		fraction = afterWhole > {
+			[d, more] -> if (and (eq d (char '.')) (isDigit (headOr 0 more)))
+				(prepend [d;] (takeWhile isDigit more))
+				"",
+			[] -> ""
+		},
+		digits = flatten [whole; fraction]
+	in
+		[[tokenNumber, stringToFloat digits, offset],
+			scan (drop (length digits) rest) (add offset (length digits))],
+
+headOr = fallback -> l -> l > { [] -> fallback, [h, t] -> h },
+
+scanWord = rest -> offset ->
+	let
+		word = takeWhile isIdentifierPart rest,
+		kind = if (contains word keywords) tokenKeyword tokenName
+	in
+		[[kind, word, offset], scan (drop (length word) rest) (add offset (length word))],
+
+-- A string runs to the next occurrence of its own quote character; the language
+-- has no escapes, so there is nothing to skip over.
+scanString = rest -> offset ->
+	let
+		quoteChar = head rest,
+		body      = takeWhile (neq quoteChar) (tail rest),
+		consumed  = add 2 (length body)
+	in
+		[[tokenString, body, offset],
+			scan (drop consumed rest) (add offset consumed)],
+
+scanSymbol = rest -> offset ->
+	symbols > find (s -> startsWith s rest) > {
+		[symbol] -> [[tokenSymbol, symbol, offset],
+			scan (drop (length symbol) rest) (add offset (length symbol))],
+		[] -> [[tokenSymbol, take 1 rest, offset], scan (drop 1 rest) (succ offset)]
+	},
+
+-- lineColumn source offset: the 1-based line and column of an offset, computed
+-- only when a message needs it.
+lineColumn = source -> offset ->
+	let
+		before = take offset source,
+		line   = succ (count (eq lf) before),
+		column = succ (length (takeWhile (neq lf) (reverse before)))
+	in
+		[line, column]
