@@ -1,0 +1,268 @@
+-- json.þ: parsing and printing JSON.
+--
+-- ## The representation, and why it is tagged
+--
+-- JSON's types do not map onto Thunky's without ambiguity. A JSON string is a
+-- list of code points and so is a JSON array of numbers; `true` and `null` have
+-- no native counterpart at all. Values are therefore tagged 2-tuples:
+--
+--     ["null",   0]
+--     ["bool",   0 or 1]
+--     ["number", n]
+--     ["string", code points]
+--     ["array",  list of values]
+--     ["object", list of [key, value] pairs, key a string, in document order]
+--
+-- The tags are strings rather than small integers so that a consumer can match
+-- them literally, which is the whole ergonomic argument for this shape:
+--
+--     total = { ["number", n] -> n, ["array", items] -> sum (map total items), v -> 0 }
+--
+-- Objects keep their pairs in document order rather than sorting or hashing
+-- them, because printing a parsed document should give it back unchanged. That
+-- makes `get` O(n) in the number of keys; `toTable` hands the pairs to the
+-- `table` module, and for a large object `hashmap.fromList` is one step away.
+--
+-- ## Parsing
+--
+-- Every parser has the shape `text -> maybe [value, rest]`: consume a prefix,
+-- return the value and what is left, or `none`. They compose with
+-- `maybe.andThen`, and the grammar below reads as the JSON spec does.
+--
+-- A `none` says only that the document is not valid, not where or why. Locating
+-- an error would mean threading a position through every parser, which is a
+-- real cost in a language with no mutable state — worth doing if this library
+-- becomes load-bearing, and deliberately not done yet.
+
+import core, list, math, maybe, text, table in
+
+module
+
+-- --- constructors ---------------------------------------------------------
+
+jsonNull   = ["null", 0],
+jsonTrue   = ["bool", 1],
+jsonFalse  = ["bool", 0],
+jsonBool   = b -> ["bool", if b 1 0],
+jsonNumber = n -> ["number", n],
+jsonString = s -> ["string", s],
+jsonArray  = items -> ["array", items],
+jsonObject = pairs -> ["object", pairs],
+
+-- --- inspection -----------------------------------------------------------
+
+-- typeOf value: one of "null", "bool", "number", "string", "array", "object".
+typeOf = [tag, content] -> tag,
+
+isNull = [tag, content] -> equal tag "null",
+
+-- get key value: the value for a key of an object, or none.
+get = key -> [tag, content] -> if (equal tag "object")
+	(content > find ([k, v] -> equal k key) > maybe.fmap second)
+	maybe.none,
+
+-- at index value: the element at a zero-based index of an array, or none.
+at = index -> [tag, content] -> if (equal tag "array")
+	(if (gte 0 index) (content > drop index > headSafe) maybe.none)
+	maybe.none,
+
+-- path keys value: follow a chain of object keys and array indices. A number in
+-- the path indexes an array, a string looks up an object key.
+path = steps -> value -> foldl (current -> step ->
+	current > maybe.andThen (v -> if (isList step) (get step v) (at step v)))
+	(maybe.some value) steps,
+
+-- Extractors, each none if the value is not of that type.
+asNumber = [tag, content] -> if (equal tag "number") (maybe.some content) maybe.none,
+asString = [tag, content] -> if (equal tag "string") (maybe.some content) maybe.none,
+asBool   = [tag, content] -> if (equal tag "bool")   (maybe.some content) maybe.none,
+asArray  = [tag, content] -> if (equal tag "array")  (maybe.some content) maybe.none,
+asObject = [tag, content] -> if (equal tag "object") (maybe.some content) maybe.none,
+
+-- toTable value: an object's pairs as a `table`, for the get/set/update family.
+toTable = [tag, content] -> if (equal tag "object") (table.fromList content) table.empty,
+
+-- --- parsing --------------------------------------------------------------
+
+parse = text -> parseValue text > maybe.andThen ([value, rest] ->
+	if (isEmpty (skipSpace rest)) (maybe.some value) maybe.none),
+
+skipSpace = dropWhile isSpace,
+
+parseValue = text -> skipSpace text > (t -> t > {
+	[] -> maybe.none,
+	[c, rest] -> case
+		(eq c (char '{'))  (parseObjectBody (skipSpace rest))
+		(eq c (char '['))  (parseArrayBody (skipSpace rest))
+		(eq c dquote)      (parseStringBody rest > maybe.fmap ([s, r] -> [["string", s], r]))
+		(eq c (char 't'))  (parseLiteral "true" jsonTrue t)
+		(eq c (char 'f'))  (parseLiteral "false" jsonFalse t)
+		(eq c (char 'n'))  (parseLiteral "null" jsonNull t)
+		else               (parseNumber t)
+}),
+
+parseLiteral = word -> value -> text -> if (startsWith word text)
+	(maybe.some [value, drop (length word) text])
+	maybe.none,
+
+-- Numbers: the JSON grammar's int/frac/exp, scanned as one span and then
+-- converted. `stringToFloat` handles the sign and the fraction; the exponent is
+-- applied here.
+isNumberChar = c -> or (isDigit c) (contains c "+-.eE"),
+
+parseNumber = text -> span isNumberChar text > ([digits, rest] ->
+	if (isEmpty digits) maybe.none (maybe.some [["number", toNumber digits], rest])),
+
+toNumber = s -> s
+	> map (c -> if (eq c (char 'E')) (char 'e') c)
+	> split "e"
+	> {
+		[mantissa;]           -> stringToFloat mantissa,
+		[mantissa; exponent]  -> mul (stringToFloat mantissa)
+			(pow (stringToFloat (dropWhile (eq (char '+')) exponent)) 10),
+		other                 -> 0
+	},
+
+-- Strings: called with the opening quote already consumed.
+parseStringBody = text -> text > {
+	[] -> maybe.none,                                   -- unterminated
+	[c, rest] -> case
+		(eq c dquote)     (maybe.some [[], rest])
+		(eq c backslash)  (parseEscape rest)
+		else              (parseStringBody rest
+			> maybe.fmap ([chars, r] -> [[c, chars], r]))
+},
+
+parseEscape = text -> text > {
+	[] -> maybe.none,
+	[e, rest] -> if (eq e (char 'u'))
+		(parseHex4 rest)
+		(escapeChar e > maybe.andThen (ch ->
+			parseStringBody rest > maybe.fmap ([chars, r] -> [[ch, chars], r])))
+},
+
+escapeChar = e -> case
+	(eq e dquote)        (maybe.some dquote)
+	(eq e backslash)     (maybe.some backslash)
+	(eq e (char '/'))    (maybe.some (char '/'))
+	(eq e (char 'n'))    (maybe.some lf)
+	(eq e (char 't'))    (maybe.some tab)
+	(eq e (char 'r'))    (maybe.some cr)
+	(eq e (char 'b'))    (maybe.some 8)
+	(eq e (char 'f'))    (maybe.some 12)
+	else                 maybe.none,
+
+hexValue = c -> case
+	(isDigit c)                          (maybe.some (digitToInt c))
+	(and (lte c (char 'a')) (lte (char 'f') c)) (maybe.some (add 10 (sub (char 'a') c)))
+	(and (lte c (char 'A')) (lte (char 'F') c)) (maybe.some (add 10 (sub (char 'A') c)))
+	else                                 maybe.none,
+
+parseHex4 = text -> if (lt 4 (length text)) maybe.none
+	(take 4 text
+		> map hexValue
+		> (values -> if (anyMatch maybe.isNone values)
+			maybe.none
+			(maybe.some (values > map maybe.value > foldl (acc -> d -> add d (mul 16 acc)) 0)))
+		> maybe.andThen (code -> parseStringBody (drop 4 text)
+			> maybe.fmap ([chars, r] -> [[code, chars], r]))),
+
+-- Arrays and objects: called with the opening bracket consumed and whitespace
+-- skipped, so an immediate closing bracket is the empty case.
+parseArrayBody = text -> text > {
+	[c, rest] -> if (eq c (char ']'))
+		(maybe.some [["array", []], rest])
+		(parseElements text > maybe.fmap ([items, r] -> [["array", items], r])),
+	[] -> maybe.none
+},
+
+parseElements = text -> parseValue text > maybe.andThen ([value, rest] ->
+	skipSpace rest > (t -> t > {
+		[c, more] -> case
+			(eq c (char ',')) (parseElements more
+				> maybe.fmap ([items, r] -> [[value, items], r]))
+			(eq c (char ']')) (maybe.some [[value;], more])
+			else              maybe.none,
+		[] -> maybe.none
+	})),
+
+parseObjectBody = text -> text > {
+	[c, rest] -> if (eq c (char '}'))
+		(maybe.some [["object", []], rest])
+		(parseMembers text > maybe.fmap ([pairs, r] -> [["object", pairs], r])),
+	[] -> maybe.none
+},
+
+parseMembers = text -> parseMember (skipSpace text) > maybe.andThen ([pair, rest] ->
+	skipSpace rest > (t -> t > {
+		[c, more] -> case
+			(eq c (char ',')) (parseMembers more
+				> maybe.fmap ([pairs, r] -> [[pair, pairs], r]))
+			(eq c (char '}')) (maybe.some [[pair;], more])
+			else              maybe.none,
+		[] -> maybe.none
+	})),
+
+parseMember = text -> text > {
+	[c, rest] -> if (eq c dquote)
+		(parseStringBody rest > maybe.andThen ([key, afterKey] ->
+			skipSpace afterKey > (t -> t > {
+				[colon, afterColon] -> if (eq colon (char ':'))
+					(parseValue afterColon > maybe.fmap ([value, r] -> [[key, value], r]))
+					maybe.none,
+				[] -> maybe.none
+			})))
+		maybe.none,
+	[] -> maybe.none
+},
+
+-- --- printing -------------------------------------------------------------
+
+-- stringify value: compact, no spaces.
+stringify = [tag, content] -> case
+	(equal tag "null")    "null"
+	(equal tag "bool")    (if content "true" "false")
+	(equal tag "number")  (string content)
+	(equal tag "string")  (quote content)
+	(equal tag "array")   (flatten ["["; content > map stringify > join ","; "]"])
+	else                  (flatten ["{";
+		content > map ([k, v] -> flatten [quote k; ":"; stringify v]) > join ",";
+		"}"]),
+
+quote = s -> flatten [[dquote;]; flatMap escapeOne s; [dquote;]],
+
+escapeOne = c -> case
+	(eq c dquote)     (flatten [[backslash;]; [dquote;]])
+	(eq c backslash)  (flatten [[backslash;]; [backslash;]])
+	(eq c lf)         (flatten [[backslash;]; "n"])
+	(eq c cr)         (flatten [[backslash;]; "r"])
+	(eq c tab)        (flatten [[backslash;]; "t"])
+	(lt 32 c)         (flatten [[backslash;]; "u"; padLeft 4 (char '0') (toHex4 c)])
+	else              [c;],
+
+hexDigits = "0123456789abcdef",
+toHex4 = n -> if (eq n 0) "0" (toHexGo n),
+toHexGo = n -> if (eq n 0) [] (append [nth (mod 16 n) hexDigits;] (toHexGo (div 16 n))),
+
+-- stringifyPretty indent value: one member or element per line, indented by
+-- `indent` spaces per level.
+stringifyPretty = indent -> value -> prettyAt indent 0 value,
+
+prettyAt = indent -> depth -> [tag, content] ->
+	let
+		pad   = n -> replicate (mul indent n) space,
+		inner = succ depth
+	in case
+		(equal tag "array") (if (isEmpty content) "[]" (flatten [
+			"["; [lf;];
+			content
+				> map (v -> flatten [pad inner; prettyAt indent inner v])
+				> join (flatten [","; [lf;]]);
+			[lf;]; pad depth; "]"]))
+		(equal tag "object") (if (isEmpty content) "{}" (flatten [
+			"{"; [lf;];
+			content
+				> map ([k, v] -> flatten [pad inner; quote k; ": "; prettyAt indent inner v])
+				> join (flatten [","; [lf;]]);
+			[lf;]; pad depth; "}"]))
+		else (stringify [tag, content])
