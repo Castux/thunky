@@ -2,33 +2,20 @@
 -- The index of the first Fibonacci term with 1000 digits.
 -- Answer: 4782
 --
--- Written as a recursion carrying the pair (F(n), F(n+1)) rather than as
--- `findIndex` over `iterate`, on purpose: naming the stream would keep every
--- one of the 4782 terms — each a list of up to 1000 digits — alive to the end.
--- Unnamed and consumed as it goes, the search holds two numbers at a time.
+-- "Has 1000 digits" is tested as ">= 10^999" rather than by rendering the
+-- number: intCompare walks limbs and stops early, while intToString would
+-- convert all 4782 terms to decimal.
+--
+-- The search carries the pair (F(n), F(n+1)) rather than indexing a named
+-- stream, so only two terms are ever live.
 
-import core, list, math in
+import core, list, math, big in
 
 let
-	fromInt = n -> if (lt 10 n) [n;] (prepend [mod 10 n;] (fromInt (div 10 n))),
+	limit = big.intPow (big.intFromNumber 10) 999,
 
-	carry = c -> {
-		[] -> if (eq c 0) [] (fromInt c),
-		[d, rest] -> let s = add d c in [mod 10 s, carry (div 10 s) rest]
-	},
-
-	zipLong = {
-		[] -> b -> b,
-		[x, xs] -> {
-			[] -> [x, xs],
-			[y, ys] -> [add x y, zipLong xs ys]
-		}
-	},
-
-	bigAdd = a -> b -> carry 0 (zipLong a b),
-
-	search = index -> a -> b -> if (gte 1000 (length a))
+	search = index -> a -> b -> if (gte 0 (big.intCompare a limit))
 		index
-		(search (succ index) b (bigAdd a b))
+		(search (succ index) b (big.intAdd a b))
 in
-	search 1 [1;] [1;] > show
+	search 1 big.intOne big.intOne > show

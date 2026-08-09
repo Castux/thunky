@@ -1,4 +1,4 @@
-import core, math, list, comb, text, heap, maybe, table, hashmap in
+import core, math, list, comb, text, heap, maybe, table, hashmap, bit, big in
 
 let
 	assert = name -> expr -> expected ->
@@ -400,5 +400,49 @@ runTests [
 		(hashmap.singleton "a" 1 > set "b" 2 > hashmap.keyValues > sortWith (on lt second))
 		[["a", 1]; ["b", 2]];
 	assert "hashmap.keyValues-single" (hashmap.singleton "a" 1 > hashmap.keyValues) [["a",1];];
-	assert "hashmap.keyValues-empty" (hashmap.empty) []
+	assert "hashmap.keyValues-empty" (hashmap.empty) [];
+
+	-- bit.þ
+	assert "bit.bAnd" (bit.bAnd 12 10) 8;
+	assert "bit.bOr" (bit.bOr 12 10) 14;
+	assert "bit.bXor" (bit.bXor 12 10) 6;
+	assert "bit.bXor-wide" (bit.bXor 3735928559 4294967295) 559038736;
+	assert "bit.bNot" (bit.bNot 0) 4294967295;
+	assert "bit.shiftLeft" (bit.shiftLeft 4 1) 16;
+	assert "bit.shiftLeft-wraps" (bit.shiftLeft 1 2147483648) 0;
+	assert "bit.shiftRight" (bit.shiftRight 4 4096) 256;
+	assert "bit.rotateLeft" (bit.rotateLeft 8 305419896) 878082066;
+	assert "bit.rotateRight" (bit.rotateRight 8 878082066) 305419896;
+	assert "bit.popCount" (bit.popCount 4294967295) 32;
+	assert "bit.testBit" (bit.testBit 3 8) 1;
+	assert "bit.setBit" (bit.setBit 3 0) 8;
+	assert "bit.clearBit" (bit.clearBit 3 15) 7;
+	assert "bit.bits-roundtrip" (bit.fromBits (bit.toBits 123456789)) 123456789;
+	assert "bit.toHex" (bit.toHex 3735928559) "deadbeef";
+	assert "bit.wrap-negative" (bit.wrap (negate 1)) 4294967295;
+
+	-- big.þ
+	assert "big.intToString-zero" (big.intToString (big.intFromNumber 0)) "0";
+	assert "big.intToString-negative" (big.intToString (big.intFromNumber (negate 42))) "-42";
+	assert "big.intFromString" (big.intToString (big.intFromString "987654321098765432109876543210"))
+		"987654321098765432109876543210";
+	assert "big.intAdd" (big.intToString (big.intAdd (big.intFromNumber 999999999999) (big.intFromNumber 1)))
+		"1000000000000";
+	assert "big.intAdd-signs" (big.intToString (big.intAdd (big.intFromNumber 5) (big.intFromNumber (negate 8)))) "-3";
+	assert "big.intSub-to-zero" (big.intToString (big.intSub (big.intFromNumber 7) (big.intFromNumber 7))) "0";
+	assert "big.intMul" (big.intToString (big.intMul (big.intFromNumber 123456789) (big.intFromNumber 987654321)))
+		"121932631112635269";
+	assert "big.intPow" (big.intToString (big.intPow (big.intFromNumber 2) 64)) "18446744073709551616";
+	assert "big.intDiv" (big.intToString (big.intDiv (big.intFromNumber 1000000007) (big.intFromNumber 3))) "333333335";
+	assert "big.intMod" (big.intToString (big.intMod (big.intFromNumber 1000000007) (big.intFromNumber 3))) "2";
+	assert "big.intCompare" (big.intCompare (big.intFromNumber 5) (big.intFromNumber 9)) (negate 1);
+	assert "big.intDigits-sum" (big.intDigits (big.intPow (big.intFromNumber 2) 100) > sum) 115;
+	assert "big.floatDiv" (big.floatToString 20 (big.floatDiv (big.floatFromNumber 200 1) (big.floatFromNumber 200 3)))
+		"0.33333333333333333333";
+	assert "big.floatAdd" (big.floatToString 5 (big.floatAdd (big.floatFromNumber 100 1.5) (big.floatFromNumber 100 2.25)))
+		"3.75000";
+	assert "big.floatMul" (big.floatToString 5 (big.floatMul (big.floatFromNumber 100 1.5) (big.floatFromNumber 100 4)))
+		"6.00000";
+	assert "big.floatSqrt" (big.floatToString 20 (big.floatSqrt (big.floatFromNumber 200 2)))
+		"1.41421356237309504880"
 ]

@@ -4,39 +4,16 @@
 --
 --   thunky examples/euler/p013-large-sum.þ < examples/euler/data/p013-numbers.txt
 --
--- Numbers are float64, exact only to 2^53, so a 50-digit value cannot be held
--- as one. The standard library has no arbitrary-precision type, so this file
--- carries its own: a natural is a little-endian list of decimal digits, and
--- addition is digit-wise `zipLong` followed by a carry pass.
+-- A 50-digit number does not fit in a float64, so this is `big`: parse each
+-- line as an arbitrary-precision integer, fold with intAdd, print, take ten.
 
-import core, list, math, text in
+import core, list, math, text, big in
 
-let
-	fromInt = n -> if (lt 10 n) [n;] (prepend [mod 10 n;] (fromInt (div 10 n))),
-
-	-- Propagate carries along a list whose "digits" may exceed 9.
-	carry = c -> {
-		[] -> if (eq c 0) [] (fromInt c),
-		[d, rest] -> let s = add d c in [mod 10 s, carry (div 10 s) rest]
-	},
-
-	-- Digit-wise sum, keeping the longer tail.
-	zipLong = {
-		[] -> b -> b,
-		[x, xs] -> {
-			[] -> [x, xs],
-			[y, ys] -> [add x y, zipLong xs ys]
-		}
-	},
-
-	bigAdd  = a -> b -> carry 0 (zipLong a b),
-	bigFromDigits = digits -> reverse (map digitToInt digits),
-
-	numbers = stdin
-		> split [lf;]
-		> filter (isEmpty *> not)
-		> map bigFromDigits,
-
-	total = foldl bigAdd [0;] numbers
-in
-	total > reverse > take 10 > map intToDigit > write
+	stdin
+	> split [lf;]
+	> filter (isEmpty *> not)
+	> map big.intFromString
+	> foldl big.intAdd big.intZero
+	> big.intToString
+	> take 10
+	> write

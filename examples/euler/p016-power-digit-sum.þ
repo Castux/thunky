@@ -1,21 +1,7 @@
 -- Project Euler 16: Power digit sum
 -- The sum of the digits of 2^1000.
 -- Answer: 1366
---
--- 2^1000 has 302 digits and numbers here are float64, so this needs the same
--- little-endian digit list as problem 13. Doubling is `map (mul 2)` followed by
--- a carry pass, and the digit sum is then just `sum`.
 
-import core, list, math in
+import core, list, math, big in
 
-let
-	fromInt = n -> if (lt 10 n) [n;] (prepend [mod 10 n;] (fromInt (div 10 n))),
-
-	carry = c -> {
-		[] -> if (eq c 0) [] (fromInt c),
-		[d, rest] -> let s = add d c in [mod 10 s, carry (div 10 s) rest]
-	},
-
-	double = digits -> carry 0 (map (mul 2) digits)
-in
-	times 1000 double [1;] > sum > show
+	big.intPow (big.intFromNumber 2) 1000 > big.intDigits > sum > show
