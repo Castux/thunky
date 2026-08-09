@@ -54,7 +54,7 @@ const ThunkyRunner = (() => {
     }
 
     // run(source, opts) -> Promise<{exitCode} | {timedOut} | {cancelled} | {hostError}>
-    // opts: { path, stdin, dump, onOutput(text, fd), timeoutMs }
+    // opts: { path, stdin, dump, modules, onOutput(text, fd), timeoutMs }
     function run(source, opts = {}) {
         stop({ cancelled: true });
         if (!worker) spawnWorker();
@@ -74,6 +74,7 @@ const ThunkyRunner = (() => {
                 path: opts.path || "playground.þ",
                 stdin: opts.stdin || "",
                 dump: opts.dump || "",
+                modules: opts.modules || {},
             });
         });
     }

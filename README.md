@@ -123,6 +123,14 @@ language reference and tutorial is editable and runnable in place, and the
 playground offers a full editor with example programs, stdin, stage dumps
 (AST / Core IR / bytecode), and shareable URLs.
 
+Its example picker carries everything in `examples/`, including all of
+[Project Euler](examples/euler/README.md) and
+[Rosetta Code](examples/rosetta/README.md). Choosing one that reads input
+pre-fills the stdin box with its data file, and one that imports a local module
+(`examples/euler/euler.th`) has it fetched and handed to the runtime — the
+browser has no filesystem to resolve an import against, so the page supplies
+those modules itself.
+
 The site is deployed to GitHub Pages by `.github/workflows/pages.yml`. One-time
 setup on the GitHub repository:
 

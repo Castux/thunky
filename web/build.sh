@@ -40,4 +40,12 @@ cp docs/*.md "$out/docs/"
 cp docs/tutorial/*.md "$out/docs/tutorial/"
 cp examples/*.þ "$out/examples/"
 
+# The exercise sets, their data files, and the helper module a few of them
+# import. The playground fetches modules and hands them to the runtime, since
+# the browser has no filesystem to resolve `import euler` against.
+mkdir -p "$out/examples/euler/data" "$out/examples/rosetta"
+cp examples/euler/*.þ examples/euler/*.th "$out/examples/euler/"
+cp examples/euler/data/*.txt "$out/examples/euler/data/"
+cp examples/rosetta/*.þ "$out/examples/rosetta/"
+
 echo "site assembled in $out/"

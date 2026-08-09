@@ -26,6 +26,11 @@ jobs:
         run: bash web/build.sh _site
       - name: Smoke-test the wasm build
         run: node web/smoke.mjs _site examples/core_tests.þ
+      - name: Check the playground's example catalogue
+        # Static check only: every program, data file and module the picker
+        # names must be in the site. Adding --run also executes the non-slow
+        # ones, which takes about ten minutes.
+        run: node web/check-examples.mjs _site
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

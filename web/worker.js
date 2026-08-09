@@ -77,7 +77,7 @@ class ExitSignal extends Error {
 }
 
 onmessage = async event => {
-    const { id, source, path, stdin, dump } = event.data;
+    const { id, source, path, stdin, dump, modules } = event.data;
 
     // An uncaught async throw from inside the Go runtime would otherwise reach
     // worker.onerror as an unlabelled "worker error"; claim it for this run.
@@ -98,6 +98,10 @@ onmessage = async event => {
         globalThis.__thunky_source = source;
         globalThis.__thunky_path = path || "playground.þ";
         globalThis.__thunky_dump = dump || "";
+        // Local modules the page fetched for this program: the browser has no
+        // filesystem, so this stands in for the directory a program's helper
+        // modules would sit in natively.
+        globalThis.__thunky_modules = modules || {};
 
         const go = new Go();
         go.exit = code => {

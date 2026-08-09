@@ -71,6 +71,10 @@ A local file always shadows the built-in module of the same name, which
 includes the program itself: a program stored as `json.þ` shadows the `json`
 library for its own run.
 
+In the browser there is no filesystem to search, so the embedded library is all
+that resolves by default; the playground supplies a program's local modules to
+the runtime explicitly, and those are searched first, in the same order.
+
 There is **no automatic library import**. A program that wants the standard
 library must say so explicitly:
 
