@@ -1,0 +1,65 @@
+-- Advent of Code 2025, day 2: the invalid ids in a list of ranges.
+-- An id is invalid when its decimal digits are one block repeated — exactly
+-- twice for part 1 (99, 1212, 123123), any number of times for part 2 (1111111,
+-- 123123123, 1212121212). Each part sums the invalid ids of every range.
+-- Answer: [55916882972; 76169125915]
+--
+--   thunky examples/aoc2025/aoc02.th < examples/aoc2025/aoc02.txt
+--
+-- No id is ever tested: the repeats are constructed. An id of width w made of a
+-- d-digit block is p * (1 + 10^d + 10^2d + …), so at fixed w and d the invalid
+-- ids are the d-digit numbers scaled by one constant, and those inside a range
+-- are a contiguous slice of them, summed in closed form. A range costs one such
+-- sum per (width, block) pair instead of one test per id.
+--
+-- Part 2 must count each id once, and 1111 is "1" four times as well as "11"
+-- twice. Generating an id only from its *shortest* block settles it: the blocks
+-- must themselves be aperiodic, which is the same question one level down — the
+-- aperiodic d-digit numbers in an interval are all of them, less those that are
+-- repeats. So `repeated` and `aperiodic` are mutually recursive, and the parts
+-- differ only in which blocks they draw from: any block for part 1, aperiodic
+-- blocks for part 2.
+
+import core, math, list, text in
+
+let
+	ranges = stdin > trim > split "," > map (split "-" *> map stringToInt),
+
+	-- sum of the integers a..b, 0 when the interval is empty
+	sumBetween = a -> b -> if (lt a b) 0 (mul (add a b) (succ (sub a b)) > div 2),
+
+	-- 1 + 10^d + 10^2d + … : multiplying a d-digit block by this writes it w/d times
+	repeater = w -> d -> iterate (mul (pow d 10)) 1 > take (div d w) > sum,
+
+	-- sum of the width-w ids in [low, high] made of a repeated d-digit block,
+	-- the blocks themselves summed by `blocks d` over an interval of d-digit numbers
+	repeatSum = blocks -> low -> high -> w -> d ->
+		let
+			r = repeater w d,
+			smallest = max (pow (pred d) 10) (div r (add (pred r) low)),
+			largest  = min (pred (pow d 10)) (div r high)
+		in
+			mul r (blocks d smallest largest),
+
+	-- every width an id of the range can have, from 2 up
+	widths = high -> digits high > length > rangeIncl 2,
+
+	-- part 1: two halves, so w = 2d and any d-digit block will do
+	part1 = [low; high] -> widths high > filter even
+		> map (w -> repeatSum (const sumBetween) low high w (div 2 w)) > sum,
+
+	-- part 2: any number of repeats, so d is any proper divisor of w
+	properDivisors = w -> range 1 w > filter (d -> eq 0 (mod d w)),
+
+	repeated = low -> high -> w ->
+		properDivisors w > map (repeatSum aperiodic low high w) > sum,
+
+	aperiodic = d -> a -> b -> sub (repeated a b d) (sumBetween a b),
+
+	part2 = [low; high] -> widths high > map (repeated low high) > sum
+in
+
+show [
+	ranges > map part1 > sum;
+	ranges > map part2 > sum
+]
