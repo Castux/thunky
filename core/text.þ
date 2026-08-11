@@ -42,16 +42,28 @@ join = separator -> {
 -- every program that reads stdin pays it. The direct recursion is one pass: the
 -- empty input yields no lines at all, which is also what drops the final empty
 -- line, since the text after a trailing newline is empty and recurses to [].
+--
+-- The span stops at either break character, so a line never holds the carriage
+-- return in the first place and nothing has to look at its end to take one off;
+-- what follows the line is what says how long the break is. A carriage return
+-- with no line feed after it is not a break at all, and that is the one case
+-- that costs anything: the line runs through it, so it has to be joined to
+-- whatever the scan after it produces.
 lines = {
 	[] -> [],
-	s -> s > span (neq lf) > {
-		[line, []]        -> [line;],
-		[line, [_, rest]] -> prepend [dropTrailingCr line;] (lines rest)
+	s -> s > span (c -> and (neq lf c) (neq cr c)) > {
+		[line, []]        -> [line;],                     -- no break: the last line
+		[line, [c, rest]] -> if (eq c lf)
+			[line, lines rest]                            -- LF: a one-character break
+			(rest > {                                     -- the break starts with CR
+				[]         -> [append [cr;] line;],       -- at the very end: a lone CR
+				[c2, more] -> if (eq c2 lf)
+					[line, lines more]                    -- CRLF: a two-character break
+					(lines rest > ([next, others] ->      -- lone CR: no break here
+						[flatten [line; [cr;]; next], others]))
+			})
 	}
 },
-
--- dropTrailingCr l: drop one trailing carriage return, if there is one.
-dropTrailingCr = l -> if (endsWith [cr;] l) (init l) l,
 
 -- unlines ls: join a list of lines with line feeds, without a trailing one, so
 -- that `unlines (lines s)` returns s for any s not ending in a newline.

@@ -674,7 +674,7 @@ The tables below list each module's public interface. Thunky has no privacy
 mechanism — every binding in a module is importable — so a few implementation
 helpers are reachable but deliberately undocumented and not covered by any
 stability promise: `heap.rankOf`, `heap.makeNode`, `hashmap.minNode`,
-`hashmap.removeMin`, `text.parsePositive`, and `text.dropTrailingCr`.
+`hashmap.removeMin`, and `text.parsePositive`.
 
 ---
 
