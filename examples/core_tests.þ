@@ -75,6 +75,11 @@ runTests [
 	assert "math.gcd-zero-second" (math.gcd 5 0) 5;
 	assert "math.lcm" (math.lcm 4 6) 12;
 	assert "math.lcm-zero" (math.lcm 0 5) 0;
+	assert "math.floorMod-negative" (math.floorMod 100 (negate 50)) 50;
+	assert "math.floorMod-positive" (math.floorMod 100 150) 50;
+	assert "math.floorMod-zero" (math.floorMod 100 0) 0;
+	assert "math.floorMod-exact-negative" (math.floorMod 100 (negate 100)) 0;
+	assert "math.floorMod-vs-mod" (math.floorMod 7 (negate 1)) 6;
 	assert "math.digits-0" (math.digits 0) [0;];
 	assert "math.digits" (math.digits 123) [1; 2; 3];
 	assert "math.isInteger-int" (math.isInteger 123) 1;

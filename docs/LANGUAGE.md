@@ -778,6 +778,7 @@ This module adds the derived operations.
 | `ceil n` | round towards +∞ |
 | `round n` | round half-up |
 | `isInteger n` | `1` if `n` has no fractional part |
+| `floorMod a n` | `n mod a`, always in `[0, a)` for positive `a` — unlike `mod`, which truncates toward zero |
 | `even n` | `1` if `n mod 2 = 0` |
 | `odd n` | `1` if `n mod 2 ≠ 0` |
 | `gcd a b` | greatest common divisor |

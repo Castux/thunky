@@ -43,6 +43,10 @@ ceil = n ->
 -- round n: round n to the nearest integer, half toward positive infinity (round half up)
 round = n -> floor (add 0.5 n),
 
+-- floorMod a n: n mod a, always in [0, a) for positive a (mod truncates
+-- toward zero, so mod 100 (-50) = -50; this corrects it back into range)
+floorMod = a -> n -> let r = mod a n in if (lt 0 r) (add a r) r,
+
 even = n -> eq 0 (mod 2 n), -- 1 if n is even
 odd  = n -> eq 1 (mod 2 n), -- 1 if n is odd
 
