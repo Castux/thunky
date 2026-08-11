@@ -20,8 +20,10 @@ let
 
 	positions = stdin > lines > map toOffset > scanl add 50,
 
-	-- how many multiples of 100 are at or below n
-	zerosUpTo = n -> n > div 100,
+	-- how many multiples of 100 are at or below n. The dial is never wrapped, so
+	-- n reaches -22400 on the real input and the rounding has to be toward minus
+	-- infinity: `div` truncates toward zero, and miscounts every negative n.
+	zerosUpTo = n -> n > fdiv 100 > floor,
 
 	-- multiples of 100 in the half-open interval swept from a to b: (a, b]
 	-- going up, [b, a) going down — the same interval shifted down by one, so
