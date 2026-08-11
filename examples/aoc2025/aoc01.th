@@ -1,24 +1,37 @@
+-- Advent of Code 2025, day 1: a hundred-position dial, starting at 50.
+-- Each input line turns it left or right by some number of steps.
+-- Part 1: how many turns end on 0. Part 2: how many times 0 is reached at all.
+-- Answer: [1092; 6616]
+--
+--   thunky examples/aoc2025/aoc01.th < examples/aoc2025/aoc01.txt
+--
+-- The dial is never wrapped. `positions` is the running sum of the turns, so a
+-- turn sweeps the integer interval between two consecutive positions, and both
+-- questions are about the multiples of 100 in those intervals: part 1 asks which
+-- endpoints are multiples, part 2 counts the multiples inside. Wrapping is left
+-- to a single `floorMod` where part 1 tests an endpoint.
+
 import core, list, text, math in
 
 let
-	toOffset = [direction, rest] -> stringToInt rest > if (eq direction (char 'L')) negate id,
-	offsets = stdin > lines > map toOffset,
+	toOffset = [direction, steps] -> steps
+		> stringToInt
+		> if (eq direction (char 'L')) negate id,
 
-	crossingsIn = position -> offset ->
-		let
-			distance  = abs offset,
-			direction = signum offset,
-			target    = floorMod 100 (negate (mul direction position)) > (t -> if (eq t 0) 100 t)
-		in
-			if (lt target distance) 0 (succ (div 100 (sub target distance))),
+	positions = stdin > lines > map toOffset > scanl add 50,
 
-	step = [position, total] -> offset ->
-		[floorMod 100 (add offset position), add total (crossingsIn position offset)],
+	-- how many multiples of 100 are at or below n
+	zerosUpTo = n -> n > div 100,
 
-	steps = offsets > scanl step [50, 0]
+	-- multiples of 100 in the half-open interval swept from a to b: (a, b]
+	-- going up, [b, a) going down — the same interval shifted down by one, so
+	-- neither counts the position it starts from
+	crossings = a -> b -> if (lt a b)
+		(zerosUpTo (pred a) > sub (zerosUpTo (pred b)))
+		(zerosUpTo b > sub (zerosUpTo a))
 in
 
 show [
-	steps > map first > count (eq 0);
-	steps > last > second
+	positions > count (floorMod 100 *> eq 0);
+	zipWith crossings positions (tail positions) > sum
 ]
