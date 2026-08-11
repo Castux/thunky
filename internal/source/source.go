@@ -61,19 +61,27 @@ func toSpace(r rune) rune {
 	return r
 }
 
+// LineCol returns the 1-based line and column of a span's start, and the offset
+// at which that line begins.
+func (loc SourcePos) LineCol() (line, column, lineStart int) {
+	if loc.File == nil {
+		return 0, 0, 0
+	}
+	breaks := reLineBreak.FindAllStringIndex(loc.File.Text[:loc.Start], -1)
+	lineStart = 0
+	if len(breaks) > 0 {
+		lineStart = breaks[len(breaks)-1][0] + 1
+	}
+	return len(breaks) + 1, loc.Start - lineStart + 1, lineStart
+}
+
 // Log prints a located diagnostic: the path/line/column, the message, the
 // offending source line, and an underline of the span, all colored by severity.
 func Log(msg string, loc SourcePos, severity Severity) {
 	text := loc.File.Text
 
-	breaks := reLineBreak.FindAllStringIndex(text[:loc.Start], -1)
-	lineIndex := len(breaks)
-
-	lineStart := 0
-	if lineIndex > 0 {
-		lineStart = breaks[len(breaks)-1][0] + 1
-	}
-	column := loc.Start - lineStart
+	lineNumber, columnNumber, lineStart := loc.LineCol()
+	lineIndex, column := lineNumber-1, columnNumber-1
 
 	lineEnd := loc.Start
 	nextBreak := reLineBreak.FindStringIndex(text[loc.Start:])

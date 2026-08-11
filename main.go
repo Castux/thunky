@@ -14,6 +14,7 @@ import (
 	"thunky/internal/core"
 	"thunky/internal/source"
 	"thunky/internal/syntax"
+	"thunky/internal/types"
 )
 
 func LoadProgram(path string) *syntax.Program {
@@ -120,10 +121,12 @@ type dumpFlags struct {
 	ast      bool
 	core     bool
 	bytecode bool
+	types    bool
+	typesAll bool
 	toFile   bool
 }
 
-func (d dumpFlags) any() bool { return d.ast || d.core || d.bytecode }
+func (d dumpFlags) any() bool { return d.ast || d.core || d.bytecode || d.types || d.typesAll }
 
 func main() {
 	var path string
@@ -136,6 +139,10 @@ func main() {
 			dump.core = true
 		case arg == "--dump-bytecode":
 			dump.bytecode = true
+		case arg == "--types":
+			dump.types = true
+		case arg == "--types-all":
+			dump.typesAll = true
 		case arg == "--to-file":
 			dump.toFile = true
 		case len(arg) > 0 && arg[0] == '-':
@@ -147,7 +154,7 @@ func main() {
 	}
 
 	if path == "" {
-		fmt.Println("Usage: thunky [--dump-ast] [--dump-core] [--dump-bytecode] [--to-file] <path>")
+		fmt.Println("Usage: thunky [--dump-ast] [--dump-core] [--dump-bytecode] [--types] [--types-all] [--to-file] <path>")
 		os.Exit(1)
 	}
 
@@ -161,11 +168,25 @@ func main() {
 		emitDump(path, "ast", syntax.DumpAST(program, modules), dump.toFile)
 	}
 
-	if dump.core || dump.bytecode || !dump.any() {
+	if dump.core || dump.bytecode || dump.types || dump.typesAll || !dump.any() {
 		resolution := syntax.Resolve(program, modules)
 		if resolution.Errors > 0 {
 			fmt.Printf("Analyzer found %d errors\n", resolution.Errors)
 			os.Exit(1)
+		}
+
+		if dump.types || dump.typesAll {
+			analysis := types.Infer(program, modules, resolution)
+			if dump.types {
+				emitDump(path, "types", types.Report(analysis, path), dump.toFile)
+			}
+			if dump.typesAll {
+				emitDump(path, "types-all", types.ReportAll(analysis), dump.toFile)
+			}
+		}
+
+		if !dump.core && !dump.bytecode && dump.any() {
+			return
 		}
 
 		mainCore, moduleCores := core.Lower(program, modules, resolution)

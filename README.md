@@ -52,10 +52,13 @@ one or more dump flags:
 thunky --dump-ast       <path>   # the parsed AST
 thunky --dump-core      <path>   # the lowered Core IR (slots, captures, thunks)
 thunky --dump-bytecode  <path>   # the compiled flat bytecode
+thunky --types          <path>   # inferred types, one line per binding
+thunky --types-all      <path>   # inferred type of every expression
 ```
 
 Any dump flag emits the requested stage(s) to stdout and skips execution. Add
-`--to-file` to write each one to a sibling file instead (`.ast`, `.ir`, `.bc`).
+`--to-file` to write each one to a sibling file instead (`.ast`, `.ir`, `.bc`,
+`.types`, `.types-all`).
 See [docs/implementation/0.Overview.md](docs/implementation/0.Overview.md#inspecting-the-stages) for the format.
 
 ## Example

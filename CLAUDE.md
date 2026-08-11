@@ -1,7 +1,7 @@
 Thunky (Þunky): a toy programming language and its compiler
 
 - Purely functional, dynamic, lazily evaluated. Language definition in docs/LANGUAGE.md (README.md is the short tour).
-- Compiler in Go. Architecture: `internal/{source,syntax,value,core,backend}`. Demos/tests: `examples/`, `tests/`.
+- Compiler in Go. Architecture: `internal/{source,syntax,value,core,backend,types}` (`types` is the `--types` static analysis, not part of execution). Demos/tests: `examples/`, `tests/`.
 - Browser build: `main_wasm.go` (js/wasm entry) + `web/` (docs site & playground, assembled by `web/build.sh`, deployed to GitHub Pages by `.github/workflows/pages.yml`, smoke-tested headlessly with `node web/smoke.mjs`).
 
 These reference documents MUST be kept up to date. They should be both human-readable and useful as context for an LLM.
