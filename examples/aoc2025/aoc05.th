@@ -1,0 +1,42 @@
+-- Advent of Code 2025, day 5: the kitchen's inventory database — a list of
+-- fresh ingredient ID ranges, a blank line, then the IDs actually on hand.
+-- Part 1 counts the IDs on hand that fall in some range; part 2 counts every ID
+-- the ranges call fresh, which is the size of their union.
+-- Answer: [720; 357608232770687]
+--
+--   thunky examples/aoc2025/aoc05.th < examples/aoc2025/aoc05.txt
+--
+-- The ranges overlap, so both parts want them merged first. Sorted by where
+-- they start, each range either reaches the one before it — in which case the
+-- two become one, ending at whichever ends later — or begins a new one, and a
+-- single pass settles the lot. Part 1 is then a membership test against far
+-- fewer ranges, and part 2 is the sum of their widths: the union covers 3.5e14
+-- IDs, so nothing here can afford to look at an ID one at a time.
+
+import core, list, math, text in
+
+let
+	-- the two halves of the database, split at the blank line
+	database = stdin > lines > span (isEmpty *> not),
+
+	ranges = first database > map (split "-" *> map stringToInt *> ([a; b] -> [a, b])),
+	onHand = second database > tail > map stringToInt,
+
+	merge = {
+		[] -> [],
+		[range, []] -> [range;],
+		[[a, b], [[c, d], rest]] -> if (lte (succ b) c)
+			(merge [[a, max b d], rest])       -- c is within reach of b: one range
+			[[a, b], merge [[c, d], rest]]     -- a gap: keep the first, go on
+	},
+
+	fresh = ranges > sortWith (on lt first) > merge,
+
+	holds = id -> [a, b] -> and (id > gte a) (id > lte b),
+	width = [a, b] -> succ (sub a b)
+in
+
+show [
+	onHand > count (id -> fresh > anyMatch (holds id));
+	fresh > map width > sum
+]

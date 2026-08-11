@@ -1,0 +1,55 @@
+-- Advent of Code 2025, day 4: rolls of paper (@) on a grid.
+-- A roll is accessible when fewer than four of its eight neighbours are rolls.
+-- Part 1 counts the accessible rolls; part 2 removes them, which frees others,
+-- and repeats until nothing more can be taken, counting everything removed.
+-- Answer: [1389; 9000]
+--
+--   thunky examples/aoc2025/aoc04.th < examples/aoc2025/aoc04.txt
+--
+-- Nothing indexes into the grid: a cell's neighbourhood is reached by lining the
+-- grid up against shifted copies of itself. `blur` sums each element with its
+-- two neighbours, and applying it twice — once along every row, once down the
+-- list of rows, where the "elements" are whole rows added element-wise — gives
+-- the 3x3 total around every cell in two passes. Padding with a zero at each
+-- end is what handles the border, so there are no edge cases.
+--
+-- Removal is simultaneous, which is the same fixpoint as removing one roll at a
+-- time: taking a roll away only ever lowers its neighbours' counts, so a roll
+-- that is accessible now stays accessible.
+--
+-- The real input takes 49 passes to settle and each pass sweeps all 135x135
+-- cells, which is what makes this the slowest of these programs (~17s).
+-- The passes are what cost, not the sweep: the last twenty of them remove fewer
+-- than thirty rolls each and still walk the whole grid.
+
+import core, list, math, text in
+
+let
+	grid = stdin > lines > map (map (eq (char '@'))),
+
+	-- l lined up with itself shifted one step each way, combined by f, with pad
+	-- standing in for the elements that fall off either end
+	blur = pad -> f -> l -> zipWith3 f (prepend [pad;] (init l)) l (append [pad;] (tail l)),
+
+	sum3 = a -> b -> c -> add a (add b c),
+
+	-- the 3x3 total around every cell, the cell itself included
+	neighbourhood = rows ->
+		let blank = map (const 0) (head rows) in
+		rows > map (blur 0 sum3) > blur blank (zipWith3 sum3),
+
+	-- the rolls a forklift can reach: a roll with fewer than four neighbours
+	accessible = rows ->
+		zipWith (zipWith (cell -> total -> and cell (lt 4 (sub cell total))))
+			rows (neighbourhood rows),
+
+	rolls = rows -> rows > map sum > sum,
+
+	-- how many rolls each pass takes away, until a pass takes none
+	passes = rows -> accessible rows > (gone -> rolls gone > {
+		0 -> [],
+		n -> [n, passes (zipWith (zipWith sub) gone rows)]
+	})
+in
+
+passes grid > (taken -> show [head taken; sum taken])

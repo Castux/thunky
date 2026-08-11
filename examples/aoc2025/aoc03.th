@@ -1,0 +1,36 @@
+-- Advent of Code 2025, day 3: banks of batteries, one bank per input line.
+-- Turning on k of a bank's batteries produces the number formed by their digits,
+-- which cannot be reordered; each part sums, over every bank, the largest number
+-- k batteries can produce — k = 2, then k = 12.
+-- Answer: [17321; 171989894144198]
+--
+--   thunky examples/aoc2025/aoc03.th < examples/aoc2025/aoc03.txt
+--
+-- The choice is greedy, digit by digit. The leading digit should be the largest
+-- one that still leaves k-1 digits behind it, so it is the maximum of the first
+-- n-k+1 digits; a tie goes to the earliest occurrence, which leaves the most room
+-- for the digits still to come. Take it and repeat on what follows it with k-1 —
+-- so `dropWhile` looking for that maximum both finds it and hands back the rest.
+
+import core, list, math, text in
+
+let
+	banks = stdin > lines > map (map digitToInt),
+
+	-- the largest k-digit subsequence of a list of digits
+	best = {
+		0 -> const [],
+		k -> digits ->
+			let
+				lead = digits > take (succ (sub k (length digits))) > maximum,
+				rest = digits > dropWhile (neq lead) > tail
+			in
+				cons lead (best (pred k) rest)
+	},
+
+	joltage = foldl (n -> digit -> mul 10 n > add digit) 0,
+
+	total = k -> banks > map (best k *> joltage) > sum
+in
+
+show [total 2; total 12]
