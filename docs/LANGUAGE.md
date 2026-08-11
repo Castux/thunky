@@ -1242,7 +1242,7 @@ The named constants cover the characters that cannot be written literally:
 | Name | Description |
 |------|-------------|
 | `join sep strings` | intercalate `sep` between each string in the list |
-| `lines s` | split on line feeds; a single trailing newline does not add an empty last line, so `lines ""` is `[]` |
+| `lines s` | split on line feeds, treating a preceding carriage return as part of the same break (so `"\n"` and `"\r\n"` both end a line, a lone `"\r"` is left alone); a single trailing newline does not add an empty last line, so `lines ""` is `[]` |
 | `unlines ls` | join with line feeds, without a trailing one — `unlines (lines s)` returns `s` when `s` does not end in a newline |
 | `words s` | split on runs of whitespace, discarding the empty pieces around them |
 | `unwords ws` | join with single spaces |

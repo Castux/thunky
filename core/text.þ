@@ -28,10 +28,12 @@ join = separator -> {
 	}
 },
 
--- lines s: split on line feeds. A single trailing newline does not produce a
--- final empty line, so `lines` of a file that ends in a newline gives exactly
--- the lines it contains.
-lines = split [lf;] *> dropTrailingEmpty,
+-- lines s: split on line feeds, treating a preceding carriage return as part
+-- of the same break — so "\n" and "\r\n" both end a line, and a lone "\r" is
+-- left alone rather than guessed at. A single trailing newline does not
+-- produce a final empty line, so `lines` of a file that ends in a newline
+-- gives exactly the lines it contains.
+lines = replaceAllSub [cr; lf] [lf;] *> split [lf;] *> dropTrailingEmpty,
 
 -- dropTrailingEmpty ls: drop one trailing empty element, if there is one.
 dropTrailingEmpty = ls -> if (isEmpty ls) ls (if (isEmpty (last ls)) (init ls) ls),

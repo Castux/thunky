@@ -477,6 +477,8 @@ runTests [
 	assert "text.lines-trailing" (lines (flatten ["a"; [lf;]; "b"; [lf;]])) ["a"; "b"];
 	assert "text.lines-empty" (lines "") [];
 	assert "text.lines-blank" (lines (flatten ["a"; [lf;]; [lf;]; "b"])) ["a"; ""; "b"];
+	assert "text.lines-crlf" (lines (flatten ["a"; [cr;lf]; "b"; [cr;lf]; "c"])) ["a"; "b"; "c"];
+	assert "text.lines-mixed" (lines (flatten ["a"; [cr;lf]; "b"; [lf;]; "c"])) ["a"; "b"; "c"];
 	assert "text.unlines" (unlines ["a"; "b"]) (flatten ["a"; [lf;]; "b"]);
 	assert "text.words" (words "  one   two three ") ["one"; "two"; "three"];
 	assert "text.words-mixed" (words (flatten ["a"; [tab;]; "b"; [lf;]; "c"])) ["a"; "b"; "c"];
