@@ -1,0 +1,24 @@
+import core, list, text, math in
+
+let
+	toOffset = [direction, rest] -> stringToInt rest > if (eq direction (char 'L')) negate id,
+	offsets = stdin > lines > map toOffset,
+
+	crossingsIn = position -> offset ->
+		let
+			distance  = abs offset,
+			direction = signum offset,
+			target    = floorMod 100 (negate (mul direction position)) > (t -> if (eq t 0) 100 t)
+		in
+			if (lt target distance) 0 (succ (div 100 (sub target distance))),
+
+	step = [position, total] -> offset ->
+		[floorMod 100 (add offset position), add total (crossingsIn position offset)],
+
+	steps = offsets > scanl step [50, 0]
+in
+
+show [
+	steps > map first > count (eq 0);
+	steps > last > second
+]
