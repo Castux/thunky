@@ -382,10 +382,18 @@ intToString = [sign, mag] -> if (magIsZero mag) "0"
 	in
 		if (lt 0 sign) (prepend "-" body) body),
 
--- Most significant chunk first.
-magToChunks = mag -> if (magIsZero mag) []
-	(let divided = magDivModSmall chunkBase mag in
-		append [second divided;] (magToChunks (first divided))),
+-- Most significant chunk first. The chunks come out least significant first, so
+-- they are accumulated by prepending rather than appended to the recursive
+-- result — appending copies the chunks built so far and makes printing a number
+-- quadratic in its length.
+-- One-liner equivalent: mag -> if (magIsZero mag) []
+--   (let d = magDivModSmall chunkBase mag in append [second d;] (magToChunks (first d)))
+magToChunks = mag ->
+	let gather = chunks -> m -> if (magIsZero m) chunks
+		(let divided = magDivModSmall chunkBase m in
+			gather [second divided, chunks] (first divided))
+	in
+		gather [] mag,
 
 intFromString = s -> s > {
 	[] -> intZero,

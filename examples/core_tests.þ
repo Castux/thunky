@@ -215,6 +215,7 @@ runTests [
 	assert "list.tails-empty" (list.tails []) [[];];
 	assert "list.inits" (list.inits [1; 2; 3; 4]) [[]; [1;]; [1; 2]; [1; 2; 3]; [1; 2; 3; 4]];
 	assert "list.inits-empty" (list.inits []) [[];];
+	assert "list.inits-lazy" (list.take 3 (list.inits (list.upFrom 1))) [[]; [1;]; [1; 2]];
 	assert "list.singleton" (list.singleton 42) [42;];
 	assert "list.flatMap" (list.flatMap (x -> [x; mul x 10]) [1; 2; 3]) [1; 10; 2; 20; 3; 30];
 	assert "list.flatMap-empty" (list.flatMap (x -> [x;]) []) [];
@@ -284,6 +285,9 @@ runTests [
 	assert "text.split-none" (text.split "," "abc") ["abc";];
 	assert "text.split-empty" (text.split "," "") ["";];
 	assert "text.split-only-sep" (text.split "," ",,,") [""; ""; ""; ""];
+	assert "text.split-empty-sep" (text.split "" "abc") ["a"; "b"; "c"];
+	assert "text.split-empty-sep-empty" (text.split "" "") [];
+	assert "text.replaceAllSub-empty-sep" (text.replaceAllSub "" "-" "abc") "a-b-c";
 	assert "text.containsSub-true" (text.containsSub "lo" "hello") 1;
 	assert "text.containsSub-false" (text.containsSub "xyz" "hello") 0;
 	assert "text.replaceSub" (text.replaceSub "lo" "LO" "hello world of jello!") "helLO world of jello!";
@@ -484,6 +488,9 @@ runTests [
 	assert "text.lines-blank" (lines (flatten ["a"; [lf;]; [lf;]; "b"])) ["a"; ""; "b"];
 	assert "text.lines-crlf" (lines (flatten ["a"; [cr;lf]; "b"; [cr;lf]; "c"])) ["a"; "b"; "c"];
 	assert "text.lines-mixed" (lines (flatten ["a"; [cr;lf]; "b"; [lf;]; "c"])) ["a"; "b"; "c"];
+	assert "text.lines-lone-cr" (lines (flatten ["a"; [cr;]; "b"])) [flatten ["a"; [cr;]; "b"];];
+	assert "text.lines-trailing-cr" (lines (flatten ["a"; [cr;]])) [flatten ["a"; [cr;]];];
+	assert "text.lines-cr-before-crlf" (lines (flatten ["a"; [cr;cr;lf]])) [flatten ["a"; [cr;]];];
 	assert "text.unlines" (unlines ["a"; "b"]) (flatten ["a"; [lf;]; "b"]);
 	assert "text.words" (words "  one   two three ") ["one"; "two"; "three"];
 	assert "text.words-mixed" (words (flatten ["a"; [tab;]; "b"; [lf;]; "c"])) ["a"; "b"; "c"];

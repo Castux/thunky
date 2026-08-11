@@ -33,10 +33,25 @@ join = separator -> {
 -- left alone rather than guessed at. A single trailing newline does not
 -- produce a final empty line, so `lines` of a file that ends in a newline
 -- gives exactly the lines it contains.
-lines = replaceAllSub [cr; lf] [lf;] *> split [lf;] *> dropTrailingEmpty,
+--
+-- One-liner equivalent, with
+--   dropTrailingEmpty = ls -> if (isEmpty ls) ls (if (isEmpty (last ls)) (init ls) ls):
+--   lines = replaceAllSub [cr; lf] [lf;] *> split [lf;] *> dropTrailingEmpty
+-- That is four passes and a full copy of the input — normalise every CRLF,
+-- split again, then `last` and `init` to drop the trailing empty line — and
+-- every program that reads stdin pays it. The direct recursion is one pass: the
+-- empty input yields no lines at all, which is also what drops the final empty
+-- line, since the text after a trailing newline is empty and recurses to [].
+lines = {
+	[] -> [],
+	s -> s > span (neq lf) > {
+		[line, []]        -> [line;],
+		[line, [_, rest]] -> prepend [dropTrailingCr line;] (lines rest)
+	}
+},
 
--- dropTrailingEmpty ls: drop one trailing empty element, if there is one.
-dropTrailingEmpty = ls -> if (isEmpty ls) ls (if (isEmpty (last ls)) (init ls) ls),
+-- dropTrailingCr l: drop one trailing carriage return, if there is one.
+dropTrailingCr = l -> if (endsWith [cr;] l) (init l) l,
 
 -- unlines ls: join a list of lines with line feeds, without a trailing one, so
 -- that `unlines (lines s)` returns s for any s not ending in a newline.
@@ -125,12 +140,17 @@ splitOne = sep -> s ->
 	maybe.fmap ([left,right] -> [left; right > drop (length sep)]) >
 	maybe.default [s;],
 
--- split sep s: split string s on all occurrences of sep
-split = sep ->
-	splitOne sep *> {
+-- split sep s: split string s on all occurrences of sep. The empty separator
+-- matches at every position without consuming anything, so it gets its own case:
+-- it cuts s into single-character strings rather than looping forever on a
+-- `splitOne` that hands back everything it was given.
+split = {
+	[] -> map singleton,
+	sep -> splitOne sep *> {
 		[s;] -> [s;],
 		[left; right] -> prepend [left;] (split sep right)
-	},
+	}
+},
 
 containsSub = sub -> l -> tails l > anyMatch (startsWith sub),
 replaceSub = sub -> new -> splitOne sub *> join new,

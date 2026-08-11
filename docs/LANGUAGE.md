@@ -674,7 +674,7 @@ The tables below list each module's public interface. Thunky has no privacy
 mechanism — every binding in a module is importable — so a few implementation
 helpers are reachable but deliberately undocumented and not covered by any
 stability promise: `heap.rankOf`, `heap.makeNode`, `hashmap.minNode`,
-`hashmap.removeMin`, and `text.parsePositive`.
+`hashmap.removeMin`, `text.parsePositive`, and `text.dropTrailingCr`.
 
 ---
 
@@ -895,6 +895,13 @@ counterpart returning a `maybe` instead:
 | `groupBy f l` | split into runs of consecutive elements where `f head elem = 1`; `groupBy equal` groups equal neighbours |
 | `partition p l` | `[matching, rest]` |
 | `flatten l` | concatenate a list of lists into one list |
+
+`tails`, `inits` and `spans` are built so that walking the outer list is *O(n)*
+and a prefix costs its own length only if something forces it. The search idiom
+`spans s > find (…)`, which inspects the suffix at each split point and keeps the
+prefix of the one that matches, is therefore linear; every splitting function in
+`text` is built on it. Forcing *every* prefix is *O(n²)* — that is the size of
+the answer.
 
 **Zipping and reshaping**
 
