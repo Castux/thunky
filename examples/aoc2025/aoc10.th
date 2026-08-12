@@ -1,0 +1,49 @@
+-- Advent of Code 2025, day 10: indicator lights and toggle buttons.
+-- Every machine starts with all its lights off and must be brought to the
+-- pattern in brackets; each button toggles the lights it lists. Part 1 is the
+-- fewest presses over all machines.
+--
+--   thunky examples/aoc2025/aoc10.th < examples/aoc2025/aoc10.txt
+--
+-- Pressing a button twice undoes it, and the order of presses never matters, so
+-- a solution is a *set* of buttons and the fewest presses is the smallest set
+-- whose toggles combine to the pattern. That leaves at most 2^11 sets per
+-- machine, walked as a decision per button — press it or don't — carrying the
+-- lights as they stand. A branch is abandoned as soon as pressing one more
+-- button could not beat the best set already found, which is what keeps the
+-- walk far away from its worst case.
+--
+-- The joltage figures in braces are not needed and are dropped with the rest of
+-- the punctuation.
+
+import core, list, math, text in
+
+let
+	machines = stdin > lines > map words,
+
+	-- "[.##.]" and "(0,2,3)" both want their brackets taken off
+	inside = tail *> init,
+
+	lights = target -> word -> word > inside > split "," > map stringToInt
+		> (listed -> range 0 (length target) > map (i -> if (contains i listed) 1 0)),
+
+	toggle = zipWith (a -> b -> if (eq a b) 0 1),
+
+	fewest = words ->
+		let
+			target = head words > inside > map (eq (char '#')),
+			buttons = words > tail > init > map (lights target),
+			-- no set is larger than every button, so this stands in for infinity
+			never = succ (length buttons),
+			press = best -> pressed -> state -> {
+				[] -> if (equal state target) (min best pressed) best,
+				[button, rest] -> press best pressed state rest > (skipped ->
+					if (lt skipped (succ pressed))
+						(press skipped (succ pressed) (toggle state button) rest)
+						skipped)
+			}
+		in
+			press never 0 (map (const 0) target) buttons
+in
+
+machines > map fewest > sum > show

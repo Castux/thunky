@@ -1,0 +1,98 @@
+-- Advent of Code 2025, day 8: junction boxes in 3D, joined shortest pair first.
+-- Part 1 makes the 1000 shortest connections and multiplies the sizes of the
+-- three largest circuits. Part 2 keeps going until one circuit remains and
+-- multiplies the X coordinates of the pair that finally closed it.
+-- Answer: [62186; 8420405530]
+--
+--   thunky examples/aoc2025/aoc08.th < examples/aoc2025/aoc08.txt
+--
+-- A thousand boxes is half a million pairs, far too many to sort, so neither
+-- part looks at a sorted list of pairs. Both come out of the minimum spanning
+-- tree, which Prim's method builds in one sweep per box without ever ranking
+-- anything: hold, for every box outside the tree, its cheapest edge into the
+-- tree, take the cheapest of those, and re-cost the rest against the box that
+-- just joined.
+--
+-- Part 2 is then the heaviest edge of that tree — the connection that merges
+-- the last two circuits is exactly the one Kruskal would reach last.
+--
+-- Part 1 needs the 1000 shortest pairs, but only in order to know which
+-- connections were *made*: after every edge no longer than some d, the circuits
+-- are the components of the tree's edges no longer than d, whatever redundant
+-- pairs were tried in between. So only d itself is needed — and Prim measures
+-- every pair exactly once as it goes, a pair being measured the moment the
+-- first of its two boxes joins the tree, so the thousand smallest are collected
+-- on the way rather than in a second sweep. They live in a max-heap that starts
+-- out full of distances no pair can reach: the worst of the thousand sits on
+-- top, so every later pair is one comparison away from being dropped.
+--
+-- Distances stay squared throughout: only their order matters, and squares of
+-- coordinate differences this size are exact.
+--
+-- That single sweep is half a million pairs, and is where the ~17 seconds go.
+
+import core, list, math, text, heap, hashmap in
+
+let
+	connections = 1000,
+
+	boxes = stdin > lines > map (split "," *> map stringToInt *> ([x; y; z] -> [x, y, z])),
+
+	distance = [ax, ay, az] -> [bx, by, bz] ->
+		let dx = sub ax bx, dy = sub ay by, dz = sub az bz in
+		add (mul dx dx) (add (mul dy dy) (mul dz dz)),
+
+	-- a distance no pair can reach, so the heap can start out full: every pair is
+	-- then a single comparison against the worst of the thousand kept, and no
+	-- count of how many are in there has to be carried around
+	beyond = boxes > flatMap ([x, y, z] -> [x; y; z]) > maximum > (m -> succ (mul 3 (mul m m))),
+
+	-- keep the k smallest seen so far, the largest of them on top
+	keep = kept -> d -> if (lt (top kept) d) (insert lt d (pop lt kept)) kept,
+
+	-- Prim: an entry is [distance to the tree, the box in the tree, the box out]
+	weight = [d, from, box] -> d,
+	cheapest = entries -> foldl (b -> e -> if (lt (weight b) (weight e)) e b) (head entries) (tail entries),
+
+	-- re-cost one box against the box that just joined, dropping that box from
+	-- the entries and handing the distance just measured to the heap
+	visit = joined -> [entries, kept] -> [d, from, box] -> if (equal box joined)
+		[entries, kept]
+		(distance joined box > (fresh ->
+			[[(if (lt d fresh) [fresh, joined, box] [d, from, box]), entries], keep kept fresh])),
+
+	grow = {
+		[[], kept] -> [[], kept],
+		[entries, kept] -> cheapest entries > ([d, from, box] ->
+			foldl (visit box) [[], kept] entries > grow
+				> ([rest, ended] -> [[[d, from, box], rest], ended]))
+	},
+
+	seed = [entries, kept] -> box -> distance (head boxes) box > (d ->
+		[[[d, head boxes, box], entries], keep kept d]),
+
+	-- `fromList` and `isEmpty` are exported by both heap and hashmap, and the
+	-- later import wins the unqualified name, so this one says which it means
+	grown = boxes > tail > foldl seed [[], replicate connections beyond > heap.fromList lt] > grow,
+	edges = first grown,
+	longestConnection = second grown > top,
+
+	-- Prim never adds a box before the box it hangs from, so walking its edges
+	-- backwards reaches every child before its parent and a subtree is complete
+	-- by the time the edge above it comes up. A short edge hands that subtree's
+	-- size to the parent; a long one cuts it off as a finished circuit.
+	cut = [sizes, done] -> [d, from, box] ->
+		hashmap.getOr 1 box sizes > (size -> if (lte longestConnection d)
+			[hashmap.updateOr from (add size) (succ size) sizes, done]
+			[sizes, [size, done]]),
+
+	circuits = edges > reverse > foldl cut [hashmap.empty, []]
+		> ([sizes, done] -> [hashmap.getOr 1 (head boxes) sizes, done]),
+
+	heaviest = edges > foldl (b -> e -> if (lt (weight e) (weight b)) e b) (head edges)
+in
+
+show [
+	circuits > sortDesc > take 3 > product;
+	heaviest > ([d, [ax, ay, az], [bx, by, bz]] -> mul ax bx)
+]
