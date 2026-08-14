@@ -63,23 +63,10 @@ show [
 - `fork h f g x = h (f x) (g x)` — apply `f` and `g` to `x`, combine with `h`.
 - `ap f g x = f x (g x)` — the same, except `f x` *is* the combining function.
 
-`fork` is the one to reach for: naming the combiner first (`fork fdiv length sum`)
-reads as "divide the length by the sum", where `ap` would need the combiner folded
-into a composition. Use `ap` when the first function already returns a function.
-
-These are what let a pipeline stay point-free when a value has to be used twice —
-`compose`, `flip`, and `const` all pass their argument along exactly once, so
-none of them can duplicate it:
-
-```
-import core, list in
-let rle = list.groupBy equal *> list.flatMap (core.fork list.append (list.take 1) (list.length *> string)) in
-write < rle "aaaaaabbbccddddee"    -- 6a3b2c4d2e
-```
-
-In other languages `ap` is the **S** combinator — Haskell spells it `ap` (or `<*>`
-on functions), Ramda `R.ap`, J writes it as a *hook*. `fork` is the **Φ**
-combinator — Haskell's `liftA2`, Ramda's `converge`, and J's *fork* `(f g h)`.
+These two are the reason a pipeline can stay point-free when a value has to be
+used twice, which `compose`, `flip` and `const` cannot manage on their own.
+[Chapter 13](13-point-free-style.md) is about when that is worth doing — and, at
+least as often, when it is not.
 
 ### Conditionals
 

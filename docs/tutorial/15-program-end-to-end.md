@@ -1,4 +1,4 @@
-# Chapter 14: A Program End to End
+# Chapter 15: A Program End to End
 
 Everything in this chapter you already know. There is no new syntax here — no new keyword, no new builtin, no new library module. What is new is the *scale*: instead of an expression that demonstrates one idea, we build a whole program, take input from the outside world, and split it across files.
 
@@ -268,9 +268,9 @@ The output line is `flatten [l; " = "; string (rpn l)]` — three strings concat
 
 ## Splitting it into modules
 
-The program is now big enough to have two distinct jobs: *evaluating* an RPN expression, and *being a command-line filter*. Those split cleanly along Chapter 13's lines — one module with the domain logic, one program that does I/O.
+The program is now big enough to have two distinct jobs: *evaluating* an RPN expression, and *being a command-line filter*. Those split cleanly along Chapter 14's lines — one module with the domain logic, one program that does I/O.
 
-> Like Chapter 13, these blocks span two files, so they have no Run button: the browser has no filesystem to put `rpn.þ` in. Save them next to each other and run them with the `thunky` command line.
+> Like Chapter 14, these blocks span two files, so they have no Run button: the browser has no filesystem to put `rpn.þ` in. Save them next to each other and run them with the `thunky` command line.
 
 ```thunky-static
 -- rpn.þ
@@ -315,7 +315,7 @@ printf '3 4 +\n3 4 + 2 *\n10 2 -\n20 4 /\n' | thunky main.þ
 
 Three things about this split are worth noting.
 
-**The entry point is named `evalLine`, not `eval`.** `eval` is a builtin, and a module-level binding shadows it for every other binding in the module — exactly the trap Chapter 13 describes with `vec2.add`. Nothing in `rpn.þ` calls the builtin `eval` today, so it would work; `main.þ` does call it, and that call is fine because `rpn`'s bindings are not in `main`'s scope unless `rpn` is imported (which it is). Do not rely on that. Pick a name that does not collide.
+**The entry point is named `evalLine`, not `eval`.** `eval` is a builtin, and a module-level binding shadows it for every other binding in the module — exactly the trap Chapter 14 describes with `vec2.add`. Nothing in `rpn.þ` calls the builtin `eval` today, so it would work; `main.þ` does call it, and that call is fine because `rpn`'s bindings are not in `main`'s scope unless `rpn` is imported (which it is). Do not rely on that. Pick a name that does not collide.
 
 **`main.þ` imports `list` and `text` for itself.** `rpn.þ` imports them too, but transitive imports are not re-exported — `main.þ` uses `list.map` and `text.split` in its own body, so it needs its own import clause.
 

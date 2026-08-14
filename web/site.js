@@ -23,8 +23,9 @@ const PAGES = [
     { id: "tut10", title: "10. Lazy evaluation", file: "docs/tutorial/10-lazy-evaluation.md", group: "Tutorial" },
     { id: "tut11", title: "11. Performance & space", file: "docs/tutorial/11-performance-and-space.md", group: "Tutorial" },
     { id: "tut12", title: "12. Standard library", file: "docs/tutorial/12-standard-library.md", group: "Tutorial" },
-    { id: "tut13", title: "13. Modules", file: "docs/tutorial/13-modules.md", group: "Tutorial" },
-    { id: "tut14", title: "14. A program end to end", file: "docs/tutorial/14-program-end-to-end.md", group: "Tutorial" },
+    { id: "tut13", title: "13. Point-free style", file: "docs/tutorial/13-point-free-style.md", group: "Tutorial" },
+    { id: "tut14", title: "14. Modules", file: "docs/tutorial/14-modules.md", group: "Tutorial" },
+    { id: "tut15", title: "15. A program end to end", file: "docs/tutorial/15-program-end-to-end.md", group: "Tutorial" },
 ];
 
 // The implementation notes (docs/implementation/) are deliberately not part of

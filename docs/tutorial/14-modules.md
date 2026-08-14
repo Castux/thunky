@@ -1,4 +1,4 @@
-# Chapter 13: Modules
+# Chapter 14: Modules
 
 So far every program has been a single file. As programs grow, you want to split code into reusable units. Thunky's module system is simple: a module is a file of bindings, and importing it makes those bindings available.
 
