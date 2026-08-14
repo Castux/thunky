@@ -1,0 +1,3 @@
+tests/cases/errors/mod-by-zero.þ:3:7: mod by zero
+show (mod 0 10)
+      ^^^^^^^^

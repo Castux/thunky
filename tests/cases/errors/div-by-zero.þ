@@ -1,0 +1,4 @@
+-- Integer division by zero is a positioned runtime error, not a Go panic.
+-- div is threshold-first, so the divisor is the first argument: this is 10 / 0.
+import core in
+show (div 0 10)

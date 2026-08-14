@@ -1,0 +1,4 @@
+-- fdiv and fmod are IEEE floating-point operations, so a zero divisor is not an
+-- error there: it yields an infinity or a NaN. Only the integer div/mod fail.
+import core in
+show [fdiv 0 10, fdiv 0 0, fmod 0 10]

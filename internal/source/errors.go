@@ -2,6 +2,7 @@ package source
 
 import (
 	"fmt"
+	"os"
 	"strings"
 )
 
@@ -37,9 +38,9 @@ func ReportRuntimeError(err *RuntimeError) {
 	if err.HasPos {
 		Log(err.Message, err.Pos, SeverityError)
 	} else {
-		fmt.Println("runtime error: " + err.Message)
+		fmt.Fprintln(os.Stderr, "runtime error: "+err.Message)
 	}
 	if len(err.Trace) > 0 {
-		fmt.Println("while reducing: " + strings.Join(err.Trace, " → "))
+		fmt.Fprintln(os.Stderr, "while reducing: "+strings.Join(err.Trace, " → "))
 	}
 }

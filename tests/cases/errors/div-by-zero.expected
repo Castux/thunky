@@ -1,0 +1,3 @@
+tests/cases/errors/div-by-zero.þ:4:7: div by zero
+show (div 0 10)
+      ^^^^^^^^

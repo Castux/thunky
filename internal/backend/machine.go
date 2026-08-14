@@ -447,6 +447,15 @@ func (m *Machine) finishBuiltin(op value.PrimOp, args []value.Value, pos source.
 			m.raiseRuntimeError("argument to "+value.PrimNames[op]+" is not a number", pos, stack)
 		}
 	}
+	// The integer kernels convert to int and divide, which the Go runtime
+	// panics on for a zero divisor. Both are threshold-first, so the divisor is
+	// the first argument. (fdiv and fmod stay unguarded: float division by zero
+	// is IEEE-defined and yields an infinity or a NaN.)
+	if op == value.PrimDiv || op == value.PrimMod {
+		if args[0].Num == 0 {
+			m.raiseRuntimeError(value.PrimNames[op]+" by zero", pos, stack)
+		}
+	}
 	return value.EvalPrim(op, args)
 }
 

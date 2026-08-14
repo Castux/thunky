@@ -59,6 +59,12 @@ lexical, syntactic, or name-resolution error is reported with a located diagnost
 and the program does not run; a run-time error is reported with a source location
 and a reduction trace.
 
+Diagnostics go to **standard error**, so a program's output can be redirected on
+its own: `thunky prog.þ > out.txt` puts only what the program printed in the
+file. The exit code is `0` on success, `1` for any error in the program (compile
+or run time), `2` for a bad command line, and `70` for a failed assertion inside
+the compiler — that last one is a bug in Thunky and asks to be reported.
+
 **Module search order.** For each import `name`, the runtime looks for
 `name.th` (or `name.þ`) in, in order: the **directory holding the program being
 run**, then the **current working directory**, then the standard library
@@ -136,7 +142,8 @@ Source must be UTF-8. Whitespace separates tokens but is otherwise insignificant
 - **Keywords** are reserved and may not be used as identifiers: `let`, `in`,
   `module`, `import`.
 - **Numbers** match `[0-9]+(\.[0-9]+)?`. There is a single numeric type; integer
-  and fractional literals both denote it.
+  and fractional literals both denote it. A literal too large for a 64-bit float
+  is a lexical error.
 - **Strings** are enclosed in matching single quotes `'…'` or double quotes
   `"…"`. A string denotes a list of its Unicode code points (see
   [§11](#11-lists-strings-and-other-sugar)). A string cannot contain its own
@@ -540,10 +547,10 @@ comparison builtins follow the same **threshold-first, value-second** convention
 | `add a b` | 2 | `a + b` | |
 | `mul a b` | 2 | `a * b` | |
 | `sub a b` | 2 | `b - a` | argument order: `sub 1 x = x - 1` |
-| `div a b` | 2 | `b / a` (integer) | truncating integer division |
-| `fdiv a b` | 2 | `b / a` (real) | floating-point division |
-| `mod a b` | 2 | `b mod a` (integer) | `mod 10 x = x mod 10` |
-| `fmod a b` | 2 | `b mod a` (real) | floating-point remainder |
+| `div a b` | 2 | `b / a` (integer) | truncating integer division; `a = 0` is a runtime error |
+| `fdiv a b` | 2 | `b / a` (real) | floating-point division; `a = 0` yields an infinity or a NaN |
+| `mod a b` | 2 | `b mod a` (integer) | `mod 10 x = x mod 10`; `a = 0` is a runtime error |
+| `fmod a b` | 2 | `b mod a` (real) | floating-point remainder; `a = 0` yields a NaN |
 | `pow a b` | 2 | `b ^ a` (real) | `pow 2 x = x²` |
 | `sqrt a` | 1 | `√a` | |
 | `eq a b` | 2 | `1` if `a = b` else `0` | numbers only |

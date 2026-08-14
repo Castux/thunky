@@ -29,12 +29,14 @@ import (
 // os.Stdout/os.Stderr, which wasm_exec.js routes to the host's fs.writeSync
 // hook; stdin arrives through fs.read the same way.
 func main() {
+	defer catchInternalError()
+
 	global := js.Global()
 
 	src := global.Get("__thunky_source")
 	if src.Type() != js.TypeString {
-		fmt.Println("host error: __thunky_source is not set")
-		os.Exit(2)
+		fmt.Fprintln(os.Stderr, "host error: __thunky_source is not set")
+		os.Exit(exitUsage)
 	}
 	path := "playground.th"
 	if p := global.Get("__thunky_path"); p.Type() == js.TypeString && p.String() != "" {
@@ -47,11 +49,11 @@ func main() {
 
 	tokens := syntax.LexContent(path, src.String())
 	if tokens == nil {
-		os.Exit(1)
+		os.Exit(exitError)
 	}
 	program := syntax.ParseProgram(tokens)
 	if program == nil {
-		os.Exit(1)
+		os.Exit(exitError)
 	}
 	modules := LoadEmbeddedModules(program.Imports)
 
@@ -62,8 +64,8 @@ func main() {
 
 	resolution := syntax.Resolve(program, modules)
 	if resolution.Errors > 0 {
-		fmt.Printf("Analyzer found %d errors\n", resolution.Errors)
-		os.Exit(1)
+		fmt.Fprintf(os.Stderr, "Analyzer found %d errors\n", resolution.Errors)
+		os.Exit(exitError)
 	}
 
 	mainCore, moduleCores := core.Lower(program, modules, resolution)
@@ -134,18 +136,18 @@ func LoadEmbeddedModules(imports []*syntax.Name) map[string]*syntax.Module {
 			}
 		}
 		if text == nil {
-			fmt.Printf("Module not found: %s (the browser has the embedded standard library, plus any modules the page supplied)\n", name.Value)
+			fmt.Fprintf(os.Stderr, "Module not found: %s (the browser has the embedded standard library, plus any modules the page supplied)\n", name.Value)
 			source.Log("imported here", name.Pos, source.SeverityInfo)
-			os.Exit(1)
+			os.Exit(exitError)
 		}
 
 		tokens := syntax.LexContent(corePath, string(text))
 		if tokens == nil {
-			os.Exit(1)
+			os.Exit(exitError)
 		}
 		module := syntax.ParseModule(tokens)
 		if module == nil {
-			os.Exit(1)
+			os.Exit(exitError)
 		}
 		module.Name = name.Value
 

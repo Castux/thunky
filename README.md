@@ -43,7 +43,9 @@ Runs the program at `<path>` on the G-machine. Modules are searched for first
 beside the program, then in the current directory (`name.th` or `name.þ`), then
 in the embedded standard library — so a program can be shipped with its helper
 modules and run by path from anywhere. Errors are reported with source
-locations; runtime errors include a reduction trace.
+locations on standard error; runtime errors include a reduction trace. Only what
+the program itself prints goes to standard output, so `thunky prog.þ > out.txt`
+captures the program's output alone.
 
 To inspect the compiler's intermediate forms instead of running the program, pass
 one or more dump flags:

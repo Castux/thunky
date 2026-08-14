@@ -1,0 +1,3 @@
+-- The remainder kernel divides too, so a zero modulus is the same error.
+import core in
+show (mod 0 10)

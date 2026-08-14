@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 // reLineBreak splits lines for diagnostic rendering in Log.
@@ -63,7 +64,18 @@ func toSpace(r rune) rune {
 
 // Log prints a located diagnostic: the path/line/column, the message, the
 // offending source line, and an underline of the span, all colored by severity.
+//
+// Diagnostics go to stderr, where the color detection already looks, so that a
+// program's own output (show/write/peek, on stdout) can be redirected on its own
+// without ANSI escapes and compiler noise landing in the file.
 func Log(msg string, loc SourcePos, severity Severity) {
+	// The zero SourcePos has no file. Nothing reaches Log with one today, but
+	// reporting the message unlocated beats dereferencing nil.
+	if loc.File == nil {
+		fmt.Fprintln(os.Stderr, msg)
+		return
+	}
+
 	text := loc.File.Text
 
 	breaks := reLineBreak.FindAllStringIndex(text[:loc.Start], -1)
@@ -73,7 +85,6 @@ func Log(msg string, loc SourcePos, severity Severity) {
 	if lineIndex > 0 {
 		lineStart = breaks[len(breaks)-1][0] + 1
 	}
-	column := loc.Start - lineStart
 
 	lineEnd := loc.Start
 	nextBreak := reLineBreak.FindStringIndex(text[loc.Start:])
@@ -81,19 +92,26 @@ func Log(msg string, loc SourcePos, severity Severity) {
 		lineEnd += nextBreak[0]
 	}
 
-	fmt.Printf("%s:%d:%d: %s\n", loc.File.Path, lineIndex+1, column+1, msg)
-
+	// A SourcePos is a byte span, but a column and a caret run are counted in
+	// characters: source lines hold arbitrary UTF-8 (string literals, comments),
+	// and byte arithmetic would misreport the column and over-draw the caret.
 	line := text[lineStart:lineEnd]
-	colorEnd := min(len(line), column+loc.Length)
-	coloredLine := line[:column] +
-		colorText(line[column:colorEnd], colors[severity]) +
-		line[colorEnd:]
+	byteCol := loc.Start - lineStart
+	byteEnd := min(len(line), byteCol+loc.Length)
+	column := utf8.RuneCountInString(line[:byteCol])
+	width := utf8.RuneCountInString(line[byteCol:byteEnd])
 
-	underline := strings.Map(toSpace, line[:column]) +
-		colorText(strings.Repeat("^", colorEnd-column), colors[severity])
+	fmt.Fprintf(os.Stderr, "%s:%d:%d: %s\n", loc.File.Path, lineIndex+1, column+1, msg)
 
-	fmt.Println(coloredLine)
-	fmt.Println(underline)
+	coloredLine := line[:byteCol] +
+		colorText(line[byteCol:byteEnd], colors[severity]) +
+		line[byteEnd:]
+
+	underline := strings.Map(toSpace, line[:byteCol]) +
+		colorText(strings.Repeat("^", width), colors[severity])
+
+	fmt.Fprintln(os.Stderr, coloredLine)
+	fmt.Fprintln(os.Stderr, underline)
 }
 
 // To returns the span from the start of a to the end of b. Both must be in the

@@ -19,12 +19,12 @@ import (
 func LoadProgram(path string) *syntax.Program {
 	tokens := syntax.Lex(path)
 	if tokens == nil {
-		os.Exit(1)
+		os.Exit(exitError)
 	}
 
 	prog := syntax.ParseProgram(tokens)
 	if prog == nil {
-		os.Exit(1)
+		os.Exit(exitError)
 	}
 
 	return prog
@@ -60,7 +60,7 @@ func LexModule(name string) []syntax.Token {
 				return syntax.LexContent(path, string(text))
 			}
 			if !errors.Is(err, fs.ErrNotExist) {
-				fmt.Printf("Could not read %s: %v\n", path, err)
+				fmt.Fprintf(os.Stderr, "Could not read %s: %v\n", path, err)
 				return nil
 			}
 		}
@@ -74,7 +74,7 @@ func LexModule(name string) []syntax.Token {
 		}
 	}
 
-	fmt.Printf("Module not found: %s (looked for %s.th/%s.þ in %s, and in the embedded library)\n",
+	fmt.Fprintf(os.Stderr, "Module not found: %s (looked for %s.th/%s.þ in %s, and in the embedded library)\n",
 		name, name, name, strings.Join(moduleDirs, ", "))
 	return nil
 }
@@ -91,13 +91,13 @@ func LoadModules(imports []*syntax.Name) map[string]*syntax.Module {
 		tokens := LexModule(name.Value)
 		if tokens == nil {
 			source.Log("imported here", name.Pos, source.SeverityInfo)
-			os.Exit(1)
+			os.Exit(exitError)
 		}
 
 		module := syntax.ParseModule(tokens)
 		if module == nil {
 			source.Log("imported here", name.Pos, source.SeverityInfo)
-			os.Exit(1)
+			os.Exit(exitError)
 		}
 		module.Name = name.Value
 
@@ -126,6 +126,8 @@ type dumpFlags struct {
 func (d dumpFlags) any() bool { return d.ast || d.core || d.bytecode }
 
 func main() {
+	defer catchInternalError()
+
 	var path string
 	var dump dumpFlags
 	for _, arg := range os.Args[1:] {
@@ -139,16 +141,16 @@ func main() {
 		case arg == "--to-file":
 			dump.toFile = true
 		case len(arg) > 0 && arg[0] == '-':
-			fmt.Printf("Unknown flag: %s\n", arg)
-			os.Exit(1)
+			fmt.Fprintf(os.Stderr, "Unknown flag: %s\n", arg)
+			os.Exit(exitUsage)
 		default:
 			path = arg
 		}
 	}
 
 	if path == "" {
-		fmt.Println("Usage: thunky [--dump-ast] [--dump-core] [--dump-bytecode] [--to-file] <path>")
-		os.Exit(1)
+		fmt.Fprintln(os.Stderr, "Usage: thunky [--dump-ast] [--dump-core] [--dump-bytecode] [--to-file] <path>")
+		os.Exit(exitUsage)
 	}
 
 	setModuleDirs(path)
@@ -164,8 +166,8 @@ func main() {
 	if dump.core || dump.bytecode || !dump.any() {
 		resolution := syntax.Resolve(program, modules)
 		if resolution.Errors > 0 {
-			fmt.Printf("Analyzer found %d errors\n", resolution.Errors)
-			os.Exit(1)
+			fmt.Fprintf(os.Stderr, "Analyzer found %d errors\n", resolution.Errors)
+			os.Exit(exitError)
 		}
 
 		mainCore, moduleCores := core.Lower(program, modules, resolution)
@@ -195,8 +197,8 @@ func emitDump(inputPath, ext, content string, toFile bool) {
 	}
 	outPath := strings.TrimSuffix(inputPath, filepath.Ext(inputPath)) + "." + ext
 	if err := os.WriteFile(outPath, []byte(content), 0644); err != nil {
-		fmt.Printf("Could not write %s: %v\n", outPath, err)
-		os.Exit(1)
+		fmt.Fprintf(os.Stderr, "Could not write %s: %v\n", outPath, err)
+		os.Exit(exitError)
 	}
 	fmt.Printf("wrote %s\n", outPath)
 }
