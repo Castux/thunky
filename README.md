@@ -71,7 +71,7 @@ let
 
   -- Primality test: n is prime when no divisor exists in [2, sqrt n]
   divides = d -> n -> eq 0 (mod n d),
-  isPrime = n -> range 2 (floor (sqrt n)) > noneMatch (divides n) > and (gte 2 n),
+  isPrime = n -> rangeIncl 2 (floor (sqrt n)) > noneMatch (divides n) > and (gte 2 n),
   primes  = upFrom 2 > filter isPrime,    -- lazy infinite stream of primes
 
   -- Fibonacci as a self-referential lazy stream (laziness makes this safe)
@@ -80,7 +80,7 @@ let
   -- Insertion sort: lambda with cases for structural dispatch, foldr to build result
   insert = x -> {
     []     -> [x;],
-    [h, t] -> if (lte h x) [h, insert x t] [x, [h, t]]
+    [h, t] -> if (lte h x) [x, [h, t]] [h, insert x t]
   },
   isort = foldr insert []
 
@@ -110,7 +110,7 @@ Key things illustrated:
 
 | Document | Contents |
 |----------|----------|
-| [docs/tutorial/](docs/tutorial/README.md) | Hands-on tutorial: 14 chapters from first program to a complete build, with exercises |
+| [docs/tutorial/](docs/tutorial/README.md) | Hands-on tutorial: 15 chapters from first program to a complete build, with exercises |
 | [docs/LANGUAGE.md](docs/LANGUAGE.md) | Full language reference: grammar, types, operators, builtins, standard library |
 | [docs/implementation/](docs/implementation/0.Overview.md) | How the compiler works, stage by stage: lexer, parser, resolver, Core IR, bytecode, G-machine |
 | [docs/implementation/IMPROVEMENTS.md](docs/implementation/IMPROVEMENTS.md) | Proposals for future optimization |
