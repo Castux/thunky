@@ -61,7 +61,7 @@ let
 	answer = head solutions
 in
 	[
-		flatten [string (length solutions); " solution"];
+		format "%v solution" [length solutions;];
 		prepend "water:  " (nationAt (waterHouse answer) answer);
 		prepend "zebra:  " (nationAt (zebraHouse answer) answer)
-	] > map write > eval
+	] > writeList

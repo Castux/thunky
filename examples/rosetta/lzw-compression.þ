@@ -70,10 +70,10 @@ let
 in
 	[
 		prepend "input:    " sample;
-		flatten ["codes:    "; string codes];
-		flatten ["expected: "; string expected];
-		flatten ["matches:  "; string (equal codes expected)];
+		format "codes:    %v" [codes;];
+		format "expected: %v" [expected;];
+		format "matches:  %v" [equal codes expected;];
 		prepend "decoded:  " (decode codes);
-		flatten ["round trips: "; string (["banana"; "aaaaaa"; "x"; ""; sample]
-			> allMatch roundTrip)]
-	] > map write > eval
+		format "round trips: %v"
+			[["banana"; "aaaaaa"; "x"; ""; sample] > allMatch roundTrip;]
+	] > writeList

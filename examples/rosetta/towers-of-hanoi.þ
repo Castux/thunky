@@ -10,12 +10,11 @@ let
 		[]
 		(flatten [
 			moves (pred n) from via to;
-			[flatten ["disk "; string n; ": "; from; " -> "; to];];
+			[format "disk %v: %s -> %s" [n; from; to];];
 			moves (pred n) via to from
 		]),
 
 	solution = moves 4 "A" "C" "B"
 in
-	flatten [solution; [flatten [string (length solution); " moves"];]]
-	> map write
-	> eval
+	flatten [solution; [format "%v moves" [length solution;];]]
+	> writeList

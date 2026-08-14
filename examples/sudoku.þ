@@ -75,6 +75,6 @@ let
 	initEmpties = zip (rangeIncl 0 80) puzzle > filter (second *> eq 0) > map first
 in
 
-eval < map write < prepend
+text.writeList < prepend
 	["Puzzle:"; boardStr puzzle; "Solutions:"]
 	(solutions [initBoard, initEmpties] > map ([b, _] -> boardStr (boardList b)))

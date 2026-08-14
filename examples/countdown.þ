@@ -131,7 +131,7 @@ let
 
 	solutionToString = collect
 		*> map ([v, sym, left, right] ->
-			flatten [ string < value left; sym; string < value right; '='; string v ])
+			format '%v%s%v=%v' [ value left; sym; value right; v ])
 		*> join ', ',
 
 	-- Drop duplicate solution strings, keeping the first occurrence. Two
@@ -144,9 +144,9 @@ let
 		> nub
 		> sortWith (on lt length),
 
-	header = flatten [ 'reaching '; string target; ' from '; string numbers ],
-	footer = flatten [ string (length solutions); ' solution(s)' ],
+	header = format 'reaching %v from %v' [ target; numbers ],
+	footer = format '%v solution(s)' [ length solutions; ],
 
 	report = prepend [ header; ] < prepend solutions < [ footer; ]
 in
-	report > map write > eval
+	report > writeList

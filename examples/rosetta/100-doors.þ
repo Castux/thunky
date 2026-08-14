@@ -19,4 +19,4 @@ let
 		> filter second
 		> map first
 in
-	flatten ["open doors: "; openDoors > map string > join ", "] > write
+	format "open doors: %s" [openDoors > map string > join ", ";] > write

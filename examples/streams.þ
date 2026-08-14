@@ -125,7 +125,7 @@ let
 		line "sqrt 2"          (newtonSqrt 2 > within 0.0000001);
 		line "sqrt 1000"       (newtonSqrt 1000 > within 0.0000001);
 		row  "collatz records" (collatzRecords > take 10
-			> map ([n, len] -> flatten [string n; "/"; string len])
+			> map ([n, len] -> text.format "%v/%v" [n; len])
 			> text.join " ");
 
 		"";
@@ -136,4 +136,4 @@ let
 	]
 
 in
-	report > map write > eval
+	report > text.writeList

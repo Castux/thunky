@@ -3,7 +3,7 @@ import core, list, math, text, parse in
 
 let
 	render = [tag, a, b] -> case
-		(eq tag parse.resultOk)  (flatten ["ok: "; string a])
-		else                     (flatten ["parse error: "; a; " at offset "; string b])
+		(eq tag parse.resultOk)  (format "ok: %v" [a;])
+		else                     (format "parse error: %s at offset %v" [a; b])
 in
 	parse.parseProgram stdin > render > write

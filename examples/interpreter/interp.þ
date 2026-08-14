@@ -93,8 +93,7 @@ let
 	run = parse.parseProgram mainSource > ([tag, a, b] ->
 		if (eq tag parse.resultErr)
 			(lex.lineColumn mainSource b > ([line, column] ->
-				write (flatten ["parse error at line "; string line; ", column "; string column;
-					": "; a])))
+				write (format "parse error at line %v, column %v: %s" [line; column; a])))
 			(a > ([imports, body] ->
 				-- Forcing the rendering is what runs the program: any output the
 				-- program produces on the way happens first, as it would natively.

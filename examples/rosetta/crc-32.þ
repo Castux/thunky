@@ -32,5 +32,4 @@ in
 	> map ([text, expected] -> let got = bit.toHex (crc32 text) in flatten [
 		padRight 46 space (flatten [[dquote;]; take 42 text; [dquote;]]);
 		got; if (equal got expected) "  ok" (flatten ["  EXPECTED "; expected])])
-	> map write
-	> eval
+	> writeList

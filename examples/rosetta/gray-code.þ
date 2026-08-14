@@ -30,5 +30,5 @@ in
 	flatten [
 		["  n  binary   gray        decoded";];
 		rangeIncl 0 15 > map row;
-		[flatten ["round trip holds for 0..1000: "; string roundTrips];]
-	] > map write > eval
+		[format "round trip holds for 0..1000: %v" [roundTrips;];]
+	] > writeList

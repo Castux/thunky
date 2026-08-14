@@ -166,4 +166,4 @@ let report = [
 	row  "decoded"            (encodeRuns sample > decodeRuns);
 	line "round trip"         (equal (encodeRuns sample > decodeRuns) sample)
 ] in
-	report > map write > eval
+	report > writeList

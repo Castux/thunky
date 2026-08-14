@@ -1,4 +1,4 @@
-import core, list, hashmap, math in
+import core, list, hashmap, math, text in
 
 let
 	N = 1000000,
@@ -32,4 +32,4 @@ let
 		prepend "threshold for 5% significance: ~" (string approxThreshold)
 	]
 in
-	report > map write > eval
+	report > writeList

@@ -31,7 +31,6 @@ let
 			replicate (sub column size) (char '.')])
 in
 	flatten [
-		[flatten [string (length solutions); " solutions for "; string size;
-			" queens; the first is"];];
+		[format "%v solutions for %v queens; the first is" [length solutions; size];];
 		render (head solutions)
-	] > map write > eval
+	] > writeList

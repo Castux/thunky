@@ -3,7 +3,7 @@
 import core, list, math, text in
 
 let
-	bottles = { 0 -> "no more bottles", 1 -> "1 bottle", n -> flatten [string n; " bottles"] },
+	bottles = { 0 -> "no more bottles", 1 -> "1 bottle", n -> format "%v bottles" [n;] },
 
 	verse = n -> [
 		flatten [bottles n; " of beer on the wall, "; bottles n; " of beer."];
@@ -12,4 +12,4 @@ let
 		""
 	]
 in
-	downFrom 99 > take 99 > flatMap verse > map write > eval
+	downFrom 99 > take 99 > flatMap verse > writeList

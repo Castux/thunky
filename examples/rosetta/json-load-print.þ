@@ -35,7 +35,7 @@ in
 	[
 		prepend "name:        " name;
 		prepend "3rd module:  " third;
-		flatten ["sum of all numbers: "; string (total value)];
+		format "sum of all numbers: %v" [total value;];
 		"";
 		prepend "compact:  " (json.stringify built);
 		"pretty:";
@@ -43,4 +43,4 @@ in
 		"";
 		flatten ["round trip identical: ";
 			string (equal (json.parse (json.stringify value) > maybe.value) value)]
-	] > map write > eval
+	] > writeList

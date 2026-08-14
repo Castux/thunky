@@ -132,7 +132,7 @@ let
 		(flatten [
 			boardText state;
 			[status moves state; help; flatten [red; note; plain]]
-		] > map write > eval),
+		] > writeList),
 
 	-- The loop --------------------------------------------------------------
 	--
@@ -151,7 +151,7 @@ let
 	turn = moves -> history -> state -> note -> input ->
 		seq (draw moves state note)
 			(if (solved state)
-				(write (flatten [green; "solved in "; string moves; " moves"; plain]))
+				(write (format "%ssolved in %v moves%s" [green; moves; plain]))
 				(seq (bwrite prompt)
 					(input > {
 						[] -> write (flatten [plain; "end of input"]),

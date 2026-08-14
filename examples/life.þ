@@ -115,7 +115,7 @@ let
 	draw = generation -> previous -> current ->
 		seq (bwrite home)
 			(prepend [header generation current;] (zipWith rowText previous current)
-				> map write > eval),
+				> writeList),
 
 	-- The frame delay: a loop that computes nothing, forced by `seq`.
 	spin = { 0 -> 0, n -> spin (sub 1 n) },
