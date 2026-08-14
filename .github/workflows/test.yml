@@ -1,0 +1,79 @@
+name: Tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  schedule:
+    # Weekly, for the example-catalogue run that is too slow for every push.
+    - cron: "0 5 * * 1"
+  workflow_dispatch:
+
+jobs:
+  # The golden suite is the authority on compiler behaviour, so it runs on both
+  # platforms: the two harnesses (bash and PowerShell) are separate
+  # implementations of the same contract and have drifted apart before.
+  golden:
+    name: Golden suite (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: Golden suite
+        if: runner.os != 'Windows'
+        run: bash tests/run.sh
+
+      # Deliberately powershell (Windows PowerShell 5.1), not pwsh: 5.1 is what
+      # a stock Windows box has, and it is where run.ps1's encoding traps bite.
+      - name: Golden suite
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: .\tests\run.ps1
+
+      # 471 assertions written in Thunky against the embedded standard library.
+      # The suite refuses to reduce if any of them fails, so a regression is a
+      # non-zero exit here rather than a FAIL line nobody reads.
+      - name: Standard library unit tests
+        run: go run . examples/core_tests.þ
+
+  # Every runnable fenced block in the docs is compiled and run, exactly as the
+  # site's Run buttons would. A broken snippet cannot reach the published site.
+  docs:
+    name: Documentation snippets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - run: go build -o thunky .
+      - run: python etc/check-docs.py
+
+  # Actually executing the playground's example programs takes about ten
+  # minutes under wasm, which is too slow for every push but well worth a
+  # weekly run: the per-push check in pages.yml is static only, so without this
+  # no example program is ever run by CI at all.
+  examples:
+    name: Example catalogue (executed)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+      - run: bash web/build.sh _site
+      - run: node web/check-examples.mjs _site --run

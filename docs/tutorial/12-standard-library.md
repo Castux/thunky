@@ -377,7 +377,7 @@ text.format "%s scored %v out of %v" ["Ada"; 449; 461] > write
 
 Output:
 
-```
+```text
 Ada scored 449 out of 461
 ```
 
@@ -393,7 +393,7 @@ text.format "sample:  %s
 
 Output:
 
-```
+```text
 sample:  abracadabra
 11 characters, 5 distinct
 ```
@@ -411,7 +411,7 @@ text.writeList ["first"; "second"; 42]
 
 Output:
 
-```
+```text
 first
 second
 42
@@ -432,7 +432,7 @@ text.writeTable [
 
 Output:
 
-```
+```text
 word             count
 the              1204
 quick            37

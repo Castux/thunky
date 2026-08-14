@@ -6,13 +6,22 @@ let
 			[flatten ["PASS: "; name; [text.lf;]], 1]
 			[flatten ["FAIL: "; name; " (expected "; string expected; ", got "; string expr; ")"; [text.lf;]], 0],
 
+	-- A pure program has no way to set an exit code, and a suite that always
+	-- exits 0 cannot fail a CI run — the whole point of running it there. So on
+	-- any failure the suite refuses to reduce: applying this lambda to 0 matches
+	-- no case, which is a runtime error and so exit 1. The diagnostic's caret
+	-- lands on the line below, after the FAIL lines have been printed.
+	someAssertionsFailed = { 1 -> 1 },
+
 	runTests = l -> let
 		total = length l,
 		passed = map second l > sum,
 		lines = map first l > flatten,
-		message = flatten [[lf;]; string passed; " passed out of "; string total]
+		message = flatten [[lf;]; string passed; " passed out of "; string total; [lf;]]
 	in
-		write < prepend lines message
+		-- seq forces the report out before the verdict is examined, so the
+		-- PASS/FAIL lines are printed either way.
+		if (eq passed total) 1 (someAssertionsFailed 0) > seq (write < prepend lines message)
 in
 
 runTests [

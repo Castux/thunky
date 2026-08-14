@@ -22,8 +22,18 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.25"
+      # The site embeds the compiler, so a broken compiler must not be
+      # published. test.yml covers the same ground on every push and PR; these
+      # two steps are what stop a red suite from deploying anyway.
+      - name: go vet
+        run: go vet ./...
+      - name: Golden suite
+        run: bash tests/run.sh
       - name: Build site
         run: bash web/build.sh _site
+      # core_tests.þ exits non-zero if any of its 471 assertions fails, and
+      # smoke.mjs propagates that, so this is a real check on the wasm build
+      # and not just proof that it starts.
       - name: Smoke-test the wasm build
         run: node web/smoke.mjs _site examples/core_tests.þ
       - name: Check the playground's example catalogue
