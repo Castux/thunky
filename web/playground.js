@@ -1,5 +1,5 @@
 // The playground page: a full-screen editor wired to the wasm runner, with
-// example loading, stage dumps, stdin, and shareable URLs (#code=base64).
+// example loading, stage dumps, stdin, and shareable URLs (see SHARING below).
 
 "use strict";
 
@@ -143,9 +143,116 @@ const exampleSelect = document.getElementById("example-select");
 const stdinBox = document.getElementById("stdin");
 const status = document.getElementById("status");
 
+// --- SHARING ---------------------------------------------------------------
+//
+// The fragment carries the whole state of a run, not just the program. It used
+// to carry only the program, which broke every shared example that reads stdin
+// or imports a local module: the recipient got a program with nothing to read
+// and no `euler` module to resolve, so it failed for them and worked for the
+// sender.
+//
+//   #p=<base64url>   the payload below, JSON, deflate-raw compressed
+//   #u=<base64url>   the same JSON uncompressed, where CompressionStream is
+//                    missing (Safari before 16.4, Firefox before 113)
+//   #code=<base64>   the original format: the program alone, plain base64.
+//                    Still read, so links already shared keep working; never
+//                    written any more.
+//
+// Payload keys are single letters, and empty ones are omitted, because the
+// uncompressed form has no other way to stay small: c program, i stdin,
+// d dump stage, m modules as { name: source }.
+//
+// base64url rather than base64: '+' and '/' survive a fragment but not every
+// chat client, mail client and issue tracker that will carry one of these.
+
+// Past this many characters a URL stops surviving the round trip through the
+// tools people paste into. Chrome's own limit is about 32k, but Slack, mail
+// clients and issue trackers truncate far earlier, and a truncated link fails
+// silently at the far end. Refuse to make one instead.
+const MAX_URL_LENGTH = 12000;
+
+function bytesToBase64url(bytes) {
+    let binary = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    }
+    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function base64urlToBytes(text) {
+    let b64 = text.replace(/-/g, "+").replace(/_/g, "/");
+    while (b64.length % 4) b64 += "=";
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+}
+
+const canCompress = typeof CompressionStream === "function"
+    && typeof DecompressionStream === "function";
+
+async function pipeThrough(bytes, transform) {
+    const stream = new Blob([bytes]).stream().pipeThrough(transform);
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+// The state worth carrying, minus anything empty.
+function currentPayload() {
+    const payload = { c: editor.getValue() };
+    if (stdinBox.value) payload.i = stdinBox.value;
+    if (dumpSelect.value) payload.d = dumpSelect.value;
+    if (Object.keys(currentModules).length) payload.m = currentModules;
+    return payload;
+}
+
+function applyPayload(payload) {
+    editor.setValue(payload.c || "");
+    stdinBox.value = payload.i || "";
+    dumpSelect.value = payload.d || "";
+    currentModules = payload.m || {};
+    // Open the stdin drawer when there is input to see, so the recipient of a
+    // link knows the program is being fed something.
+    if (payload.i) document.querySelector(".pg-stdin").open = true;
+}
+
+// What, if anything, the fragment asks us to load. Returns null for no
+// fragment; { code } for one that can be decoded synchronously (so the editor
+// can be built with the right text and never flash the default program); or
+// { deferred: encoded } for the compressed form, which cannot.
+function parseFragment() {
+    const hash = location.hash;
+    let match;
+    if ((match = hash.match(/^#p=(.*)$/))) return { deferred: match[1] };
+    if ((match = hash.match(/^#u=(.*)$/))) {
+        return { payload: decodeUncompressed(match[1]) };
+    }
+    if ((match = hash.match(/^#code=(.*)$/))) {
+        try {
+            return { payload: { c: decodeURIComponent(escape(atob(match[1]))) } };
+        } catch (err) {
+            return { error: "the #code= payload is not valid base64" };
+        }
+    }
+    return null;
+}
+
+function decodeUncompressed(encoded) {
+    return JSON.parse(new TextDecoder().decode(base64urlToBytes(encoded)));
+}
+
+const fragment = (() => {
+    try {
+        return parseFragment();
+    } catch (err) {
+        return { error: err.message };
+    }
+})();
+
 // Thunky sources are indented with tabs, shown four columns wide.
 const editor = CodeMirror(document.getElementById("editor"), {
-    value: initialProgram(),
+    value: fragment
+        ? (fragment.payload ? fragment.payload.c || "" : "")
+        : DEFAULT_PROGRAM,
     mode: "thunky",
     theme: "thunky",
     lineNumbers: true,
@@ -166,15 +273,33 @@ const editor = CodeMirror(document.getElementById("editor"), {
 editor.getWrapperElement().setAttribute("aria-label",
     "Thunky program editor. Press Escape to leave the editor.");
 
-function initialProgram() {
-    const match = location.hash.match(/#code=(.+)/);
-    if (match) {
-        try {
-            return decodeURIComponent(escape(atob(match[1])));
-        } catch (err) { /* fall through to default */ }
+// Finish loading a shared link. A corrupt or truncated payload used to be
+// discarded in silence, leaving the recipient looking at the default program
+// and no reason to think anything had gone wrong; now it says so.
+(async () => {
+    if (!fragment) return;
+    try {
+        if (fragment.error) throw new Error(fragment.error);
+        if (fragment.deferred) {
+            if (!canCompress) {
+                throw new Error("this browser cannot decompress the link " +
+                    "(it has no DecompressionStream)");
+            }
+            const bytes = await pipeThrough(base64urlToBytes(fragment.deferred),
+                new DecompressionStream("deflate-raw"));
+            applyPayload(JSON.parse(new TextDecoder().decode(bytes)));
+        } else {
+            applyPayload(fragment.payload);
+        }
+    } catch (err) {
+        editor.setValue(DEFAULT_PROGRAM);
+        output.textContent = "This shared link could not be read: " +
+            err.message + ".\nIt may have been truncated in transit — the " +
+            "whole URL, fragment included, has to arrive intact.";
+        status.textContent = "bad link";
+        status.className = "pg-status failed";
     }
-    return DEFAULT_PROGRAM;
-}
+})();
 
 // Options are keyed by index rather than by filename, because one program can
 // appear twice with different input — Euler 18 and 67 are the same file.
@@ -216,6 +341,9 @@ exampleSelect.addEventListener("change", async () => {
             modules[name] = await fetchExampleFile(path);
         }
         currentModules = modules;
+        // The fragment describes whatever was in the editor a moment ago, not
+        // this example. Drop it rather than leave the URL lying.
+        if (location.hash) history.replaceState(null, "", location.pathname);
     } catch (err) {
         output.textContent = "Could not load example: " + err.message;
     }
@@ -276,9 +404,26 @@ runBtn.addEventListener("click", run);
 stopBtn.addEventListener("click", () => ThunkyRunner.stop());
 
 shareBtn.addEventListener("click", async () => {
-    const encoded = btoa(unescape(encodeURIComponent(editor.getValue())));
-    const url = location.origin + location.pathname + "#code=" + encoded;
-    history.replaceState(null, "", "#code=" + encoded);
+    const json = new TextEncoder().encode(JSON.stringify(currentPayload()));
+    const hash = canCompress
+        ? "#p=" + bytesToBase64url(await pipeThrough(json, new CompressionStream("deflate-raw")))
+        : "#u=" + bytesToBase64url(json);
+    const url = location.origin + location.pathname + hash;
+
+    if (url.length > MAX_URL_LENGTH) {
+        const kb = n => Math.ceil(n / 1024) + " KB";
+        output.textContent = "This program is too large to put in a link (" +
+            kb(url.length) + "; the limit is " + kb(MAX_URL_LENGTH) + ").\n" +
+            (stdinBox.value.length > editor.getValue().length
+                ? "Most of it is the standard input — clear the stdin box, or " +
+                  "point the recipient at the example that supplies it."
+                : "Shorten the program, or share it as a file.");
+        status.textContent = "too large to share";
+        status.className = "pg-status failed";
+        return;
+    }
+
+    history.replaceState(null, "", hash);
     try {
         await navigator.clipboard.writeText(url);
         shareBtn.textContent = "Copied!";
