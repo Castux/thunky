@@ -42,11 +42,11 @@ let
 		}
 	},
 
-	report = name -> order -> flatten [padRight 12 space name; order > map string > join " "]
+	row = name -> order -> [name; order > map string > join " "]
 in
 	[
-		report "preorder"   (preorder tree);
-		report "inorder"    (inorder tree);
-		report "postorder"  (postorder tree);
-		report "level order" (levelorder [tree;])
-	] > map write > eval
+		row "preorder"    (preorder tree);
+		row "inorder"     (inorder tree);
+		row "postorder"   (postorder tree);
+		row "level order" (levelorder [tree;])
+	] > writeTable
