@@ -60,7 +60,7 @@ let
 	-- Each row from the previous one: shift left, shift right, add. `iterate`
 	-- makes the infinite triangle out of that single step.
 
-	pascal = iterate (row -> zipWith add (prepend [0;] row) (append [0;] row)) [1;],
+	pascal = iterate (fork (zipWith add) (prepend [0;]) (append [0;])) [1;],
 
 	-- Look-and-say ----------------------------------------------------------
 	--

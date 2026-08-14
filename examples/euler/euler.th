@@ -67,8 +67,8 @@ totient = n -> factorise n
 -- Figurate numbers and digit helpers.
 -- triangle n: the nth triangle number. isPalindromeNumber n: does n read the
 -- same both ways. digitSum n: the sum of n's decimal digits.
-triangle = n -> div 2 (mul n (succ n)),
-isPalindromeNumber = n -> let s = string n in equal s (reverse s),
+triangle = ap mul succ *> div 2,
+isPalindromeNumber = string *> ap equal reverse,
 digitSum = digits *> sum,
 
 -- amicable n: the partner of n if the two are amicable, else 0.

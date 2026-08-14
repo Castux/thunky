@@ -17,7 +17,7 @@ let
 		]
 		> map (foldl (acc -> d -> add d (mul 10 acc)) 0),
 
-	isTruncatable = n -> and (euler.isPrime n) (truncations n > allMatch euler.isPrime)
+	isTruncatable = fork and euler.isPrime (truncations *> allMatch euler.isPrime)
 in
 	upFrom 11
 	> filter isTruncatable

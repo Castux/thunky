@@ -33,5 +33,5 @@ in
 		flatten ["Y fibonacci 0..10:  "; rangeIncl 0 10 > map fibonacci > string];
 		flatten ["fix factorial 0..10: "; rangeIncl 0 10 > map factorialFix > string];
 		flatten ["Y and fix agree:    "; string (rangeIncl 0 12
-			> allMatch (n -> eq (factorial n) (factorialFix n)))]
+			> allMatch (fork eq factorial factorialFix))]
 	] > map write > eval
