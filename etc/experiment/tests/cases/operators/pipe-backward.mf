@@ -1,4 +1,0 @@
--- Backward application: f < a applies f to a.
-import core, list in
-let inc = add 1, dbl = mul 2 in
-show [dbl < inc < 5; sum < map inc < [1; 2; 3]]

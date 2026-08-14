@@ -1,3 +1,0 @@
--- bstdin as raw bytes; show the first five.
-import core, list in
-bstdin > take 5 > show

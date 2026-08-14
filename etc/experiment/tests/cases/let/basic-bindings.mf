@@ -1,4 +1,0 @@
--- A let with several bindings, one referring to earlier ones.
-import core in
-let x = 10, y = 20, z = add x y in
-show [x; y; z]

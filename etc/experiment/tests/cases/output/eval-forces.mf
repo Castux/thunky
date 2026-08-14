@@ -1,4 +1,0 @@
--- eval forces full normal form before show renders.
-import core, list in
-let xs = map (add 1) [1; 2; 3] in
-eval xs > show

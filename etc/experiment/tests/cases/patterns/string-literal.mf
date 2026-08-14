@@ -1,4 +1,0 @@
--- String-literal patterns.
-import core in
-let greet = { 'hi' -> 1, 'bye' -> 2, other -> 0 } in
-show [greet 'hi'; greet 'bye'; greet 'yo']

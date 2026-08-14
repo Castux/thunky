@@ -1,3 +1,0 @@
--- Invalid UTF-8 on the code-point stream is a runtime error.
-import core, list in
-stdin > write

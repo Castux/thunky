@@ -1,17 +1,17 @@
-## Syntax highlighting for the microfun language (.mf files)
-## Install: copy to ~/.config/micro/syntax/microfun.yaml
+## Syntax highlighting for the Thunky language (.th / .þ files)
+## Install: copy to ~/.config/micro/syntax/thunky.yaml
 ## Micro will pick it up automatically on next launch.
 
-filetype: microfun
+filetype: thunky
 
 detect:
-  filename: "\\.mf$"
+  filename: "\\.(th|þ)$"
 
 rules:
   # Line comments
   - comment: "--.*$"
 
-  # String literals (single-line; no escape sequences in microfun)
+  # String literals (single-line; no escape sequences in Thunky)
   - constant.string: "\"[^\"]*\""
   - constant.string: "'[^']*'"
 

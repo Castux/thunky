@@ -1,4 +1,0 @@
--- Partially applied binary builtins (RuntimePartial).
-import core, list in
-let add5 = add 5, atMost3 = lte 3 in
-show [map add5 [1; 2; 3]; map atMost3 [1; 2; 3; 4; 5]; equal 7 7; equal 7 8]

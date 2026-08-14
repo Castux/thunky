@@ -1,3 +1,0 @@
--- An unbound name is a static (analyzer) error.
-import core in
-show undefined_name

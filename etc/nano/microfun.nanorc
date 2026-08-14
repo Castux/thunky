@@ -1,10 +1,10 @@
-## Syntax highlighting for the microfun language (.mf files)
+## Syntax highlighting for the Thunky language (.th / .þ files)
 ## Install: copy to /usr/share/nano/ and add to /etc/nanorc:
-##   include "/usr/share/nano/microfun.nanorc"
+##   include "/usr/share/nano/thunky.nanorc"
 ## Or add to ~/.config/nano/nanorc:
-##   include "/path/to/microfun.nanorc"
+##   include "/path/to/thunky.nanorc"
 
-syntax "microfun" "\.mf$"
+syntax "thunky" "\.(th|þ)$"
 
 # Line comments — must be first so "--" inside strings is still coloured correctly
 # (nano applies the last matching rule, so put strings after comments to win)

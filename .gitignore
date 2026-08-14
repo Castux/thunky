@@ -1,11 +1,14 @@
 test.mf
 test.th
 .DS_Store
+
+# Advent of Code asks that puzzle inputs not be republished, so they stay local
+# (see examples/aoc2025/README.md).
+examples/aoc2025/*.txt
 thunky.exe
 thunky.test.exe
 thunky.bench.exe
 thunky.oracle.exe
 thunky
-etc/experiment/*.exe
 _site/
 _site*/

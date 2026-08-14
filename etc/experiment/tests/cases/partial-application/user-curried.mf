@@ -1,5 +1,0 @@
--- Partially applied user-defined curried function (closure capture).
-import core, list in
-let scale = factor -> n -> mul factor n in
-let triple = scale 3 in
-show [map triple [1; 2; 3]; triple 10]

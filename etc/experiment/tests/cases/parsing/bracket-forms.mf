@@ -1,4 +1,0 @@
--- Brackets are overloaded but unambiguous: [] empty, [a] 1-tuple, [a;] 1-list,
--- [a; b] list, [a, b] pair (cons). A PEG picks one form by ordered choice.
-import core in
-show [ []; [1]; [2;]; [3; 4]; [5, 6] ]

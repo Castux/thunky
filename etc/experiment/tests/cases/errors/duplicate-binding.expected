@@ -1,7 +1,0 @@
-tests/cases/errors/duplicate-binding.mf:3:12: x was already defined
-let x = 1, x = 2 in show x
-           ^
-tests/cases/errors/duplicate-binding.mf:3:5: here
-let x = 1, x = 2 in show x
-    ^
-Analyzer found 1 errors

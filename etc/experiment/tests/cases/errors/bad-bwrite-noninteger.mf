@@ -1,3 +1,0 @@
--- bwrite rejects non-integer byte values.
-import core in
-bwrite [72; 105.5]

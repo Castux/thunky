@@ -1,3 +1,0 @@
--- A 2-tuple is a cons; the empty tuple is also the empty list.
-import core in
-show [[1, 2]; []; [3, 4]]

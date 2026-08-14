@@ -1,3 +1,0 @@
--- write rejects non-integer code points.
-import core in
-write [65; 66.5]

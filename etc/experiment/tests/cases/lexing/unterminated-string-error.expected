@@ -1,3 +1,0 @@
-tests/cases/lexing/unterminated-string-error.mf:3:7: unexpected character '''
-write 'hello
-      ^

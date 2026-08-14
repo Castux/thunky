@@ -1,3 +1,0 @@
--- A non-number argument to an arithmetic builtin is a runtime error.
-import core in
-add 1 'x' > eval

@@ -1,4 +1,0 @@
--- Bare application is left-associative: f a b c = ((f a) b) c.
-import core in
-let f = a -> b -> c -> sub (sub a b) c in
-show [f 100 10 1; sub (sub 100 10) 1]

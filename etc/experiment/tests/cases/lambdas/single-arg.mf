@@ -1,4 +1,0 @@
--- A one-argument lambda.
-import core in
-let square = x -> mul x x in
-show [square 5; square 12]

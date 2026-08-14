@@ -1,4 +1,0 @@
--- Currying: nested single-argument lambdas.
-import core in
-let add3 = a -> b -> c -> add a (add b c) in
-show [add3 1 2 3; add3 10 20 30]

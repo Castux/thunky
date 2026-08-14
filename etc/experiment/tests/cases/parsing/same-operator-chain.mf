@@ -1,4 +1,0 @@
--- A chain of one operator is allowed; grouping with parens lets forms combine.
-import core in
-let inc = add 1, dbl = mul 2, dec = sub 1 in
-show [ 1 > inc > inc > inc; (10 > dbl) > dec ]

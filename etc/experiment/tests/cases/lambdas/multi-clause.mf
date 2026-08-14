@@ -1,4 +1,0 @@
--- A multi-clause lambda (first matching clause wins).
-import core in
-let classify = { 0 -> 100, 1 -> 200, n -> 999 } in
-show [classify 0; classify 1; classify 5]

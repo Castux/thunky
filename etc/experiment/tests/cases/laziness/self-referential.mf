@@ -1,7 +1,0 @@
--- Self-referential lazy structures: a cyclic list and the Fibonacci stream.
-import core, list in
-let
-  ones = [1, ones],
-  fibs = concat [0; 1] (zipWith add fibs (tail fibs))
-in
-show [take 4 ones; take 8 fibs]

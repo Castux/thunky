@@ -1,3 +1,0 @@
--- bwrite prints a list of numbers as bytes.
-import core, list in
-bwrite [72; 101; 108; 108; 111]

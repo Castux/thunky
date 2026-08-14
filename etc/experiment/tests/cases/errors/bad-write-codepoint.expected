@@ -1,3 +1,0 @@
-Atests/cases/errors/bad-write-codepoint.mf:3:1: write expects a list of code points, found invalid code point 55296
-write [65; 55296]
-^^^^^^^^^^^^^^^^^

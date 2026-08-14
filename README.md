@@ -138,19 +138,31 @@ setup on the GitHub repository:
 
 1. **Settings → Pages → Build and deployment → Source: "GitHub Actions"**
    (not "Deploy from a branch").
-2. The workflow deploys on pushes to `v1` (the current main development
-   branch); adjust the `branches:` trigger if that changes. The *Run workflow*
-   button (workflow_dispatch) deploys manually from any state.
+2. The workflow deploys on pushes to `master`; adjust the `branches:` trigger
+   if that changes. The *Run workflow* button (workflow_dispatch) deploys
+   manually from any state.
 
-The workflow builds the wasm binary with the pinned Go version, assembles the
-site, smoke-tests the wasm build under Node against `examples/core_tests.þ`,
-and publishes. To build and preview locally:
+The workflow runs `go vet` and the golden suite, builds the wasm binary with the
+pinned Go version, assembles the site, smoke-tests the wasm build under Node
+against `examples/core_tests.þ`, and publishes — so a red test suite does not
+deploy. To build and preview locally:
 
 ```sh
 web/build.sh            # assembles the site (incl. the wasm build) into _site/
 python -m http.server -d _site
 node web/smoke.mjs _site examples/core_tests.þ   # headless check of the wasm build
 ```
+
+## Contributing
+
+Thunky is a learning project — built to explore compiler construction, not to be
+depended on. Issues and pull requests are welcome all the same; expect replies
+to be leisurely.
+
+If you change the compiler, `tests/run.sh` (or `tests/run.ps1` on Windows) must
+stay green and `examples/core_tests.þ` must exit 0. Both run in CI, along with
+`go vet` and the documentation snippet checker. A deliberate change to output
+means re-blessing the golden files — review that diff before committing it.
 
 ## License
 

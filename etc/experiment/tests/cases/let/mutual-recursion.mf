@@ -1,7 +1,0 @@
--- Mutually recursive bindings in one let (two-pass binding).
-import core in
-let
-  isEven = n -> if (eq 0 n) 1 (isOdd (sub 1 n)),
-  isOdd  = n -> if (eq 0 n) 0 (isEven (sub 1 n))
-in
-show [isEven 10; isOdd 10; isEven 7; isOdd 7]

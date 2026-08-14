@@ -1,4 +1,0 @@
--- Application binds tighter than the pipe operators: `f a b > g` is `(f a b) > g`.
-import core, list in
-let inc = add 1 in
-show [ map inc [1; 2; 3] > sum; add 1 2 > mul 10 ]

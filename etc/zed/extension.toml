@@ -3,7 +3,7 @@ name = "microfun"
 version = "0.0.1"
 schema_version = 1
 authors = ["Noé Falzon"]
-description = "microfun language support for Zed (.mf files)"
+description = "Thunky language support for Zed (.th / .þ files)"
 repository = "https://github.com/noefalzon/tree-sitter-microfun"
 
 # grammars/microfun is a local git repo with remote = tree-sitter-microfun.

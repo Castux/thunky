@@ -1,4 +1,0 @@
--- A lambda's pattern is parsed as an expression and reinterpreted as a pattern,
--- so the same bracket forms mean the same thing on both sides of `->`.
-import core in
-show [ ([a, b] -> a) [7, 8]; ([x;] -> x) [9;] ]

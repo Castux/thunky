@@ -1,4 +1,0 @@
--- There is no infix minus and no unary minus token: '-' alone is a lexing error
--- (subtraction is the builtin sub; negation is math.negate).
-import core in
-show (sub 5 - 2)

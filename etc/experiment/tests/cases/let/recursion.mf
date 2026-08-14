@@ -1,4 +1,0 @@
--- Self-recursive binding.
-import core in
-let fact = n -> if (lte 1 n) 1 (mul n (fact (sub 1 n))) in
-show [fact 5; fact 0]

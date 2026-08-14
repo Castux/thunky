@@ -1,3 +1,0 @@
--- A trailing separator before ']' is a parse error (no empty final element).
-import core in
-show [1, 2,]
