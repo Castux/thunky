@@ -3,19 +3,36 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Playground — Thunky</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<title>Playground — Thunky (Þunky)</title>
+<!-- __SITE_URL__ and __REPO_URL__ are substituted by web/build.sh. -->
+<meta name="description" content="Write and run Thunky in the browser: the whole compiler and G-machine, built to WebAssembly. Seventy-odd example programs, standard input, and dumps of every compilation stage.">
+<link rel="canonical" href="__SITE_URL__/playground.html">
+<meta name="theme-color" content="#6f42c1">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Thunky">
+<meta property="og:title" content="Thunky playground">
+<meta property="og:description" content="Write and run Thunky in the browser: the whole compiler and G-machine, built to WebAssembly. Example programs, stdin, and dumps of every compilation stage.">
+<meta property="og:url" content="__SITE_URL__/playground.html">
+<meta property="og:image" content="__SITE_URL__/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Thunky — a toy language, lazily evaluated">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.ico" sizes="32x32">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="stylesheet" href="vendor/codemirror.min.css">
 <link rel="stylesheet" href="style.css">
 </head>
 <body class="playground-page">
+<a class="skip-link" href="#editor">Skip to the editor</a>
 <header class="pg-header">
   <div class="brand"><a href="index.html"><img class="brand-logo" src="logo.svg" alt="">Thunky</a> <span class="pg-title">playground</span></div>
   <div class="pg-controls">
-    <select id="example-select" title="Load an example">
+    <select id="example-select" title="Load an example" aria-label="Load an example">
       <option value="">Examples…</option>
     </select>
-    <select id="dump-select" title="What to produce">
+    <select id="dump-select" title="What to produce" aria-label="What to produce">
       <option value="">Run</option>
       <option value="ast">Dump AST</option>
       <option value="core">Dump Core IR</option>
@@ -27,21 +44,27 @@
     <a class="doc-link" href="index.html?page=language">Language reference</a>
   </div>
 </header>
+<noscript>
+  <p class="noscript-note">The playground runs the Thunky compiler as
+  WebAssembly in your browser, so it needs JavaScript enabled. The
+  <a href="__REPO_URL__#readme">documentation on GitHub</a> reads fine
+  without it.</p>
+</noscript>
 <div class="pg-main">
   <div class="pg-editor" id="editor"></div>
   <div class="pg-right">
     <div class="pg-outbar">
-      <span class="pg-outlabel">output</span>
-      <span id="status" class="pg-status"></span>
+      <span class="pg-outlabel" id="output-label">output</span>
+      <span id="status" class="pg-status" role="status" aria-live="polite"></span>
     </div>
-    <pre id="output" class="pg-output"></pre>
+    <pre id="output" class="pg-output" tabindex="0" role="log" aria-live="polite" aria-labelledby="output-label"></pre>
     <details class="pg-stdin">
       <summary>stdin</summary>
-      <textarea id="stdin" rows="4" spellcheck="false" placeholder="Text fed to the program's stdin stream"></textarea>
+      <textarea id="stdin" rows="4" spellcheck="false" aria-label="Standard input" placeholder="Text fed to the program's stdin stream"></textarea>
     </details>
   </div>
 </div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="vendor/codemirror.min.js"></script>
 <script src="thunky-mode.js"></script>
 <script src="runner.js"></script>
 <script src="playground.js"></script>

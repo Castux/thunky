@@ -158,8 +158,13 @@ const editor = CodeMirror(document.getElementById("editor"), {
         "Cmd-Enter": run,
         Tab: cm => cm.execCommand(cm.somethingSelected() ? "indentMore" : "insertTab"),
         "Shift-Tab": cm => cm.execCommand("indentLess"),
+        // Tab indents, so it cannot also move focus. Esc is the way out
+        // (WCAG 2.1.2: no keyboard trap).
+        Esc: cm => cm.getInputField().blur(),
     },
 });
+editor.getWrapperElement().setAttribute("aria-label",
+    "Thunky program editor. Press Escape to leave the editor.");
 
 function initialProgram() {
     const match = location.hash.match(/#code=(.+)/);
