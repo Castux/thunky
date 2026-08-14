@@ -15,7 +15,7 @@ After completing it, you will know how to write Thunky programs and will have a 
 | 1 | [Getting Started](01-getting-started.md) | Running programs, numbers, arithmetic, `show`, tuples |
 | 2 | [Functions and Application](02-functions-and-application.md) | Lambdas, currying, partial application, higher-order functions |
 | 3 | [Pipes and Composition](03-pipes-and-composition.md) | `>`, `<`, `*>`, `<*`; the `import` clause |
-| 4 | [Data: Tuples, Lists and Strings](04-data.md) | Cons cells, list literals, the `[x;]` trap, strings, `eq` vs `equal` |
+| 4 | [Data: Tuples, Lists and Strings](04-data.md) | Cons cells, list literals, `[x]` vs `[x;]`, strings, `eq` vs `equal` |
 | 5 | [Pattern Matching](05-pattern-matching.md) | Number, string, tuple and list patterns; multi-case lambdas |
 | 6 | [Errors and Debugging](06-errors-and-debugging.md) | Reading diagnostics, the common failures, `peek` |
 | 7 | [Let and Recursion](07-let-and-recursion.md) | Bindings, mutual visibility, recursion, accumulators |

@@ -1170,11 +1170,11 @@ makes the estimate safe rather than hopeful.
 | `floatToString digits x` | decimal rendering with that many places, truncated |
 
 ```
-import big in
+import big, text in
 [
-  big.intToString (big.intPow (big.intFromNumber 2) 100);
+  big.intToString (big.intPow 100 (big.intFromNumber 2));
   big.floatToString 20 (big.floatSqrt (big.floatFromNumber 200 2))
-] > map write > eval
+] > text.writeList
 ```
 
 ---
@@ -1273,6 +1273,17 @@ The named constants cover the characters that cannot be written literally:
 | `trim s` | remove leading/trailing whitespace |
 | `padLeft n fill s` | left-pad `s` with code point `fill` to minimum width `n` |
 | `padRight n fill s` | right-pad `s` with code point `fill` to minimum width `n` |
+| `format template values` | fill `template` from `values`, left to right: `%s` takes a string, `%v` takes any value and renders it with `string` |
+
+In a `format` template, `%%s` and `%%v` are those two characters literally and any
+other `%` is itself, so `"5% of"` needs no escaping. A placeholder with no value
+left is copied through unchanged and surplus values are ignored. String literals
+may span lines, so a template can be a whole block of text.
+
+```
+import text in
+text.format "%s scored %v out of %v" ["Ada"; 449; 461] > write
+```
 
 **Character classification and conversion**
 
@@ -1340,4 +1351,32 @@ eval < map write [
 ```
 import text in
 show [text.stringToInt "123", text.split "," "one,two,three"]
+```
+
+**Output**
+
+| Name | Description |
+|------|-------------|
+| `render v` | `v` as text: a number becomes its digits, a string passes through unchanged |
+| `writeList l` | print one element of `l` per line, rendering numbers; returns `l` |
+| `tableLines rows` | rows of cells as a list of aligned lines, columns separated by two spaces |
+| `writeTable rows` | print `rows` as an aligned table; returns `rows` |
+
+`writeList` and `writeTable` return their argument, so they sit in a pipeline the
+way `write` and `show` do. `tableLines` is the pure counterpart of `writeTable`,
+for a report assembled before it is printed; `render` is the cell renderer both
+use.
+
+Each row is a list of cells, `[a; b]`. Columns are padded to the widest cell,
+right-aligned when every cell in the column reads as a number and left-aligned
+otherwise; short rows are padded with empty cells. A list meant as data rather
+than as text must be rendered by the caller: `xs > map string > writeList`.
+
+```
+import text in
+text.writeTable [
+  ["word"; "count"];
+  ["the"; 1204];
+  ["extraordinarily"; 5]
+]
 ```

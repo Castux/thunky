@@ -364,6 +364,93 @@ show [
 ]
 ```
 
+### Building a message with `format`
+
+Assembling a line out of `flatten` and `string` gets noisy as soon as there is
+more than one value in it. `format` takes a template instead: `%s` inserts a
+value that is already a string, `%v` inserts any value rendered with `string`.
+
+```
+import text in
+text.format "%s scored %v out of %v" ["Ada"; 449; 461] > write
+```
+
+Output:
+
+```
+Ada scored 449 out of 461
+```
+
+Any `%` that does not begin `%s` or `%v` is an ordinary character, so `"5% of"`
+needs nothing special; write `%%s` or `%%v` for those two characters literally.
+Since string literals may span lines, one template can hold a whole block:
+
+```
+import text in
+text.format "sample:  %s
+%v characters, %v distinct" ["abracadabra"; 11; 5] > write
+```
+
+Output:
+
+```
+sample:  abracadabra
+11 characters, 5 distinct
+```
+
+### Printing lists and tables
+
+A program that ends by printing several lines does not need to write them one at
+a time. `writeList` prints one element per line, turning numbers into digits and
+leaving strings alone:
+
+```
+import text in
+text.writeList ["first"; "second"; 42]
+```
+
+Output:
+
+```
+first
+second
+42
+```
+
+`writeTable` does the same for rows of cells, sizing each column to its widest
+entry. Columns that hold only numbers are right-aligned:
+
+```
+import text in
+text.writeTable [
+  ["word"; "count"];
+  ["the"; 1204];
+  ["quick"; 37];
+  ["extraordinarily"; 5]
+]
+```
+
+Output:
+
+```
+word             count
+the              1204
+quick            37
+extraordinarily  5
+```
+
+Each row is a list of cells, written with semicolons — `["the"; 1204]`. As
+Chapter 4 describes, `["x", "y"]` is the same value as the list `["x"; 121]`,
+so the separator is what selects a row of two cells.
+
+A column is right-aligned when every cell in it reads as a number. `"count"` is
+text, so that column is left-aligned here; a table without the header row would
+line its counts up on the units digit.
+
+Both functions return their argument, so they fit in a pipeline. `text.tableLines`
+is the pure counterpart of `writeTable`, returning the lines instead of printing
+them, for a report assembled before it is written.
+
 ### Character classification
 
 ```

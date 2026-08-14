@@ -502,6 +502,42 @@ runTests [
 	assert "text.words-blank" (words "   ") [];
 	assert "text.unwords" (unwords ["a"; "b"; "c"]) "a b c";
 
+	assert "text.format-s" (text.format "hello %s" ["world";]) "hello world";
+	assert "text.format-v" (text.format "%v + %v" [1; 2.5]) "1 + 2.5";
+	assert "text.format-v-string" (text.format "%v" ["ab";]) "[97; 98]";
+	assert "text.format-mixed" (text.format "%s = %v" ["n"; 42]) "n = 42";
+	assert "text.format-bare-percent" (text.format "5% of %v" [10;]) "5% of 10";
+	assert "text.format-escaped" (text.format "%%s %%v %s" ["x";]) "%s %v x";
+	assert "text.format-starved" (text.format "%s %v" []) "%s %v";
+	assert "text.format-surplus" (text.format "%v" [1; 2; 3]) "1";
+	assert "text.format-no-placeholder" (text.format "plain" [1;]) "plain";
+	assert "text.format-empty" (text.format "" [1;]) "";
+
+	-- Output: render and tableLines are the pure halves of writeList/writeTable.
+	assert "text.render-number" (text.render 42) "42";
+	assert "text.render-float" (text.render 3.5) "3.5";
+	assert "text.render-string" (text.render "abc") "abc";
+	assert "text.render-empty" (text.render "") "";
+	assert "text.tableLines-empty" (text.tableLines []) [];
+	assert "text.tableLines-align"
+		(text.tableLines [["a"; 1]; ["bbb"; 22]; ["cc"; 333]])
+		["a      1"; "bbb   22"; "cc   333"];
+	assert "text.tableLines-text-column-left"
+		(text.tableLines [["x"; "yy"]; ["zzz"; "w"]])
+		["x    yy"; "zzz  w"];
+	assert "text.tableLines-ragged"
+		(text.tableLines [["a"; "b"; "c"]; ["longer";]])
+		["a       b  c"; "longer"];
+	assert "text.tableLines-no-trailing-space"
+		(text.tableLines [["a"; "bb"]; ["cc"; ""]])
+		["a   bb"; "cc"];
+	assert "text.tableLines-single-column"
+		(text.tableLines [["one";]; ["three";]])
+		["one"; "three"];
+	-- The writers return their argument, so they drop into a pipeline.
+	assert "text.writeList-empty" (text.writeList []) [];
+	assert "text.writeTable-empty" (text.writeTable []) [];
+
 	-- big.þ division: checked by the identity a = q*b + r, 0 <= r < b
 	assert "big.intDiv-large" (big.intToString (big.intDiv
 		(big.intFromString "987654321098765432") (big.intFromString "123456789012345678901234567890")))
