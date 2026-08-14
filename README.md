@@ -21,7 +21,7 @@ is lazy throughout.
   a lambda with multiple cases `{ pat -> body, … }` is the primary control-flow
   construct.
 - **Purity** — no mutable state, no implicit effects; output is produced only
-  via the `show`, `write`, and `peek` builtins.
+  via the `show`, `write`, `bwrite`, and `peek` builtins.
 - **Four operators** — `>` (pipe), `<` (reverse-pipe), `*>` and `<*` (forward
   and backward composition) — cover the common function-chaining idioms.
 - **Standard library in Thunky** — `core`, `list`, `math`, `text`, `maybe`,
@@ -138,16 +138,17 @@ Key things illustrated:
 | [docs/tutorial/](docs/tutorial/README.md) | Hands-on tutorial: 15 chapters from first program to a complete build, with exercises |
 | [docs/LANGUAGE.md](docs/LANGUAGE.md) | Full language reference: grammar, types, operators, builtins, standard library |
 | [docs/implementation/](docs/implementation/0.Overview.md) | How the compiler works, stage by stage: lexer, parser, resolver, Core IR, bytecode, G-machine |
-| [docs/implementation/IMPROVEMENTS.md](docs/implementation/IMPROVEMENTS.md) | Proposals for future optimization |
+| [docs/implementation/IMPROVEMENTS.md](docs/implementation/IMPROVEMENTS.md) | Optimization worklog: what was proposed, tried, measured, and rejected |
 | [CHANGELOG.md](CHANGELOG.md) | What changed between releases |
 
 ## Try it in the browser
 
 The compiler and runtime also build to WebAssembly (`main_wasm.go`), powering a
 static documentation site with a playground: every Thunky code snippet in the
-language reference and tutorial is editable and runnable in place, and the
-playground offers a full editor with example programs, stdin, stage dumps
-(AST / Core IR / bytecode), and shareable URLs.
+language reference and tutorial is editable, and every one that is a whole
+program is runnable in place (fragments are editable but have no Run button).
+The playground itself offers a full editor with example programs, stdin, stage
+dumps (AST / Core IR / bytecode), and shareable URLs.
 
 Its example picker carries everything in `examples/`, including all of
 [Project Euler](examples/euler/README.md) and

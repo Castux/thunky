@@ -9,6 +9,11 @@ Runtime performance is the optimization target; clarity comes first, so each of
 these is a deliberate trade and listed in roughly descending order of expected
 payoff.
 
+This is a **worklog, not a roadmap**. Each proposal carries its own status —
+some are implemented, some were measured and rejected, most are untouched — and
+that status is the useful part: it records what was tried and what the numbers
+said. Nothing here is a commitment.
+
 ---
 
 ## 1. Eager strict-argument evaluation (the big one)

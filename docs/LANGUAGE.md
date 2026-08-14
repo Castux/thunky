@@ -27,7 +27,7 @@ constructed type, functions are pure, and evaluation is lazy throughout.
 
 - **A program is an expression.** There are no statements. Running a program
   evaluates its single body expression; output happens only through the
-  side-effecting builtins `peek`, `show`, and `write`.
+  side-effecting builtins `peek`, `show`, `write`, and `bwrite`.
 - **One primitive, one constructor.** The only primitive type is the number; the
   only way to build compound data is the tuple. Lists and strings are not
   separate types — they are conventions built on tuples (see
@@ -681,11 +681,17 @@ that run.
 
 Each module can be imported directly when only part of the library is needed.
 
-The tables below list each module's public interface. Thunky has no privacy
-mechanism — every binding in a module is importable — so a few implementation
-helpers are reachable but deliberately undocumented and not covered by any
-stability promise: `heap.rankOf`, `heap.makeNode`, `hashmap.minNode`,
-`hashmap.removeMin`, and `text.parsePositive`.
+The tables below list each module's **public interface**: the bindings that are
+supported and will not change shape without notice.
+
+Thunky has no privacy mechanism — every binding in a module is importable — so
+each module's internals are reachable too. Around sixty bindings are in that
+position, most of them in `big` (its limb arithmetic: `magAdd`, `magDivMod`,
+`normalize`, …) and `json` (its recursive-descent parser: `parseValue`,
+`parseEscape`, …), where the interesting code is naturally written as a stack of
+small helpers. **Anything not in a table below is an implementation detail**:
+usable if you are reading the source anyway, but undocumented, unstable, and
+not something to build on.
 
 ---
 

@@ -23,7 +23,7 @@ After completing it, you will know how to write Thunky programs and will have a 
 | 9 | [Thinking Functionally](09-thinking-functionally.md) | Replacing loops: `range`, `map`, `filter`, `fold` |
 | 10 | [Lazy Evaluation](10-lazy-evaluation.md) | Thunks, memoization, infinite lists, self-referential data |
 | 11 | [Performance and Space](11-performance-and-space.md) | WHNF vs normal form, `seq`, `foldlStrict`, sharing |
-| 12 | [The Standard Library](12-standard-library.md) | `core`, `math`, `maybe`, `text`, `table`, `hashmap`, `comb`, `heap` |
+| 12 | [The Standard Library](12-standard-library.md) | `core`, `math`, `maybe`, `list`, `text`, `table`, `hashmap`, `comb`, `heap`, `bit`, `big`, `json` |
 | 13 | [Point-Free Style](13-point-free-style.md) | `ap`, `fork`, `on`; when to drop the lambda and when to keep it |
 | 14 | [Modules](14-modules.md) | Writing and importing modules, qualified access, design |
 | 15 | [A Program End to End](15-program-end-to-end.md) | Building a complete program, reading `stdin` |

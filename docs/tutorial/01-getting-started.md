@@ -2,7 +2,7 @@
 
 Welcome to Thunky — a small, purely functional, lazily evaluated programming language. This tutorial assumes you know how to program (you've written loops, functions, variables in some language) but have no particular experience with functional or lazy styles. Those ideas will be introduced as you need them.
 
-Thunky is deliberately minimal. There are two runtime types: **numbers** and **tuples**. There are no variables, no loops, no classes, no mutation. A complete program is a single expression. This sounds limiting; by the end of this tutorial you will see it is not.
+Thunky is deliberately minimal. There are three runtime types: **numbers**, **tuples**, and **functions**. There are no variables, no loops, no classes, no mutation. A complete program is a single expression. This sounds limiting; by the end of this tutorial you will see it is not.
 
 ---
 

@@ -4,7 +4,11 @@ Running notes from writing `examples/euler/` and `examples/rosetta/`. The point
 of those directories is not the puzzles; it is to find what the language makes
 awkward and what the standard library should have been carrying all along.
 
-Ordered by how much it cost, not by how hard it would be to fix.
+Ordered by how much it cost, not by how hard it would be to fix. This is a
+working journal rather than reference documentation — it records what was
+missing at the time and what was done about it, and each heading says which.
+For what the language and library *are*, read
+[LANGUAGE.md](../docs/LANGUAGE.md).
 
 ---
 
@@ -82,18 +86,22 @@ site should control.
 **Wanted:** selective import (`import bignum (bigAdd, bigMul)`) or
 qualified-only import.
 
-## 6. No `lines` / `words`
+## 6. No `lines` / `words` — **addressed, `text`**
 
-Every program that reads standard input opens with the same incantation:
+Every program that reads standard input opened with the same incantation:
 
-```
+```thunky-static
 stdin > split [lf;] > filter (isEmpty *> not)
 ```
 
-and the ones reading numbers add `> map (line -> line > split " " > filter
-(isEmpty *> not) > map stringToInt)`. Five of the Euler files start this way.
+and the ones reading numbers added `> map (line -> line > split " " > filter
+(isEmpty *> not) > map stringToInt)`. Five of the Euler files started this way.
 
-**Wanted:** `text.lines`, `text.words`, `text.unlines`, `text.unwords`.
+`text.lines`, `text.words`, `text.unlines` and `text.unwords` now exist, so that
+first line is `stdin > text.lines`. `lines` also handles CRLF and a lone CR, and
+drops a single trailing newline rather than yielding an empty last element —
+which is what the hand-rolled `filter (isEmpty *> not)` was really approximating,
+badly, since it also dropped genuinely blank lines in the middle.
 
 ## 7. No prime utilities — **addressed locally, not in the library**
 

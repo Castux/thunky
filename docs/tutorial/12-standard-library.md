@@ -647,6 +647,65 @@ Use `sortAsc` / `sortDesc` when you just want a sorted list without thinking abo
 
 ---
 
+## `bit`, `big`, `json` — the three specialist modules
+
+The remaining three modules solve one problem each, and are worth knowing exist
+even before you need them. All three are written in Thunky, with no builtin
+added for any of them — which is the point: `bit` and `big` in particular are
+built entirely out of the ordinary float64 arithmetic of Chapter 2.
+
+**`bit`** — bitwise operations on 32-bit integers, for hashing, checksums, and
+anything that thinks in words. Chapter 13 uses it without introduction; this is
+that introduction.
+
+```
+import bit, text in
+[
+  string (bit.bAnd 12 10);      -- 8, from 1100 & 1010
+  string (bit.bXor 12 10);      -- 6
+  string (bit.shiftLeft 3 1);   -- 8; threshold-first, so this shifts 1 by 3
+  string (bit.popCount 255);    -- 8
+  bit.toHex 48879               -- 0000beef
+] > text.writeList
+```
+
+**`big`** — arbitrary-precision integers and floats, for when 2⁵³ is not enough.
+Values are opaque: build them with `intFromNumber` / `intFromString`, combine
+them with `intAdd` and friends, and read them back with `intToString`.
+
+```
+import big in
+big.intPow 100 (big.intFromNumber 2) > big.intToString > write
+```
+
+That is 2¹⁰⁰ exactly, all thirty-one digits of it. `big` also carries floats at
+a chosen precision — `floatSqrt`, `floatDiv`, `floatToString` — which is how the
+Project Euler solutions that need a thousand digits of a square root get them.
+
+**`json`** — a parser and printer. A parsed value is a tagged 2-tuple —
+`["number", n]`, `["object", pairs]`, and so on — so a JSON document is ordinary
+Thunky data you can pattern-match on. `get`, `at` and `path` reach into it
+without unpacking the tags by hand. Both `parse` and the accessors return
+maybe values, since either can fail, which is why `maybe.value` appears twice
+here.
+
+```
+import json, maybe, text in
+let doc = json.parse '{"name": "Ada", "scores": [7, 9, 8]}' > maybe.value in
+[
+  json.path ["name";] doc > maybe.value > json.stringify;      -- "Ada"
+  json.path ["scores"; 1] doc > maybe.value > json.stringify   -- 9
+] > text.unlines > write
+```
+
+Note the single quotes around the document: Thunky strings have no escape
+sequences, so a string holding double quotes is written with single ones.
+
+The full interface of all three is in
+[the language reference](../LANGUAGE.md#14-standard-library).
+
+---
+
 ## Summary
 
 | Module | What it provides |
@@ -660,6 +719,9 @@ Use `sortAsc` / `sortDesc` when you just want a sorted list without thinking abo
 | `hashmap` | Hash maps (O(log n)): `get`, `set`, `remove`, `update`, `updateOr`, `keys`, `values`, `keyValues` |
 | `comb` | `choose`, `permutations`, `crossPairs`, `subsets` |
 | `heap` | Priority queues: `insert`, `top`, `pop`, `sortAsc`, `sortDesc` |
+| `bit` | 32-bit bitwise operations: `bAnd`, `bOr`, `bXor`, `shiftLeft`, `popCount`, `toHex` |
+| `big` | Arbitrary precision: `intFromString`, `intAdd`, `intPow`, `intToString`, `floatSqrt` |
+| `json` | `parse`, `stringify`, `get`, `at`, `path` over tagged 2-tuples |
 
 ---
 
