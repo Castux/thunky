@@ -46,6 +46,41 @@ in
 - `const c x = c` — ignores its second argument.
 - `on f g x y = f (g x) (g y)` — applies `g` to both arguments before comparing with `f`.
 
+### `ap` and `fork`
+
+`on` runs *one* function over *two* arguments. `ap` and `fork` do the opposite: they
+run *two* functions over the *same* argument and combine the results.
+
+```
+import core, list in
+let mean = core.fork fdiv list.length list.sum in
+show [
+  core.ap add (mul 2) 5,    -- add 5 (mul 2 5) = 15
+  mean [1; 2; 3; 4]         -- fdiv (length xs) (sum xs) = 10 / 4 = 2.5
+]
+```
+
+- `fork h f g x = h (f x) (g x)` — apply `f` and `g` to `x`, combine with `h`.
+- `ap f g x = f x (g x)` — the same, except `f x` *is* the combining function.
+
+`fork` is the one to reach for: naming the combiner first (`fork fdiv length sum`)
+reads as "divide the length by the sum", where `ap` would need the combiner folded
+into a composition. Use `ap` when the first function already returns a function.
+
+These are what let a pipeline stay point-free when a value has to be used twice —
+`compose`, `flip`, and `const` all pass their argument along exactly once, so
+none of them can duplicate it:
+
+```
+import core, list in
+let rle = list.groupBy equal *> list.flatMap (core.fork list.append (list.take 1) (list.length *> string)) in
+write < rle "aaaaaabbbccddddee"    -- 6a3b2c4d2e
+```
+
+In other languages `ap` is the **S** combinator — Haskell spells it `ap` (or `<*>`
+on functions), Ramda `R.ap`, J writes it as a *hook*. `fork` is the **Φ**
+combinator — Haskell's `liftA2`, Ramda's `converge`, and J's *fork* `(f g h)`.
+
 ### Conditionals
 
 ```
@@ -542,7 +577,7 @@ Use `sortAsc` / `sortDesc` when you just want a sorted list without thinking abo
 
 | Module | What it provides |
 |--------|-----------------|
-| `core` | `id`, `flip`, `compose`, `const`, `on`, `if`, `case`, `and`, `or`, `not`, `curry`, `uncurry`, `fix` |
+| `core` | `id`, `flip`, `compose`, `const`, `on`, `ap`, `fork`, `if`, `case`, `and`, `or`, `not`, `curry`, `uncurry`, `fix` |
 | `math` | `succ`, `pred`, `abs`, `max`, `min`, `clamp`, `even`, `odd`, `gcd`, `factorial`, `digits`, rounding |
 | `maybe` | Optional values: `none`, `some`, `fmap`, `andThen`, `default`, `value`, `orElse` |
 | `list` | Complete list library: construction, higher-order, folding, slicing, sorting, infinite lists |

@@ -691,9 +691,25 @@ stability promise: `heap.rankOf`, `heap.makeNode`, `hashmap.minNode`,
 | `uncurry f` | `uncurry f [x, y] = f x y` |
 | `const c` | constant function: `const c x = c` |
 | `on f g` | apply `g` to two arguments then `f`: `(on f g) x y = f (g x) (g y)` |
+| `ap f g` | apply both to one argument, `f x` consuming `g x`: `(ap f g) x = f x (g x)` |
+| `fork h f g` | apply `f` and `g` to one argument, combine with `h`: `(fork h f g) x = h (f x) (g x)` |
 | `fix f` | fixed-point combinator: `fix f = f (fix f)` |
 | `first [a, b]` | first element of a 2-tuple |
 | `second [a, b]` | second element of a 2-tuple |
+
+`on`, `ap`, and `fork` are the three ways to run a value through inner functions
+before combining the results, and they are what make a pipeline point-free where
+`compose` alone cannot. `on` applies the *same* `g` to *two* arguments — the
+comparator idiom, `sortWith (on lt second)`. `ap` and `fork` apply *two different*
+functions to the *same* argument: `ap` lets `f x` be the combining function, while
+`fork` names the combiner up front, which is usually what you want. They are
+interdefinable — `fork h f g` is `ap (f *> h) g`.
+
+```
+import core, list in
+let mean = fork fdiv length sum in    -- fdiv a b = b / a, so this is sum / length
+show [ap add (mul 2) 5, mean [1; 2; 3; 4]]    -- [15, 2.5]
+```
 
 **Booleans / control flow**
 

@@ -34,6 +34,11 @@ runTests [
 	assert "core.not-1" (core.not 1) 0;
 	assert "core.not-0" (core.not 0) 1;
 	assert "core.on" (core.on add (mul 2) 3 4) 14;
+	assert "core.ap" (core.ap add (mul 2) 5) 15;
+	assert "core.ap-string" (core.ap (list.take 1 *> list.append) (list.length *> string) "aaaa") "4a";
+	assert "core.fork" (core.fork add (mul 2) (add 1) 5) 16;
+	assert "core.fork-mean" (core.fork fdiv list.length list.sum [1; 2; 3; 4]) 2.5;
+	assert "core.fork-is-ap" (core.fork add (mul 2) (add 1) 5) (core.ap (mul 2 *> add) (add 1) 5);
 	assert "core.fix" (core.fix (f -> n -> if (eq n 0) 1 (mul n (f (sub 1 n)))) 5) 120;
 	assert "core.case" (core.case false 0 false 1 true 2 false 3 true 4 else 5) 2;
 	assert "core.case-else" (core.case false 0 false 1 false 2 false 3 false 4 else 5) 5;

@@ -14,6 +14,13 @@ const = c -> x -> c, -- constant function: returns c for any argument
 -- on f g x y: apply g to x and y, then apply f to the results.
 on = f -> g -> x -> y -> f (g x) (g y),
 
+-- ap f g x: apply f and g to the same x, f x consuming g x. Aka. the S combinator.
+ap = f -> g -> x -> (f x) (g x),
+
+-- fork h f g x: apply f and g to the same x, then combine with h. Aka. the Phi
+-- combinator; fork h f g is ap (f *> h) g.
+fork = h -> f -> g -> x -> h (f x) (g x),
+
 -- fix f: the fixed-point combinator (recursive definitions without let)
 fix = f -> let x = f x in x,
 
