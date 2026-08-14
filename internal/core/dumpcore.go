@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"thunky/internal/value"
+	"github.com/Castux/thunky/internal/value"
 )
 
 // dumpcore.go renders the Core IR (core.go) as an indented tree, reached by the

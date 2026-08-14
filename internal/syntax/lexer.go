@@ -8,7 +8,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"thunky/internal/source"
+	"github.com/Castux/thunky/internal/source"
 )
 
 var (

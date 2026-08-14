@@ -3,9 +3,9 @@ package core
 import (
 	"fmt"
 
-	"thunky/internal/source"
-	"thunky/internal/syntax"
-	"thunky/internal/value"
+	"github.com/Castux/thunky/internal/source"
+	"github.com/Castux/thunky/internal/syntax"
+	"github.com/Castux/thunky/internal/value"
 )
 
 // lower.go translates the resolved AST into the Core IR (core.go). It is where

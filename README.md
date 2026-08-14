@@ -33,6 +33,25 @@ is lazy throughout.
 
 For the full language reference see [docs/LANGUAGE.md](docs/LANGUAGE.md).
 
+## Installing
+
+Prebuilt binaries for Linux, macOS and Windows (amd64 and arm64) are attached
+to every [release](https://github.com/Castux/thunky/releases). Each archive
+holds a single `thunky` executable with the standard library embedded in it;
+there is nothing else to install.
+
+With a Go toolchain (1.25 or newer), building it yourself is one line:
+
+```sh
+go install github.com/Castux/thunky@latest     # installs `thunky` into $GOBIN
+```
+
+Or from a clone:
+
+```sh
+go build -o thunky .
+```
+
 ## Usage
 
 ```sh
@@ -59,6 +78,10 @@ thunky --dump-bytecode  <path>   # the compiled flat bytecode
 Any dump flag emits the requested stage(s) to stdout and skips execution. Add
 `--to-file` to write each one to a sibling file instead (`.ast`, `.ir`, `.bc`).
 See [docs/implementation/0.Overview.md](docs/implementation/0.Overview.md#inspecting-the-stages) for the format.
+
+`thunky --help` lists every flag; `thunky --version` reports the build. The
+exit code is `0` on success, `1` for an error in the program, `2` for a bad
+command line, and `70` for a bug in the compiler.
 
 ## Example
 
@@ -116,6 +139,7 @@ Key things illustrated:
 | [docs/LANGUAGE.md](docs/LANGUAGE.md) | Full language reference: grammar, types, operators, builtins, standard library |
 | [docs/implementation/](docs/implementation/0.Overview.md) | How the compiler works, stage by stage: lexer, parser, resolver, Core IR, bytecode, G-machine |
 | [docs/implementation/IMPROVEMENTS.md](docs/implementation/IMPROVEMENTS.md) | Proposals for future optimization |
+| [CHANGELOG.md](CHANGELOG.md) | What changed between releases |
 
 ## Try it in the browser
 

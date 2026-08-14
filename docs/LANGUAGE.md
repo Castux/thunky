@@ -65,6 +65,10 @@ file. The exit code is `0` on success, `1` for any error in the program (compile
 or run time), `2` for a bad command line, and `70` for a failed assertion inside
 the compiler — that last one is a bug in Thunky and asks to be reported.
 
+`thunky --help` lists the flags, of which the interesting ones are the stage
+dumps (`--dump-ast`, `--dump-core`, `--dump-bytecode`, and `--to-file` to write
+them beside the program); `thunky --version` reports the build.
+
 **Module search order.** For each import `name`, the runtime looks for
 `name.th` (or `name.þ`) in, in order: the **directory holding the program being
 run**, then the **current working directory**, then the standard library

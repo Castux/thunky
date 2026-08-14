@@ -3,7 +3,7 @@ package syntax
 import (
 	"fmt"
 
-	"thunky/internal/source"
+	"github.com/Castux/thunky/internal/source"
 )
 
 type Parser struct {

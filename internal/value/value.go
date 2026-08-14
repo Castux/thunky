@@ -1,6 +1,6 @@
 package value
 
-import "thunky/internal/source"
+import "github.com/Castux/thunky/internal/source"
 
 // PC is a program counter: an index into the compiled instruction array. It lives
 // here because Thunk and Closure store entry points; the backend re-exports it.

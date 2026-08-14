@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build (must already exist)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build and publish binaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          # The version stamp falls back to the VCS revision, so the build
+          # needs real history rather than a shallow clone.
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      # Nothing ships that has not passed the suite.
+      - run: go vet ./...
+      - run: bash tests/run.sh
+      - run: go run . examples/core_tests.þ
+
+      - name: Build
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          # Thunky is pure Go with no cgo, so every target cross-compiles from
+          # here. -trimpath keeps the builder's absolute paths out of panic
+          # traces; -X stamps the tag into the binary for --version.
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
+            os="${target%/*}"; arch="${target#*/}"
+            ext=""; [ "$os" = windows ] && ext=".exe"
+            name="thunky-$TAG-$os-$arch"
+            echo "building $name"
+            GOOS="$os" GOARCH="$arch" CGO_ENABLED=0 go build \
+              -trimpath -ldflags "-s -w -X main.version=$TAG" \
+              -o "dist/$name/thunky$ext" .
+            cp README.md LICENSE.md "dist/$name/"
+            if [ "$os" = windows ]; then
+              (cd dist && zip -qr "$name.zip" "$name")
+            else
+              (cd dist && tar czf "$name.tar.gz" "$name")
+            fi
+            rm -rf "dist/$name"
+          done
+          (cd dist && sha256sum * > SHA256SUMS)
+          ls -l dist
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          gh release create "$TAG" dist/* \
+            --title "Thunky $TAG" \
+            --notes "See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/$TAG/CHANGELOG.md) for what changed.
+
+          Each archive holds a single \`thunky\` binary. Verify a download against \`SHA256SUMS\`.
+
+          Or build from source: \`go install github.com/${{ github.repository }}@$TAG\`" \
+            --verify-tag

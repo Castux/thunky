@@ -1,6 +1,6 @@
 package syntax
 
-import "thunky/internal/source"
+import "github.com/Castux/thunky/internal/source"
 
 type ResolveKind uint8
 

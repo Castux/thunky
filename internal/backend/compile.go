@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"sort"
 
-	"thunky/internal/core"
-	"thunky/internal/source"
-	"thunky/internal/syntax"
-	"thunky/internal/value"
+	"github.com/Castux/thunky/internal/core"
+	"github.com/Castux/thunky/internal/source"
+	"github.com/Castux/thunky/internal/syntax"
+	"github.com/Castux/thunky/internal/value"
 )
 
 // compile.go translates the Core IR (core.go) into the flat bytecode of

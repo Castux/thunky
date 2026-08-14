@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"thunky/internal/source"
-	"thunky/internal/value"
+	"github.com/Castux/thunky/internal/source"
+	"github.com/Castux/thunky/internal/value"
 )
 
 // Machine is the STG-style push/enter reducer. It executes the flat bytecode

@@ -10,10 +10,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"thunky/internal/backend"
-	"thunky/internal/core"
-	"thunky/internal/source"
-	"thunky/internal/syntax"
+	"github.com/Castux/thunky/internal/backend"
+	"github.com/Castux/thunky/internal/core"
+	"github.com/Castux/thunky/internal/source"
+	"github.com/Castux/thunky/internal/syntax"
 )
 
 func LoadProgram(path string) *syntax.Program {
@@ -125,11 +125,37 @@ type dumpFlags struct {
 
 func (d dumpFlags) any() bool { return d.ast || d.core || d.bytecode }
 
+const usage = `thunky — the Thunky (Þunky) compiler and runtime
+
+Usage:
+  thunky [flags] <path>
+
+Runs the program at <path> on the G-machine. Modules are searched for beside
+the program, then in the working directory (name.th or name.þ), then in the
+standard library embedded in this binary.
+
+Flags:
+  --dump-ast         print the parsed AST and do not run
+  --dump-core        print the lowered Core IR and do not run
+  --dump-bytecode    print the compiled bytecode and do not run
+  --to-file          write each dump to a sibling file (.ast, .ir, .bc)
+                     instead of to stdout; only meaningful with a dump flag
+  --version          print the version and exit
+  --help, -h         print this and exit
+
+The program's own output goes to stdout; diagnostics go to stderr. Exit codes:
+0 success, 1 an error in the program, 2 a bad command line, 70 a bug in the
+compiler.
+
+Documentation: %s#readme
+`
+
 func main() {
 	defer catchInternalError()
 
 	var path string
 	var dump dumpFlags
+	paths := 0
 	for _, arg := range os.Args[1:] {
 		switch {
 		case arg == "--dump-ast":
@@ -140,16 +166,33 @@ func main() {
 			dump.bytecode = true
 		case arg == "--to-file":
 			dump.toFile = true
+		case arg == "--version" || arg == "-v":
+			fmt.Println(versionString())
+			return
+		case arg == "--help" || arg == "-h":
+			fmt.Printf(usage, repoURL)
+			return
 		case len(arg) > 0 && arg[0] == '-':
-			fmt.Fprintf(os.Stderr, "Unknown flag: %s\n", arg)
+			fmt.Fprintf(os.Stderr, "thunky: unknown flag %s (try --help)\n", arg)
 			os.Exit(exitUsage)
 		default:
 			path = arg
+			paths++
 		}
 	}
 
 	if path == "" {
-		fmt.Fprintln(os.Stderr, "Usage: thunky [--dump-ast] [--dump-core] [--dump-bytecode] [--to-file] <path>")
+		fmt.Fprintf(os.Stderr, usage, repoURL)
+		os.Exit(exitUsage)
+	}
+	// Silently running the last of several paths is a good way to run the
+	// wrong program.
+	if paths > 1 {
+		fmt.Fprintln(os.Stderr, "thunky: expected one program, got several (try --help)")
+		os.Exit(exitUsage)
+	}
+	if dump.toFile && !dump.any() {
+		fmt.Fprintln(os.Stderr, "thunky: --to-file needs a dump flag to write (try --help)")
 		os.Exit(exitUsage)
 	}
 

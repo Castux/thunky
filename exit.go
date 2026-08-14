@@ -3,12 +3,58 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"runtime/debug"
 )
 
 // repoURL is where a user is sent to report a compiler bug. Shared by the native
 // and browser entry points.
 const repoURL = "https://github.com/Castux/thunky"
+
+// version is the release this binary was built from. A release build stamps the
+// tag over it:
+//
+//	go build -trimpath -ldflags "-X main.version=v1.0.0" .
+//
+// Left as "dev", it means a build from a working tree; versionString then falls
+// back to the VCS stamp the Go toolchain records, so even an unstamped
+// `go install` reports the commit it came from.
+var version = "dev"
+
+func versionString() string {
+	v := version
+	if v == "dev" {
+		if revision, modified := vcsStamp(); revision != "" {
+			v = "dev-" + revision
+			if modified {
+				v += "-dirty"
+			}
+		}
+	}
+	return fmt.Sprintf("thunky %s (%s/%s, %s)", v, runtime.GOOS, runtime.GOARCH, runtime.Version())
+}
+
+// vcsStamp reads the commit the Go toolchain embeds when building from a
+// checkout. Absent when building from a module cache or with -buildvcs=false.
+func vcsStamp() (revision string, modified bool) {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "", false
+	}
+	for _, setting := range info.Settings {
+		switch setting.Key {
+		case "vcs.revision":
+			if len(setting.Value) > 12 {
+				revision = setting.Value[:12]
+			} else {
+				revision = setting.Value
+			}
+		case "vcs.modified":
+			modified = setting.Value == "true"
+		}
+	}
+	return revision, modified
+}
 
 // Exit codes. Everything the user can provoke is exitError (a lexing, parsing,
 // resolution or runtime error, all reported as positioned diagnostics) or

@@ -7,10 +7,10 @@ import (
 	"os"
 	"syscall/js"
 
-	"thunky/internal/backend"
-	"thunky/internal/core"
-	"thunky/internal/source"
-	"thunky/internal/syntax"
+	"github.com/Castux/thunky/internal/backend"
+	"github.com/Castux/thunky/internal/core"
+	"github.com/Castux/thunky/internal/source"
+	"github.com/Castux/thunky/internal/syntax"
 )
 
 // Browser entry point. The JS host stores the program in globals before
