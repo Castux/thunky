@@ -411,9 +411,9 @@ func (l *Lowerer) lowerName(e *syntax.Name) Expr {
 	case syntax.ResolveBuiltin:
 		switch e.Value {
 		case "stdin":
-			return Const{Val: value.StdinCodePoints()}
+			return Stdin{}
 		case "bstdin":
-			return Const{Val: value.StdinBytes()}
+			return Stdin{Bytes: true}
 		}
 		return Const{Val: value.BuiltinValue(value.InitialBuiltins[e.Value])}
 

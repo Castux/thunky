@@ -76,6 +76,13 @@ func writeCoreExpr(sb *strings.Builder, expr Expr, prefix string, isLast bool) {
 	case Const:
 		coreLine(sb, prefix, isLast, "const %s", value.ShowConst(e.Val))
 
+	case Stdin:
+		if e.Bytes {
+			coreLine(sb, prefix, isLast, "bstdin")
+		} else {
+			coreLine(sb, prefix, isLast, "stdin")
+		}
+
 	case Var:
 		coreLine(sb, prefix, isLast, "var %s", showAddr(e.Addr))
 

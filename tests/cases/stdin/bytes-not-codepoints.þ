@@ -1,0 +1,6 @@
+-- The byte stream is not the code-point stream. The input here is the two bytes
+-- of one character, so bstdin yields [195; 169] where stdin would yield [233]:
+-- swapping bstdin for stdin below changes the output. The sibling `bytes` case
+-- reads pure ASCII, where the two streams agree and nothing is pinned.
+import core, list in
+bstdin > show
