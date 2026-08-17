@@ -61,16 +61,52 @@ jobs:
           (cd dist && sha256sum * > SHA256SUMS)
           ls -l dist
 
+      # Before publishing, so that a failure in the step below does not throw the
+      # archives away with the runner. Recovering them cost a full rebuild the
+      # first time this workflow ran.
+      - name: Keep the archives regardless of what happens next
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ inputs.tag || github.ref_name }}
+          path: dist/
+          retention-days: 14
+
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag || github.ref_name }}
         run: |
-          gh release create "$TAG" dist/* \
-            --title "Thunky $TAG" \
-            --notes "See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/$TAG/CHANGELOG.md) for what changed.
+          set -uo pipefail
+          gh --version
+          echo "publishing $TAG with assets:"
+          ls -1 dist
+
+          # A semver prerelease (v1.0.0-rc1) must not be marked as the latest
+          # release; a plain v1.0.0 must.
+          extra=()
+          case "$TAG" in *-*) extra+=(--prerelease) ;; esac
+
+          notes="See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/$TAG/CHANGELOG.md) for what changed.
 
           Each archive holds a single \`thunky\` binary. Verify a download against \`SHA256SUMS\`.
 
-          Or build from source: \`go install github.com/${{ github.repository }}@$TAG\`" \
-            --verify-tag
+          Or build from source: \`go install github.com/${{ github.repository }}@$TAG\`"
+
+          # The first run of this workflow built all six targets and then died on
+          # a transient HTTP 503 from the releases API. Retry — idempotently:
+          # once the release object exists, switch to uploading onto it rather
+          # than trying to create it again.
+          for attempt in 1 2 3 4 5; do
+            if gh release view "$TAG" >/dev/null 2>&1; then
+              echo "release $TAG exists; uploading assets"
+              gh release upload "$TAG" dist/* --clobber && exit 0
+            else
+              gh release create "$TAG" dist/* \
+                --title "Thunky $TAG" --notes "$notes" --verify-tag "${extra[@]}" && exit 0
+            fi
+            delay=$((attempt * 15))
+            echo "publish attempt $attempt failed; retrying in ${delay}s"
+            sleep "$delay"
+          done
+          echo "could not publish $TAG after 5 attempts"
+          exit 1
