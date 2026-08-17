@@ -64,7 +64,7 @@ func tokenizeType(s string) []string {
 		case strings.HasPrefix(s[i:], "->"):
 			out = append(out, "->")
 			i += 2
-		case strings.ContainsRune("[](),;|?.", rune(s[i])):
+		case strings.ContainsRune("[](),;|?.!", rune(s[i])):
 			out = append(out, string(s[i]))
 			i++
 		default:
@@ -102,7 +102,7 @@ func (p *exprParser) fail(format string, args ...any) *pattern {
 func wildcard() *pattern { p := newPattern(); p.hole = 0; return p }
 
 func (p *exprParser) parseType() *pattern {
-	left := p.parseUnion()
+	left := p.parseAsserted()
 	if p.peek() == "->" {
 		p.pos++
 		right := p.parseType()
@@ -111,6 +111,26 @@ func (p *exprParser) parseType() *pattern {
 		return t
 	}
 	return left
+}
+
+// parseAsserted reads a type and an optional `!` suffix.
+//
+// Precedence: `!` binds to the *whole* type at this position, so `List a!` means
+// `(List a)!` — an assertion about the argument, not about its element type.
+// Parentheses are accepted for readers who want it spelled out, and `List (a!)`
+// is the way to mark the element instead. A `!` on a bare type variable is an
+// error: a variable claims nothing, so there is nothing to over-claim.
+func (p *exprParser) parseAsserted() *pattern {
+	t := p.parseUnion()
+	if p.peek() != "!" {
+		return t
+	}
+	p.pos++
+	if t.hole >= 0 {
+		return p.fail("`!` on a type variable claims nothing; put it on a concrete type")
+	}
+	t.asserted = true
+	return t
 }
 
 func (p *exprParser) parseUnion() *pattern {

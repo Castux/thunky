@@ -45,9 +45,11 @@ type Entry struct {
 
 	// Given is true when Type is the author's signature rather than the inferred
 	// shape. Inferred is filled in only when a given signature is contradicted, so
-	// the report can show the disagreement in place.
+	// the report can show the disagreement in place. Asserted counts the `!` marks
+	// in it: assumptions the analysis was told to take on trust.
 	Given    bool
 	Inferred string
+	Asserted int
 }
 
 // ExprType is one expression's inferred type, for the full dump.
@@ -159,6 +161,7 @@ func Infer(program *syntax.Program, modules map[string]*syntax.Module, res *synt
 				// to reach the preamble, which rendering the inferred shape would
 				// otherwise have been what did it.
 				e.Given = true
+				e.Asserted = g.asserted
 				if g.conflicted {
 					e.Inferred = e.Type
 				}
@@ -556,6 +559,7 @@ type givenSig struct {
 	text       string
 	names      []Decl
 	conflicted bool
+	asserted   int // `!` marks, counted so the report can total them
 }
 
 // checkSignatures resolves every `--> name : Type` annotation in its own unit's
@@ -592,7 +596,8 @@ func (in *inferrer) checkSignatures(units []unit, perModule map[string][]Decl) m
 			if !ok {
 				continue
 			}
-			g := givenSig{text: sig.Text, names: namedIn(sig.Text, scope)}
+			g := givenSig{text: sig.Text, names: namedIn(sig.Text, scope),
+				asserted: countAsserted(sig.Pat, map[*pattern]bool{})}
 			if msg, bad := conflict(sig.Pat, t, in.namer, "", map[[2]any]bool{}); bad {
 				g.conflicted = true
 				in.warnings = append(in.warnings, Warning{
@@ -600,6 +605,11 @@ func (in *inferrer) checkSignatures(units []unit, perModule map[string][]Decl) m
 						sig.Name, sig.Text, msg, in.namer.String(t)),
 					Pos: sig.Pos,
 				})
+			} else {
+				// Only when the claim is not simply wrong: the patterns cannot cover a
+				// domain the code does not accept, and suggesting `!` for a plainly
+				// wrong type is how the mark would become a rubber stamp.
+				in.checkExhaustive(b, sig)
 			}
 			out[b] = g
 		}
@@ -642,4 +652,19 @@ func (a *Analysis) Coverage() (given, total int) {
 		}
 	}
 	return given, total
+}
+
+// Assertions counts the `!` marks across the report, and how many signatures
+// carry at least one. They are assumptions the analysis could not verify, so
+// they are worth being able to count.
+func (a *Analysis) Assertions() (marks, sigs int) {
+	for _, m := range a.Modules {
+		for _, e := range m.Entries {
+			if e.Asserted > 0 {
+				marks += e.Asserted
+				sigs++
+			}
+		}
+	}
+	return marks, sigs
 }

@@ -5,51 +5,66 @@ module
 
 --> Maybe a = [] | [a]
 
+--> some : a -> Maybe a
 some = x -> [x],
+--> none : Maybe a
 none = [],
 
+--> isSome : Maybe a -> Num
 isSome = {
 	[x] -> 1,
 	_ -> 0
 },
 
+--> isNone : Maybe a -> Num
 isNone = {
 	[] -> 1,
 	_ -> 0
 },
 
+--> isMaybe : a -> Num
 isMaybe = {
 	[] -> 1,
 	[x] -> 1,
 	_ -> 0
 },
 
+--> fmap : (a -> b) -> Maybe a -> Maybe b
 fmap = f -> {
 	[] -> [],
 	[x] -> [f x]
 },
 
 -- andThen f m: if m is some x, apply f to x and return the result; propagate none.
--- f may return a maybe (chaining) or any other value (extraction + mapping).
+-- f returns a maybe, so andThen chains operations that may each fail.
+--> andThen : (a -> Maybe b) -> Maybe a -> Maybe b
 andThen = f -> {
 	[] -> [],
 	[x] -> f x
 },
 
+--> value : Maybe a! -> a
 value = [x] -> x,
 
+--> default : a -> Maybe a -> a
 default = def -> {
 	[] -> def,
 	[x] -> x
 },
 
--- orElse other m: return m if it is some, otherwise other.
+-- orElse other m: return m if it is some, otherwise other. Both are maybes and
+-- so is the result, which is what distinguishes it from `default`: orElse picks
+-- the first of two maybes and stays inside Maybe, where default leaves it.
+-- (Scala names this pair orElse/getOrElse. Java's Optional.orElse is the
+-- unwrapping one, so a reader coming from there wants `default`.)
+--> orElse : Maybe a -> Maybe a -> Maybe a
 orElse = other -> {
 	[] -> other,
 	[x] -> [x]
 },
 
 -- mapDefault def f m: apply f to the wrapped value, or return def if none.
+--> mapDefault : a -> (b -> a) -> Maybe b -> a
 mapDefault = def -> f -> {
 	[] -> def,
 	[x] -> f x

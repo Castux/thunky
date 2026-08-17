@@ -33,34 +33,42 @@ length = {
 	[h,t] -> succ (length t)
 },
 
+--> head : List a! -> a
 head = [h,t] -> h, -- first element of a non-empty list
+--> tail : List a! -> List a
 tail = [h,t] -> t, -- everything but the first element of a non-empty list
+--> headSafe : List a -> Maybe a
 headSafe = {
 	[] -> maybe.none,
 	[h,t] -> maybe.some h
 },
+--> tailSafe : List a -> Maybe (List a)
 tailSafe = {
 	[] -> maybe.none,
 	[h,t] -> maybe.some t
 },
 
 -- last l: last element of a non-empty list
+--> last : List a! -> a
 last = {
 	[x, []] -> x,
 	[h, t] -> last t
 },
 
+--> lastSafe : List a -> Maybe a
 lastSafe = {
 	[] -> maybe.none,
 	l -> maybe.some (last l)
 },
 
 -- init l: everything but the last element of a non-empty list
+--> init : List a! -> List a
 init = {
 	[x, []] -> [],
 	[h, t] -> [h, init t]
 },
 
+--> initSafe : List a -> Maybe (List a)
 initSafe = {
 	[] -> maybe.none,
 	l -> maybe.some (init l)
@@ -366,11 +374,15 @@ rangeIncl = a -> b -> range a (succ b),
 contains = elem -> anyMatch (equal elem), -- 1 if list contains elem, else 0
 
 -- maximum l: largest element in list l (crashes on empty list)
+--> maximum : List Num! -> Num
 maximum = [h,t] -> foldlStrict max h t,
+
 -- minimum l: smallest element in list l (crashes on empty list)
+--> minimum : List Num! -> Num
 minimum = [h,t] -> foldlStrict min h t,
 
 -- nth n l: zero-based index into list l
+--> nth : Num -> List a! -> a
 nth = n -> drop n *> head,
 
 -- nub l: remove duplicates, keeping only the first occurrence of each value

@@ -50,6 +50,11 @@ type pattern struct {
 	hole int  // >= 0: this whole position is parameter #hole
 	self bool // the declared type, recursively
 
+	// asserted is set by a `!` suffix: the author claims this position beyond what
+	// the analysis can confirm, so exhaustiveness is not required of it. It marks
+	// an assumption rather than a fact, and the report counts them.
+	asserted bool
+
 	top    bool
 	num    bool
 	tuples map[int][]*pattern

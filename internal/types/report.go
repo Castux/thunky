@@ -71,6 +71,12 @@ func Report(a *Analysis, programPath string) string {
 	if given, total := a.Coverage(); total > 0 {
 		fmt.Fprintf(&out, "\n-- %d of %d module types are given signatures; %d inferred\n",
 			given, total, total-given)
+		// The `!` marks are the assumptions the analysis was told to take on
+		// trust. Totalling them keeps them auditable rather than letting them
+		// accumulate unnoticed.
+		if marks, sigs := a.Assertions(); marks > 0 {
+			fmt.Fprintf(&out, "-- %d position(s) in %d signature(s) asserted with `!`\n", marks, sigs)
+		}
 	}
 
 	if len(a.Warnings) > 0 {
