@@ -14,7 +14,7 @@ func definitions(a *Analysis) string {
 		return ""
 	}
 	var out strings.Builder
-	out.WriteString("-- recursive types\n")
+	out.WriteString("-- types\n")
 	width := 0
 	for _, e := range a.Equations {
 		if n := len(e.Header()); n > width {
@@ -22,7 +22,13 @@ func definitions(a *Analysis) string {
 		}
 	}
 	for _, e := range a.Equations {
-		fmt.Fprintf(&out, "  %-*s : %s\n", width, e.Header(), e.Body)
+		// A declared name came from a `--> Name … = …` annotation; the rest were
+		// generated for shapes nothing had named.
+		mark := ""
+		if e.Declared {
+			mark = "  (declared)"
+		}
+		fmt.Fprintf(&out, "  %-*s = %s%s\n", width, e.Header(), e.Body, mark)
 	}
 	out.WriteString("\n")
 	return out.String()

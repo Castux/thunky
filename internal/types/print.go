@@ -38,6 +38,10 @@ type Equation struct {
 	Name   string
 	Params []string
 	Body   string
+
+	// Declared is true when the name came from a `-->` annotation rather than
+	// being generated, so a report can say which names are the author's.
+	Declared bool
 }
 
 // Header renders the left-hand side, `T1 a b`.
@@ -52,9 +56,59 @@ func (e Equation) Header() string {
 type Namer struct {
 	eqs   []Equation
 	byKey map[string]int // canonical shape -> index into eqs
+
+	// decls are the `-->` declarations in scope. A node matching one is printed
+	// with the declared name instead of a generated T<n>, which is the whole
+	// effect of a declaration: it names a shape and changes nothing else.
+	decls []Decl
+	used  map[string]bool // declared names already listed in the preamble
+
+	// notes are remarks about the declarations themselves: two names for one
+	// shape, or one name declared twice. Neither is an error — structurally
+	// identical types *are* the same type here — but choosing silently would hide
+	// that the other name applies just as well.
+	notes    []Warning
+	seenPair map[string]bool
 }
 
-func NewNamer() *Namer { return &Namer{byKey: map[string]int{}} }
+func NewNamer() *Namer {
+	return &Namer{byKey: map[string]int{}, used: map[string]bool{}, seenPair: map[string]bool{}}
+}
+
+// Declare puts type declarations in scope for every type this Namer renders. A
+// name already declared is kept as it was; a second declaration of the same name
+// with a different body is reported, since one of the two is not taking effect.
+func (n *Namer) Declare(decls []Decl) {
+	for _, d := range decls {
+		if prev, dup := n.byName(d.Name); dup {
+			if prev.Body != d.Body {
+				n.notes = append(n.notes, Warning{
+					Message: d.Name + " is declared twice with different bodies (" +
+						prev.Body + " and " + d.Body + "); the first is used.",
+					Pos: d.Pos,
+				})
+			}
+			continue
+		}
+		n.decls = append(n.decls, d)
+	}
+	sortDecls(n.decls)
+}
+
+func (n *Namer) byName(name string) (Decl, bool) {
+	for _, d := range n.decls {
+		if d.Name == name {
+			return d, true
+		}
+	}
+	return Decl{}, false
+}
+
+// Notes reports remarks about the declarations: shapes that more than one name
+// matched, and names declared more than once. In a structural system two
+// declarations of one shape denote one type, so a name is a view rather than a
+// distinction, and neither case is an error.
+func (n *Namer) Notes() []Warning { return n.notes }
 
 // Equations returns the equations every type rendered so far depends on, in the
 // order they were first needed.
@@ -296,6 +350,65 @@ func shape(r *Type) (skel string, params []*Type, ok bool) {
 	return skel, params, true
 }
 
+// declared checks a node against the `-->` declarations in scope and, on a
+// match, returns the declared name applied to whatever its parameters stood for.
+// The declaration is added to the preamble the first time it is used, so a report
+// lists only the names it actually mentions.
+func (p *printer) declared(t *Type) (string, bool) {
+	if p.namer == nil {
+		return "", false
+	}
+	for i, d := range p.namer.decls {
+		args, ok := matchDecl(t, d)
+		if !ok {
+			continue
+		}
+		// Another declaration of the same shape is not wrong, but the reader
+		// should know their name applies here too.
+		for _, other := range p.namer.decls[i+1:] {
+			if other.Name == d.Name {
+				continue
+			}
+			if _, also := matchDecl(t, other); also {
+				key := d.Name + "/" + other.Name
+				if !p.namer.seenPair[key] {
+					p.namer.seenPair[key] = true
+					p.namer.notes = append(p.namer.notes, Warning{
+						Message: d.Name + " and " + other.Name + " name the same shape; " +
+							d.Name + " is used. Structurally they are one type — if they " +
+							"should differ, one of them needs a tag in the value.",
+						Pos: other.Pos,
+					})
+				}
+			}
+		}
+		if !p.namer.used[d.Name] {
+			p.namer.used[d.Name] = true
+			p.namer.eqs = append(p.namer.eqs, Equation{
+				Name:     d.Name,
+				Params:   d.Params,
+				Body:     d.Body,
+				Declared: true,
+			})
+		}
+		// Mark the node so a recursive reference inside the arguments prints the
+		// name rather than unrolling the shape again.
+		p.names[t] = d.Name
+		p.onPath[t] = true
+		ref := d.Name
+		for _, arg := range args {
+			s := p.print(find(arg))
+			if !atomic(s) {
+				s = "(" + s + ")"
+			}
+			ref += " " + s
+		}
+		p.onPath[t] = false
+		return ref, true
+	}
+	return "", false
+}
+
 // equation interns a recursive node's shape and returns a reference to it,
 // rendering the arguments in the caller's own variable namespace.
 func (p *printer) equation(t *Type) (string, bool) {
@@ -350,6 +463,14 @@ func (p *printer) print(t *Type) string {
 
 	if name, ok := p.names[t]; ok && p.onPath[t] {
 		return name
+	}
+
+	// A declared name wins over a generated one, and applies to any shape — not
+	// only a recursive one, since `Maybe a = [] | [a]` is not recursive.
+	if !p.onPath[t] {
+		if ref, ok := p.declared(t); ok {
+			return ref
+		}
 	}
 
 	if p.recNeed[t] && !p.onPath[t] {

@@ -144,7 +144,10 @@ embedded in the binary; see [§14](#14-standard-library) for the full catalogue.
 
 Source must be UTF-8. Whitespace separates tokens but is otherwise insignificant.
 
-- **Comments** start with `--` and run to the end of the line.
+- **Comments** start with `--` and run to the end of the line. A comment
+  beginning `-->` is an annotation read by the type analysis
+  ([7.Type Analysis](implementation/7.Type%20Analysis.md)); it has no effect on
+  running the program.
 - **Identifiers** match `[a-zA-Z_][a-zA-Z0-9_]*`.
 - **Keywords** are reserved and may not be used as identifiers: `let`, `in`,
   `module`, `import`.

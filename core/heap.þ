@@ -1,3 +1,4 @@
+--> Heap a = [] | [Num, a, Heap a, Heap a]
 -- heap.þ: purely functional leftist heaps.
 -- Provides O(log n) insert, merge, and pop.
 -- This is a max-priority heap: the root is the element that "wins" the comparison.

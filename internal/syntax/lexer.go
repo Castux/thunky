@@ -79,8 +79,14 @@ lexLoop:
 			continue lexLoop
 		}
 
-		// 2. Consume comments
+		// 2. Consume comments. The span is recorded on the Source (without the
+		// line terminator) so that tooling can read annotations out of comments
+		// without re-scanning the text and tripping over a `--` inside a string.
 		if match := reComment.FindString(src[head:]); len(match) > 0 {
+			text := strings.TrimRight(match, "\r\n")
+			file.Comments = append(file.Comments, source.SourcePos{
+				File: file, Start: head, Length: len(text),
+			})
 			head += len(match)
 			continue lexLoop
 		}

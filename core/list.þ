@@ -1,3 +1,5 @@
+--> List a = [] | [a, List a]
+--> Stream a = [a, Stream a]
 -- list.þ: list operations and infinite lists.
 import math, core, maybe in
 

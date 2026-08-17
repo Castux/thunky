@@ -76,6 +76,9 @@ type inferrer struct {
 
 	warnings []Warning
 	seenWarn map[string]bool
+
+	// namer renders types for diagnostics, so a warning and the report agree.
+	namer *Namer
 }
 
 // Infer walks a resolved program and its modules and returns the inferred type
@@ -91,6 +94,21 @@ func Infer(program *syntax.Program, modules map[string]*syntax.Module, res *synt
 		seenWarn: map[string]bool{},
 	}
 
+	// One namer for the whole report: a recursive shape earns its equation once,
+	// however many signatures mention it. It is built before the walk so that a
+	// diagnostic raised during inference names types the same way the report does.
+	//
+	// `-->` declarations are read out of the comments of every source loaded, and
+	// gathered report-wide rather than per module: a declaration only decides what
+	// a shape is *called*, so sharing them costs nothing and keeps one name for
+	// one shape. (Checking a signature will need the module's own import scope.)
+	in.namer = NewNamer()
+	for _, file := range sourcesOf(program, modules) {
+		decls, warns := CollectDecls(file)
+		in.namer.Declare(decls)
+		in.warnings = append(in.warnings, warns...)
+	}
+
 	// The program body pulls in whatever it needs; a second pass over every
 	// module binding then reaches the ones nothing referred to, and refines the
 	// ones whose recursive group was entered at an awkward point. Joining is
@@ -103,9 +121,7 @@ func Infer(program *syntax.Program, modules map[string]*syntax.Module, res *synt
 	}
 	in.expr(program.Body)
 
-	// One namer for the whole report: a recursive shape earns its equation once,
-	// however many signatures mention it.
-	namer := NewNamer()
+	namer := in.namer
 	analysis := &Analysis{Program: namer.String(bodyType), Warnings: in.warnings}
 	for _, mod := range sortedModules(modules) {
 		entry := ModuleEntry{Name: mod.Name}
@@ -131,6 +147,7 @@ func Infer(program *syntax.Program, modules map[string]*syntax.Module, res *synt
 		})
 	}
 	analysis.Equations = namer.Equations()
+	analysis.Warnings = append(analysis.Warnings, namer.Notes()...)
 
 	sort.Slice(analysis.Exprs, func(i, j int) bool {
 		a, b := analysis.Exprs[i].Pos, analysis.Exprs[j].Pos
@@ -339,7 +356,7 @@ func (in *inferrer) apply(fn, arg *Type, pos source.SourcePos, what string) *Typ
 	}
 	if f.fun == nil {
 		if !isVar(f) {
-			in.warn("applied "+what+", which is "+String(f)+", to an argument", pos)
+			in.warn("applied "+what+", which is "+in.namer.String(f)+", to an argument", pos)
 			return in.b.any()
 		}
 		res := in.b.fresh()
@@ -347,7 +364,7 @@ func (in *inferrer) apply(fn, arg *Type, pos source.SourcePos, what string) *Typ
 		return res
 	}
 	if conflicts(f.fun.arg, arg) {
-		in.warn("passed "+String(find(arg))+" to "+what+", which takes "+String(find(f.fun.arg)), pos)
+		in.warn("passed "+in.namer.String(find(arg))+" to "+what+", which takes "+in.namer.String(find(f.fun.arg)), pos)
 	}
 	in.b.join(f.fun.arg, arg)
 	return f.fun.res
@@ -444,4 +461,22 @@ func describe(e syntax.Expression) string {
 		return node.Module + "." + node.Value
 	}
 	return "this expression"
+}
+
+// sourcesOf collects the distinct source files a program and its modules came
+// from, in a deterministic order, so their comments can be scanned once each.
+func sourcesOf(program *syntax.Program, modules map[string]*syntax.Module) []*source.Source {
+	var out []*source.Source
+	seen := map[*source.Source]bool{}
+	add := func(pos source.SourcePos) {
+		if pos.File != nil && !seen[pos.File] {
+			seen[pos.File] = true
+			out = append(out, pos.File)
+		}
+	}
+	add(program.Start)
+	for _, mod := range sortedModules(modules) {
+		add(mod.Start)
+	}
+	return out
 }

@@ -17,6 +17,13 @@ var reLineBreak = regexp.MustCompile(`\n\r?`)
 type Source struct {
 	Path string
 	Text string
+
+	// Comments are the spans of every comment the lexer skipped, in source
+	// order. The token stream deliberately does not carry them — they are not
+	// syntax — but a tool that reads annotations out of comments needs to know
+	// exactly where they were, and finding them by re-scanning Text would
+	// mistake a `--` inside a string literal for one.
+	Comments []SourcePos
 }
 
 // A SourcePos is a span within a source file: a start offset and length into
