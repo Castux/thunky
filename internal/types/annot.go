@@ -89,7 +89,17 @@ func matchPat(t *Type, p *pattern, root *Type, d Decl, binds []*Type, seen map[[
 	t = find(t)
 
 	if p.self {
-		return t == root
+		if t == root {
+			return true
+		}
+		// A finite unrolling of a recursive type is the same regular tree, so a
+		// self position also matches a *separate* node that reads as the
+		// declaration in its own right. Inference frequently produces such a node:
+		// `tails` yields `List X` where X is one step of a list unrolled over the
+		// tied one, and without this it printed as `List ([] | [a, List a])` — the
+		// element type spelled out beside the very name that means it. Binds are
+		// shared with the outer match, so the arguments still have to agree.
+		return matchPat(t, d.Pat, t, d, binds, seen)
 	}
 	if p.hole >= 0 {
 		if binds[p.hole] == nil {

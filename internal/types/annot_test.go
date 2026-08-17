@@ -30,6 +30,22 @@ func run(t *testing.T, src string) (string, string, []types.Warning) {
 	return a.Program, strings.Join(eqs, "; "), a.Warnings
 }
 
+// TestDeclMatchesUnrolling checks that a finite unrolling of a recursive type is
+// recognised as that type, since it is the same regular tree. Inference produces
+// such nodes routinely — `tails` builds its element as one step of a list over
+// the tied one — and matching by pointer identity alone rendered the element as
+// `[] | [a, List a]`, spelled out beside the very name that means it.
+func TestDeclMatchesUnrolling(t *testing.T) {
+	got, _, warns := run(t, "--> List a = [] | [a, List a]\n"+
+		"let tails = { [] -> [[];], [h, t] -> [[h, t], tails t] } in tails")
+	if len(warns) != 0 {
+		t.Fatalf("unexpected warnings: %s", messages(warns))
+	}
+	if got != "List a -> List (List a)" {
+		t.Errorf("got %q, want %q", got, "List a -> List (List a)")
+	}
+}
+
 // TestDeclNamesShapes checks that a declaration replaces the generated name for
 // the shape it matches, and only for that shape.
 func TestDeclNamesShapes(t *testing.T) {
