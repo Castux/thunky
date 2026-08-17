@@ -39,31 +39,40 @@ module
 
 --> BigInt = [Num, List Num]
 
+--> base : Num
 base      = 4294967296,     -- 2^32
+--> halfBase : Num
 halfBase  = 65536,          -- 2^16
+--> limbBits : Num
 limbBits  = 32,
 
 -- --- magnitudes -----------------------------------------------------------
 
 -- normalize limbs: drop the most significant zero limbs, so that every
 -- magnitude has one representation and `equal` can be used on whole integers.
+--> normalize : List Num -> List Num
 normalize = reverse *> dropWhile (eq 0) *> reverse,
 
+--> magZero : List Num
 magZero = [],
 
 -- magIsZero mag: is the magnitude zero (that is, empty).
+--> magIsZero : List Num -> Num
 magIsZero = isEmpty,
 
 -- magFromNumber n: a magnitude from a non-negative integer-valued number.
 -- Exact for n below 2^53, which is where a plain number stops being exact.
+--> magFromNumber : Num -> List Num
 magFromNumber = n -> if (lt 1 n) [] (prepend [mod base n;] (magFromNumber (div base n))),
 
+--> magCompare : List Num -> List Num -> Num
 magCompare = a -> b ->
 	let la = length a, lb = length b in case
 		(neq la lb) (if (lt lb la) (negate 1) 1)
 		else (magCompareSameLength (reverse a) (reverse b)),
 
 -- Both lists most significant first and of equal length.
+--> magCompareSameLength : List Num -> List Num -> Num
 magCompareSameLength = xs -> ys -> xs > {
 	[] -> 0,
 	[x, xrest] -> ys > { [y, yrest] -> case
@@ -73,6 +82,7 @@ magCompareSameLength = xs -> ys -> xs > {
 	}
 },
 
+--> magAdd : List Num -> List Num -> List Num
 magAdd = a -> b ->
 	let go = carry -> x -> y -> if (and (isEmpty x) (isEmpty y))
 		(if (eq carry 0) [] [carry;])
@@ -86,6 +96,7 @@ magAdd = a -> b ->
 		go 0 a b,
 
 -- magSub a b: a - b, requiring a >= b.
+--> magSub : List Num -> List Num -> List Num
 magSub = a -> b ->
 	let go = borrow -> x -> y -> if (isEmpty x)
 		[]
@@ -102,6 +113,7 @@ magSub = a -> b ->
 
 -- mulLimb a b: the product of two limbs as [low, high], via 16-bit halves so
 -- that no intermediate exceeds 2^53.
+--> mulLimb : Num -> Num -> [Num, Num]
 mulLimb = a -> b ->
 	let
 		al = mod halfBase a, ah = div halfBase a,
@@ -115,6 +127,7 @@ mulLimb = a -> b ->
 	in
 		[low, high],
 
+--> magMulSmall : Num -> List Num -> List Num
 magMulSmall = k -> mag ->
 	let go = carry -> m -> if (isEmpty m)
 		(if (eq carry 0) [] [carry;])
@@ -129,19 +142,25 @@ magMulSmall = k -> mag ->
 		normalize (go 0 mag),
 
 -- Shift by whole limbs: little-endian, so this is prepending zeros.
+--> magShiftLimbs : Num -> List Num -> List Num
 magShiftLimbs = n -> mag -> if (magIsZero mag) [] (prepend (replicate n 0) mag),
 
+--> magMul : List Num -> List Num -> List Num
 magMul = a -> b -> b
 	> mapIndex (i -> limb -> magShiftLimbs i (magMulSmall limb a))
 	> foldl magAdd [],
 
+--> magDouble : List Num -> List Num
 magDouble = magMulSmall 2,
 
+--> magBitLength : List Num -> Num
 magBitLength = mag -> if (magIsZero mag) 0
 	(let top = lastOr 0 mag in add (mul limbBits (pred (length mag))) (bitLengthOf top)),
 
+--> bitLengthOf : Num -> Num
 bitLengthOf = n -> if (eq n 0) 0 (succ (bitLengthOf (div 2 n))),
 
+--> magTestBit : Num -> List Num -> Num
 magTestBit = i -> mag ->
 	let limbIndex = div limbBits i in
 		bit.bitAt (mod limbBits i) (nthOr 0 limbIndex mag),
@@ -150,6 +169,7 @@ magTestBit = i -> mag ->
 -- [quotient, remainder]. The numerator reaches 2^64, so this cannot be a single
 -- division: it is a four-step long division in base 2^16, where a partial
 -- remainder times 2^16 stays under 2^48 and so stays exact.
+--> divTwoByOne : Num -> Num -> Num -> [Num, Num]
 divTwoByOne = high -> low -> d ->
 	let
 		digits = [div halfBase high; mod halfBase high; div halfBase low; mod halfBase low],
@@ -176,6 +196,7 @@ divTwoByOne = high -> low -> d ->
 --
 -- This replaced binary long division, which needed a pass per *bit* of the
 -- dividend rather than per limb: a factor of 32 on the same operands.
+--> magDivMod : List Num -> List Num -> [List Num, List Num]
 magDivMod = a -> b -> case
 	(magIsZero b)              [[], []]                      -- caller's error; no crash
 	(eq (negate 1) (magCompare a b)) [[], a]                  -- a < b
@@ -184,6 +205,7 @@ magDivMod = a -> b -> case
 		> ([quotient, remainder] -> [quotient, magFromNumber remainder]))
 	else                       (magDivModLarge a b),
 
+--> magDivModLarge : List Num -> List Num -> [List Num, List Num]
 magDivModLarge = a -> b ->
 	let
 		-- Normalise: shift left so the divisor's top limb has its high bit set.
@@ -223,6 +245,7 @@ magDivModLarge = a -> b ->
 -- Knuth's estimate is at most two too large once normalised, so this loop runs
 -- at most twice; it is written as a loop rather than as two tests because the
 -- bound is a property of the normalisation, not of this code.
+--> lowerUntilFits : Num -> List Num -> List Num -> Num
 lowerUntilFits = estimate -> remainder -> divisor ->
 	if (eq estimate 0)
 		0
@@ -232,6 +255,7 @@ lowerUntilFits = estimate -> remainder -> divisor ->
 
 -- magDivModSmall d mag: divide by a number in [1, 2^32). Works in 16-bit halves
 -- because remainder * base would overflow the exact range of a float64.
+--> magDivModSmall : Num -> List Num -> [List Num, Num]
 magDivModSmall = d -> mag ->
 	let
 		halves = mag > flatMap (limb -> [mod halfBase limb; div halfBase limb]),
@@ -259,28 +283,38 @@ magDivModSmall = d -> mag ->
 
 -- --- integers -------------------------------------------------------------
 
+--> intZero : BigInt
 intZero = [1, []],
+--> intOne : BigInt
 intOne  = [1, [1;]],
 
+--> intSign : BigInt -> Num
 intSign      = [sign, mag] -> if (magIsZero mag) 0 sign,
+--> intMagnitude : BigInt -> List Num
 intMagnitude = [sign, mag] -> mag,
+--> intIsZero : BigInt -> Num
 intIsZero    = [sign, mag] -> magIsZero mag,
 
 -- intFromNumber n: from an integer-valued number; exact below 2^53.
+--> intFromNumber : Num -> BigInt
 intFromNumber = n -> if (lt 0 n)
 	[negate 1, magFromNumber (negate n)]
 	[1, magFromNumber n],
 
+--> intNegate : BigInt -> BigInt
 intNegate = [sign, mag] -> if (magIsZero mag) [1, mag] [negate sign, mag],
+--> intAbs : BigInt -> BigInt
 intAbs    = [sign, mag] -> [1, mag],
 
 -- intCompare a b: -1, 0 or 1 as a is less than, equal to, or greater than b.
+--> intCompare : BigInt -> BigInt -> Num
 intCompare = a -> b ->
 	let sa = intSign a, sb = intSign b in case
 		(neq sa sb) (if (lt sb sa) (negate 1) 1)
 		(eq sa 0)   0
 		else        (mul sa (magCompare (intMagnitude a) (intMagnitude b))),
 
+--> intAdd : BigInt -> BigInt -> BigInt
 intAdd = a -> b -> a > ([sa, ma] -> b > ([sb, mb] ->
 	if (eq sa sb)
 		[sa, magAdd ma mb]
@@ -294,14 +328,17 @@ intAdd = a -> b -> a > ([sa, ma] -> b > ([sb, mb] ->
 -- and the partial application is the useful one. The same holds for intDiv,
 -- intMod, intDivMod, intPow and intPowMod below: a library that ordered these
 -- mathematically would silently compute the reverse when piped into.
+--> intSub : BigInt -> BigInt -> BigInt
 intSub = k -> n -> intAdd n (intNegate k),
 
+--> intMul : BigInt -> BigInt -> BigInt
 intMul = a -> b -> a > ([sa, ma] -> b > ([sb, mb] ->
 	let mag = magMul ma mb in
 		if (magIsZero mag) intZero [mul sa sb, mag])),
 
 -- intDivMod d n: [n / d, n mod d], truncating, the remainder taking the sign
 -- of n — the convention of the div and mod builtins.
+--> intDivMod : BigInt -> BigInt -> [BigInt, BigInt]
 intDivMod = d -> n -> n > ([sa, ma] -> d > ([sb, mb] ->
 	let
 		divided   = magDivMod ma mb,
@@ -314,15 +351,19 @@ intDivMod = d -> n -> n > ([sa, ma] -> d > ([sb, mb] ->
 		])),
 
 -- intDiv d n, intMod d n: the two halves of intDivMod.
+--> intDiv : BigInt -> BigInt -> BigInt
 intDiv = d -> intDivMod d *> first,
+--> intMod : BigInt -> BigInt -> BigInt
 intMod = d -> intDivMod d *> second,
 
+--> intMulSmall : Num -> BigInt -> BigInt
 intMulSmall = k -> [sign, mag] -> if (lt 0 k)
 	[negate sign, magMulSmall (negate k) mag]
 	(let m = magMulSmall k mag in if (magIsZero m) intZero [sign, m]),
 
 -- intPow e b: b^e for a non-negative e, by squaring — the argument order of the
 -- `pow` builtin, where `pow 2 x` is x squared.
+--> intPow : Num -> BigInt -> BigInt
 intPow = e -> b -> case
 	(eq e 0)  intOne
 	(even e)  (let half = intPow (div 2 e) b in intMul half half)
@@ -332,6 +373,7 @@ intPow = e -> b -> case
 -- with a reduction at every step, so the operands stay the size of m instead of
 -- growing to the size of b^e. Computing the power first and reducing afterwards
 -- is the same answer and a different order of cost: 1000^1000 has 3001 digits.
+--> intPowMod : BigInt -> Num -> BigInt -> BigInt
 intPowMod = m -> e -> b -> case
 	(eq e 0)  (intMod m intOne)
 	(even e)  (let half = intPowMod m (div 2 e) b in intMod m (intMul half half))
@@ -343,6 +385,7 @@ intPowMod = m -> e -> b -> case
 -- is the size of the modulus, and passing it as a number makes `pred e` a no-op
 -- and the recursion endless. This walks the exponent's bits instead, most
 -- significant first, squaring at each step and multiplying where the bit is set.
+--> intPowModBig : BigInt -> BigInt -> BigInt -> BigInt
 intPowModBig = m -> e -> b ->
 	let
 		mag = intMagnitude e,
@@ -360,20 +403,28 @@ intPowModBig = m -> e -> b ->
 -- `n > intLt limit` reads as "is n less than limit". intCompare is deliberately
 -- *not* of this shape — a three-way result is not a predicate, and it answers
 -- "how does a compare to b" in the usual order.
+--> intLt : BigInt -> BigInt -> Num
 intLt  = threshold -> value -> eq (negate 1) (intCompare value threshold),
+--> intLte : BigInt -> BigInt -> Num
 intLte = threshold -> value -> neq 1 (intCompare value threshold),
+--> intGt : BigInt -> BigInt -> Num
 intGt  = threshold -> value -> eq 1 (intCompare value threshold),
+--> intGte : BigInt -> BigInt -> Num
 intGte = threshold -> value -> neq (negate 1) (intCompare value threshold),
 
 -- intToNumber: back to a plain number, losing exactness past 2^53.
+--> intToNumber : BigInt -> Num
 intToNumber = [sign, mag] -> mul sign
 	(mag > foldr (limb -> acc -> add limb (mul base acc)) 0),
 
+--> chunkDigits : Num
 chunkDigits = 9,
+--> chunkBase : Num
 chunkBase   = 1000000000,      -- 10^9, the largest power of ten below 2^32
 
 -- intToString: repeated division by 10^9, so nine decimal digits come out per
 -- division rather than one.
+--> intToString : BigInt -> List Num
 intToString = [sign, mag] -> if (magIsZero mag) "0"
 	(let
 		-- Matching the chunks says what `head`/`tail` said, without assuming the
@@ -395,6 +446,7 @@ intToString = [sign, mag] -> if (magIsZero mag) "0"
 -- quadratic in its length.
 -- One-liner equivalent: mag -> if (magIsZero mag) []
 --   (let d = magDivModSmall chunkBase mag in append [second d;] (magToChunks (first d)))
+--> magToChunks : List Num -> List Num
 magToChunks = mag ->
 	let gather = chunks -> m -> if (magIsZero m) chunks
 		(let divided = magDivModSmall chunkBase m in
@@ -402,6 +454,7 @@ magToChunks = mag ->
 	in
 		gather [] mag,
 
+--> intFromString : List Num -> BigInt
 intFromString = s -> s > {
 	[] -> intZero,
 	[c, rest] -> if (eq c (char '-'))
@@ -409,11 +462,13 @@ intFromString = s -> s > {
 		(intFromDigits [c, rest])
 },
 
+--> intFromDigits : List Num -> BigInt
 intFromDigits = digits -> [1, digits
 	> filter isDigit
 	> foldl (acc -> c -> magAdd (magMulSmall 10 acc) (magFromNumber (digitToInt c))) []],
 
 -- intDigits: the decimal digits, most significant first.
+--> intDigits : BigInt -> List Num
 intDigits = n -> intToString n > filter isDigit > map digitToInt,
 
 -- --- floats ---------------------------------------------------------------
@@ -423,12 +478,16 @@ intDigits = n -> intToString n > filter isDigit > map digitToInt,
 
 --> BigFloat = [BigInt, Num, Num]
 
+--> floatMantissa : BigFloat -> BigInt
 floatMantissa  = [m, e, p] -> m,
+--> floatExponent : BigFloat -> Num
 floatExponent  = [m, e, p] -> e,
+--> floatPrecision : BigFloat -> Num
 floatPrecision = [m, e, p] -> p,
 
 -- floatRound: bring a value back to its precision by dropping low bits of the
 -- mantissa and raising the exponent to match. Truncation toward zero.
+--> floatRound : BigFloat -> BigFloat
 floatRound = [m, e, p] ->
 	let excess = sub p (magBitLength (intMagnitude m)) in
 		if (lt 1 excess)
@@ -436,12 +495,14 @@ floatRound = [m, e, p] ->
 			(let shifted = first (intDivMod (intPow excess (intFromNumber 2)) m) in
 				[shifted, add e excess, p]),
 
+--> floatFromInt : Num -> BigInt -> BigFloat
 floatFromInt = precision -> n -> floatRound [n, 0, precision],
 
 -- floatFromNumber: a plain number keeps its fraction. Doubling is exact in
 -- binary, so scaling up until the value is integral loses nothing, and the
 -- count of doublings is the exponent. A float64 carries at most 52 fractional
 -- bits, so this terminates well before the mantissa could overflow.
+--> floatFromNumber : Num -> Num -> BigFloat
 floatFromNumber = precision -> n ->
 	let go = value -> exponent -> if (isInteger value)
 		(floatRound [intFromNumber value, exponent, precision])
@@ -450,9 +511,11 @@ floatFromNumber = precision -> n ->
 		go n 0,
 
 -- floatWithPrecision: the same value carried at a different precision.
+--> floatWithPrecision : Num -> BigFloat -> BigFloat
 floatWithPrecision = precision -> [m, e, p] -> floatRound [m, e, precision],
 
 -- Align two floats on the lower exponent, so their mantissas can be combined.
+--> floatAlign : BigFloat -> BigFloat -> [BigInt, BigInt, Num]
 floatAlign = a -> b ->
 	let
 		ea = floatExponent a, eb = floatExponent b,
@@ -462,15 +525,19 @@ floatAlign = a -> b ->
 	in
 		[lift a ea, lift b eb, low],
 
+--> floatAdd : BigFloat -> BigFloat -> BigFloat
 floatAdd = a -> b -> floatAlign a b > ([ma, mb, e] ->
 	floatRound [intAdd ma mb, e, max (floatPrecision a) (floatPrecision b)]),
 
 -- floatSub k x: x - k, and floatDiv d x: x / d, ordered like their integer
 -- counterparts and like the builtins.
+--> floatSub : BigFloat -> BigFloat -> BigFloat
 floatSub = k -> x -> floatAdd x (floatNegate k),
 
+--> floatNegate : BigFloat -> BigFloat
 floatNegate = [m, e, p] -> [intNegate m, e, p],
 
+--> floatMul : BigFloat -> BigFloat -> BigFloat
 floatMul = a -> b -> floatRound [
 	intMul (floatMantissa a) (floatMantissa b),
 	add (floatExponent a) (floatExponent b),
@@ -479,6 +546,7 @@ floatMul = a -> b -> floatRound [
 
 -- floatDiv: shift the numerator up by enough bits that the quotient lands with
 -- the requested precision, then divide the mantissas.
+--> floatDiv : BigFloat -> BigFloat -> BigFloat
 floatDiv = d -> a ->
 	let
 		b     = d,
@@ -493,19 +561,26 @@ floatDiv = d -> a ->
 			p
 		],
 
+--> floatCompare : BigFloat -> BigFloat -> Num
 floatCompare = a -> b -> floatAlign a b > ([ma, mb, e] -> intCompare ma mb),
 
+--> floatIsZero : BigFloat -> Num
 floatIsZero = [m, e, p] -> intIsZero m,
 
 -- The same threshold-first predicates for floats.
+--> floatLt : BigFloat -> BigFloat -> Num
 floatLt  = threshold -> value -> eq (negate 1) (floatCompare value threshold),
+--> floatLte : BigFloat -> BigFloat -> Num
 floatLte = threshold -> value -> neq 1 (floatCompare value threshold),
+--> floatGt : BigFloat -> BigFloat -> Num
 floatGt  = threshold -> value -> eq 1 (floatCompare value threshold),
+--> floatGte : BigFloat -> BigFloat -> Num
 floatGte = threshold -> value -> neq (negate 1) (floatCompare value threshold),
 
 -- floatToString digits: a decimal rendering with that many places after the
 -- point, truncated. The value is scaled by 10^digits as an exact integer first,
 -- so the printed digits are the true ones rather than a repeated conversion.
+--> floatToString : Num -> BigFloat -> List Num
 floatToString = digits -> [m, e, p] ->
 	let
 		scaled  = intMul m (intPow digits (intFromNumber 10)),
@@ -526,6 +601,7 @@ floatToString = digits -> [m, e, p] ->
 
 -- floatSqrt: Newton's method, x' = (x + v/x)/2, run until the step stops
 -- changing the value at the working precision.
+--> floatSqrt : BigFloat -> BigFloat
 floatSqrt = value ->
 	let
 		p    = floatPrecision value,

@@ -55,6 +55,10 @@ if = cond -> t -> f -> cond > { 1 -> t, 0 -> f },
 -- case cond1 val1 cond2 val2 ... else defval
 --> else : Num
 else = 2,
+-- No signature: `case … else …` is a variadic state machine. It takes a condition
+-- and a value, then either another pair or nothing, and which one is decided by a
+-- *value* — `else` is the number 2 — not by a shape. The analysis folds the chain
+-- into one recursive function type, and there is nothing truthful to write here.
 case = cond -> t -> cond > {
 	0 -> case,
 	1 -> let
