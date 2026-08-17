@@ -9,6 +9,6 @@
 import core, list, math, euler in
 
 	range 10 354295
-	> filter (n -> eq n (digits n > map (pow 5) > sum))
+	> filter (ap eq (digits *> map (pow 5) *> sum))
 	> sum
 	> show

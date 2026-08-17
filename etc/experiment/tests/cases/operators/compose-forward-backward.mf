@@ -1,5 +1,0 @@
--- Function composition: *> (forward) and <* (backward).
-import core in
-let inc = add 1, dbl = mul 2 in
-let f = inc *> dbl, g = inc <* dbl in
-show [f 5; g 5]

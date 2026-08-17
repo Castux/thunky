@@ -1,3 +1,0 @@
--- Division family and powers: div, mod, fdiv, pow, sqrt.
-import core, math in
-show [div 5 17; mod 5 17; fdiv 2 7; pow 10 2; sqrt 144]

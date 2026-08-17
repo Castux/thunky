@@ -1,3 +1,0 @@
--- write prints a list of code points as characters.
-import core, list in
-write [72; 101; 108; 108; 111; 10; 937] -- Ω is 937

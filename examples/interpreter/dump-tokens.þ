@@ -4,10 +4,10 @@ import core, list, math, text, lex in
 let
 	source = stdin,
 	kindName = k -> nth k ["number"; "name"; "string"; "symbol"; "keyword"; "end"],
-	render = [kind, value, offset] -> flatten [
-		padLeft 4 space (string offset); "  ";
-		padRight 8 space (kindName kind);
-		if (eq kind lex.tokenNumber) (string value) (flatten [[dquote;]; value; [dquote;]])
+	row = [kind, value, offset] -> [
+		string offset;
+		kindName kind;
+		if (eq kind lex.tokenNumber) (string value) (format "%s%s%s" [[dquote;]; value; [dquote;]])
 	]
 in
-	lex.tokens source > map render > map write > eval
+	lex.tokens source > map row > writeTable

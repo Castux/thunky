@@ -1,3 +1,0 @@
--- A qualified name is exactly module.name; a further '.' does not parse.
-import core, list in
-show list.head.tail [1; 2; 3]

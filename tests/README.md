@@ -24,9 +24,13 @@ powershell -File tests/run.ps1 patterns
 ```
 
 Each builds the binary, runs every case, and prints a categorized `PASS`/`FAIL`
-list with a final count; a non-zero exit means at least one case diverged. The
-shell runners feed each case's input as raw bytes, so the invalid-UTF-8 case
-works.
+list with a final count; a non-zero exit means at least one case diverged, or
+that no case ran at all. The shell runners feed each case's input as raw bytes,
+so the invalid-UTF-8 case works.
+
+Both harnesses run in CI (`.github/workflows/test.yml`), on Linux and on
+Windows PowerShell 5.1 — they are two implementations of the same contract and
+have drifted apart before.
 
 After a deliberate output change, regenerate the expectations and review the
 diff before committing:
@@ -46,13 +50,14 @@ tests/cases/<category>/<name>.exit       golden exit code (only when non-zero)
 
 Categories (each with at least two cases): `arithmetic`, `comparison`,
 `literals`, `tuples`, `lists`, `strings`, `operators`, `lambdas`, `patterns`,
-`let`, `laziness`, `modules`, `partial-application`, `higher-order`, `output`,
-`stdin`, `errors`.
+`let`, `laziness`, `lexing`, `modules`, `partial-application`, `higher-order`,
+`output`, `stdin`, `errors`.
 
-The `errors` category covers programs that *should* raise a located runtime
-error (non-exhaustive match, applying a non-function, a non-number to an
-arithmetic builtin, a bad `write`, invalid UTF-8 on `stdin`); the recorded
-message and exit code must be reproduced exactly.
+The `lexing` and `errors` categories cover programs that *should* fail: a stray
+character or an unterminated string for the first, a located runtime error for
+the second (non-exhaustive match, applying a non-function, a non-number or a
+zero divisor passed to an arithmetic builtin, a bad `write`, invalid UTF-8 on
+`stdin`). The recorded message and exit code must be reproduced exactly.
 
 ## Adding a test
 

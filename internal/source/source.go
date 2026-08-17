@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 // reLineBreak splits lines for diagnostic rendering in Log.
@@ -61,27 +62,43 @@ func toSpace(r rune) rune {
 	return r
 }
 
-// LineCol returns the 1-based line and column of a span's start, and the offset
-// at which that line begins.
+// LineCol returns the 1-based line and column of a span's start, and the byte
+// offset at which that line begins.
+//
+// The column is counted in characters, not bytes. Source lines hold arbitrary
+// UTF-8 — string literals, comments, and in this language even the file
+// extension — and every caller of this is printing a position for a human to
+// find, so a byte count would send them to the wrong place.
 func (loc SourcePos) LineCol() (line, column, lineStart int) {
 	if loc.File == nil {
 		return 0, 0, 0
 	}
-	breaks := reLineBreak.FindAllStringIndex(loc.File.Text[:loc.Start], -1)
+	text := loc.File.Text
+	breaks := reLineBreak.FindAllStringIndex(text[:loc.Start], -1)
 	lineStart = 0
 	if len(breaks) > 0 {
 		lineStart = breaks[len(breaks)-1][0] + 1
 	}
-	return len(breaks) + 1, loc.Start - lineStart + 1, lineStart
+	return len(breaks) + 1, utf8.RuneCountInString(text[lineStart:loc.Start]) + 1, lineStart
 }
 
 // Log prints a located diagnostic: the path/line/column, the message, the
 // offending source line, and an underline of the span, all colored by severity.
+//
+// Diagnostics go to stderr, where the color detection already looks, so that a
+// program's own output (show/write/peek, on stdout) can be redirected on its own
+// without ANSI escapes and compiler noise landing in the file.
 func Log(msg string, loc SourcePos, severity Severity) {
+	// The zero SourcePos has no file. Nothing reaches Log with one today, but
+	// reporting the message unlocated beats dereferencing nil.
+	if loc.File == nil {
+		fmt.Fprintln(os.Stderr, msg)
+		return
+	}
+
 	text := loc.File.Text
 
-	lineNumber, columnNumber, lineStart := loc.LineCol()
-	lineIndex, column := lineNumber-1, columnNumber-1
+	lineNumber, column, lineStart := loc.LineCol()
 
 	lineEnd := loc.Start
 	nextBreak := reLineBreak.FindStringIndex(text[loc.Start:])
@@ -89,19 +106,25 @@ func Log(msg string, loc SourcePos, severity Severity) {
 		lineEnd += nextBreak[0]
 	}
 
-	fmt.Printf("%s:%d:%d: %s\n", loc.File.Path, lineIndex+1, column+1, msg)
-
+	// A SourcePos is a byte span, so slicing the line needs byte offsets, but the
+	// caret run is drawn in characters — for the same reason LineCol counts the
+	// column in characters.
 	line := text[lineStart:lineEnd]
-	colorEnd := min(len(line), column+loc.Length)
-	coloredLine := line[:column] +
-		colorText(line[column:colorEnd], colors[severity]) +
-		line[colorEnd:]
+	byteCol := loc.Start - lineStart
+	byteEnd := min(len(line), byteCol+loc.Length)
+	width := utf8.RuneCountInString(line[byteCol:byteEnd])
 
-	underline := strings.Map(toSpace, line[:column]) +
-		colorText(strings.Repeat("^", colorEnd-column), colors[severity])
+	fmt.Fprintf(os.Stderr, "%s:%d:%d: %s\n", loc.File.Path, lineNumber, column, msg)
 
-	fmt.Println(coloredLine)
-	fmt.Println(underline)
+	coloredLine := line[:byteCol] +
+		colorText(line[byteCol:byteEnd], colors[severity]) +
+		line[byteEnd:]
+
+	underline := strings.Map(toSpace, line[:byteCol]) +
+		colorText(strings.Repeat("^", width), colors[severity])
+
+	fmt.Fprintln(os.Stderr, coloredLine)
+	fmt.Fprintln(os.Stderr, underline)
 }
 
 // To returns the span from the start of a to the end of b. Both must be in the

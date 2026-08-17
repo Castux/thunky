@@ -24,11 +24,11 @@ let
 	-- Draining the queue is unfold-shaped: pop until empty.
 	drain = h -> if (heap.isEmpty h) [] [heap.top h, drain (heap.pop byPriority h)],
 
-	render = [priority, name] -> flatten [string priority; "  "; name]
+	render = [priority, name] -> format "%v  %s" [priority; name]
 in
 	flatten [
 		["inserted in this order:";];
 		tasks > map (render *> prepend "  ");
 		["";  "removed in priority order:"];
 		drain queue > map (render *> prepend "  ")
-	] > map write > eval
+	] > writeList

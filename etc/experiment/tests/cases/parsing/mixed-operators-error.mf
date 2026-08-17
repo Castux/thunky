@@ -1,5 +1,0 @@
--- The four operators have no relative precedence; mixing them without parens is
--- a parse error (write (a > b) < c or a > (b < c) instead).
-import core in
-let inc = add 1, dbl = mul 2 in
-1 > inc < dbl

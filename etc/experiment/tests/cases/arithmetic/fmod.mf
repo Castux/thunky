@@ -1,3 +1,0 @@
--- fmod: floating-point remainder (sign follows the dividend).
-import core, math in
-show [fmod 3 7.5; fmod 3 (negate 7.5); fmod 0.4 1]

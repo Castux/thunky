@@ -1,3 +1,0 @@
--- Decimal literals, and negatives via math.negate (the lexer has no unary minus).
-import core, math in
-show [negate 5; 3.14; negate 2.5; 0.001]

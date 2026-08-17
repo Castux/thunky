@@ -6,7 +6,7 @@ import (
 	"os"
 	"unicode"
 
-	"thunky/internal/source"
+	"github.com/Castux/thunky/internal/source"
 )
 
 var (

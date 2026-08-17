@@ -1,4 +1,0 @@
--- Tuple-destructuring patterns.
-import core in
-let fst = [a, b] -> a, swap = [a, b] -> [b, a] in
-show [fst [9, 4]; swap [1, 2]]

@@ -1,7 +1,0 @@
--- Nested patterns mixing number literals and tuple destructuring.
-import core in
-let f = {
-  [0, [a, b]] -> add a b,
-  [n, rest] -> n
-} in
-show [f [0, [3, 4]]; f [5, [1, 2]]]

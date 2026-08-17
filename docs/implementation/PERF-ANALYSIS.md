@@ -1,5 +1,14 @@
 # Runtime performance analysis
 
+> **This is a historical document.** It is the survey that motivated the
+> reducer restructure and several of the fixes in
+> [IMPROVEMENTS.md](IMPROVEMENTS.md), kept for the reasoning and the
+> measurements rather than as a description of the current engine. The code has
+> moved on: `runMatch`, `runBuiltin`, `getNumber`, `EvalPrimNumbers` and
+> `Machine.ModEnvs` no longer exist under those names, and findings that quote
+> them describe a shape the reducer no longer has. Read
+> [6.The G-machine](6.The%20G-machine.md) for what it does now.
+
 Survey of `internal/backend` (the push/enter reducer and compiler) and the
 `internal/value` runtime it drives, looking for design-level performance flaws of
 the same class as the recently fixed "thunks not all memoized" bug — i.e. costs

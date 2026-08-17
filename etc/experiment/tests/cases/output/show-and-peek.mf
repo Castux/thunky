@@ -1,4 +1,0 @@
--- peek prints the width/depth-limited rendering; show the full one.
-import core, list in
-let xs = [1; 2; 3] in
-peek xs > show

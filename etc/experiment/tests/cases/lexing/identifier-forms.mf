@@ -1,3 +1,0 @@
--- Identifiers may contain underscores and digits (but not start with a digit).
-import core in
-let _x = 1, y2 = 2, snake_case = 3 in show [_x; y2; snake_case]

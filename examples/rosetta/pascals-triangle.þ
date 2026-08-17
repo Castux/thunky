@@ -5,12 +5,11 @@
 import core, list, math, text in
 
 let
-	rows = iterate (row -> zipWith add (prepend [0;] row) (append [0;] row)) [1;],
+	rows = iterate (fork (zipWith add) (prepend [0;]) (append [0;])) [1;],
 
 	width = 4,
 	render = row -> row > map (n -> padLeft width space (string n)) > flatten
 in
 	take 10 rows
 	> mapIndex (i -> row -> prepend (replicate (mul (div 2 width) (sub i 9)) space) (render row))
-	> map write
-	> eval
+	> writeList

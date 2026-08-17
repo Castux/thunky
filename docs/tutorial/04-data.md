@@ -126,7 +126,7 @@ Use `eq` on numbers — it is the cheaper primitive — and `equal` on everythin
 
 ## Exercises
 
-### Exercise 4.1 — The `[x;]` trap, diagnosed
+### Exercise 4.1 — `[x]` and `[x;]`, diagnosed
 
 Write one program that calls `list.length` on a one-element list, `list.length` on a two-element list, and `list.sum` on `[1; 2]`. Then change the one-element list from `[5;]` to `[5]` and run it again. Read the error message carefully: where does it point, and why is that misleading?
 

@@ -1,3 +1,0 @@
--- Core arithmetic builtins: add, sub, mul, and nesting.
-import core in
-show [add 2 3; sub 10 4; mul 6 7; add (mul 2 3) (sub 9 4)]

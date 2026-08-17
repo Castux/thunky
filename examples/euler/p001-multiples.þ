@@ -6,6 +6,6 @@ import core, list, math in
 
 let divisibleBy = d -> n -> eq 0 (mod d n) in
 	range 1 1000
-	> filter (n -> or (divisibleBy 3 n) (divisibleBy 5 n))
+	> filter (fork or (divisibleBy 3) (divisibleBy 5))
 	> sum
 	> show

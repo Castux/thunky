@@ -1,0 +1,3 @@
+tests/cases/lexing/unexpected-character-non-ascii.þ:5:13: unexpected character '×'
+show (add 1 × 2)
+            ^

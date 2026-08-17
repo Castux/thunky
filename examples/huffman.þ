@@ -123,17 +123,16 @@ let
 
 	report = flatten [
 		["sample:"; sample];
-		[flatten [string (length sample); " characters, ";
-			string (length counts); " distinct"];];
+		[text.format "%v characters, %v distinct" [length sample; length counts];];
 		[""; "char count  code"];
 		codes > sortWith byLengthThenChar > map codeRow;
-		[""; flatten ["encoded: "; take 64 encoded; " … ("; string codedBits; " bits)"]];
-		[flatten ["packed:  "; string (take 8 packed); " … ("; string (length packed); " bytes)"];];
-		[flatten [string plainBits; " bits at 8 per character -> "; string codedBits;
-			" bits, "; string bitsPerChar; " per character"];];
-		[flatten ["encoded / original = "; string (fdiv plainBits codedBits > round2)];];
-		[flatten ["round trip: "; case (equal (decode encoded) sample) "ok" else "FAILED"];]
+		[""; text.format "encoded: %s … (%v bits)" [take 64 encoded; codedBits]];
+		[text.format "packed:  %v … (%v bytes)" [take 8 packed; length packed];];
+		[text.format "%v bits at 8 per character -> %v bits, %v per character"
+			[plainBits; codedBits; bitsPerChar];];
+		[text.format "encoded / original = %v" [fdiv plainBits codedBits > round2;];];
+		[text.format "round trip: %s" [case (equal (decode encoded) sample) "ok" else "FAILED";];]
 	]
 
 in
-	report > map write > eval
+	report > text.writeList

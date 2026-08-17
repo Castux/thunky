@@ -1,3 +1,0 @@
--- Derived comparisons lte, gte, neq.
-import core, math in
-show [lte 10 5; lte 10 20; gte 0 5; gte 0 (negate 3); neq 1 2; neq 2 2]

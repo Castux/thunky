@@ -44,5 +44,5 @@ in
 	[
 		flatten ["key: "; key];
 		flatten ["text: "; take 60 plain; "..."];
-		flatten ["sum: "; string (sum plain)]
-	] > map write > eval
+		format "sum: %v" [sum plain;]
+	] > writeList

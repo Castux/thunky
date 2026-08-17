@@ -30,8 +30,8 @@ keywords = ["let"; "in"; "module"; "import"],
 -- their prefixes, so `->` is never a `-` followed by a `>`.
 symbols = ["->"; "<*"; "*>"; ">"; "<"; "."; "="; ","; ";"; "("; ")"; "{"; "}"; "["; "]"],
 
-isIdentifierStart = c -> or (isAlpha c) (eq c (char '_')),
-isIdentifierPart  = c -> or (isAlphaNum c) (eq c (char '_')),
+isIdentifierStart = fork or isAlpha (eq (char '_')),
+isIdentifierPart  = fork or isAlphaNum (eq (char '_')),
 
 -- tokens source: the token list, ending with a tokenEnd. `offset` counts code
 -- points from the start, so it survives the recursion without a second pass.

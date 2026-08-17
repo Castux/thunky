@@ -1,8 +1,8 @@
 package backend
 
 import (
-	"thunky/internal/source"
-	"thunky/internal/value"
+	"github.com/Castux/thunky/internal/source"
+	"github.com/Castux/thunky/internal/value"
 )
 
 // The bytecode is flat: one Instr slice for the whole program (see Program.Code),

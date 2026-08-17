@@ -1,0 +1,48 @@
+-- Advent of Code 2025, day 6: the cephalopods' arithmetic worksheet.
+-- The problems sit side by side across one very wide grid, each separated from
+-- the next by a column of spaces, with its operator on the bottom row. Part 1
+-- reads a problem's operands along its rows; part 2 reads them down its columns
+-- instead, most significant digit at the top.
+-- Answer: [4805473544166; 8907730960817]
+--
+--   thunky examples/aoc2025/aoc06.th < examples/aoc2025/aoc06.txt
+--
+-- Turning the sheet on its side makes both readings the same program. The
+-- column is the unit the worksheet is built from — a blank one is what
+-- separates two problems — so the grid is transposed once and then cut into
+-- problems by the same `splitWith` that `words` uses on a string, a blank
+-- column playing the part of a space. A problem's operands are then either its
+-- columns (part 2) or its columns turned back into rows (part 1), and that is
+-- the whole difference between the two answers: `total transpose`, `total id`.
+--
+-- Addition and multiplication are commutative, so neither the order of the
+-- problems nor the order of their operands matters, and the puzzle's
+-- right-to-left reading needs no reversing to come out the same.
+
+import core, list, math, text in
+
+let
+	grid = stdin > lines,
+
+	-- pad first: a line that lost its trailing spaces would otherwise cut every
+	-- column after it short, and `transpose` stops at the shortest row
+	width = grid > map length > maximum,
+	sheet = grid > map (padRight width space) > transpose,
+
+	blank = allMatch (eq space),
+	problems = sheet > splitWith blank > filter (isEmpty *> not),
+
+	-- a problem without its operator row, one string per column
+	digits = map init,
+
+	-- spaces are alignment, and a strip with no digit at all is not an operand
+	operands = map (filter isDigit) *> filter (isEmpty *> not) *> map stringToInt,
+
+	answer = readAs -> problem ->
+		problem > digits > readAs > operands
+			> if (problem > map last > filter (neq space) > head > eq (char '+')) sum product,
+
+	total = readAs -> problems > map (answer readAs) > sum
+in
+
+show [total transpose; total id]

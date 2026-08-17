@@ -12,6 +12,29 @@ const ThunkyRunner = (() => {
     let current = null; // { id, onOutput, resolve, timer }
     let nextId = 1;
 
+    // The compiled wasm module is cached here, on the main thread, rather than
+    // in the worker: Stop and the timeout both work by terminating the worker,
+    // and a worker that had to fetch and compile 3.87 MB again would make the
+    // run after a Stop the slowest one of the session. A WebAssembly.Module
+    // posts to a worker by handle, so this is compiled exactly once per page.
+    let modulePromise = null;
+
+    function compiledModule() {
+        if (!modulePromise) {
+            // Deliberately not compileStreaming: it insists on an
+            // application/wasm content type, which not every static file
+            // server (python -m http.server, for one) sends.
+            modulePromise = fetch("thunky.wasm")
+                .then(resp => {
+                    if (!resp.ok) throw new Error("could not fetch thunky.wasm (" + resp.status + ")");
+                    return resp.arrayBuffer();
+                })
+                .then(bytes => WebAssembly.compile(bytes))
+                .catch(err => { modulePromise = null; throw err; });
+        }
+        return modulePromise;
+    }
+
     function spawnWorker() {
         worker = new Worker("worker.js");
         worker.onmessage = event => {
@@ -68,13 +91,20 @@ const ThunkyRunner = (() => {
                 startedAt: performance.now(),
                 timer: setTimeout(() => stop({ timedOut: true }), opts.timeoutMs || TIMEOUT_MS),
             };
-            worker.postMessage({
-                id,
-                source,
-                path: opts.path || "playground.þ",
-                stdin: opts.stdin || "",
-                dump: opts.dump || "",
-                modules: opts.modules || {},
+            compiledModule().then(module => {
+                // The run may have been cancelled while the module compiled.
+                if (!current || current.id !== id) return;
+                worker.postMessage({
+                    id,
+                    module,
+                    source,
+                    path: opts.path || "playground.þ",
+                    stdin: opts.stdin || "",
+                    dump: opts.dump || "",
+                    modules: opts.modules || {},
+                });
+            }).catch(err => {
+                if (current && current.id === id) finish({ hostError: String(err.message || err) });
             });
         });
     }

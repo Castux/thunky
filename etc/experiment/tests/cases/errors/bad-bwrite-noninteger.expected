@@ -1,3 +1,0 @@
-Htests/cases/errors/bad-bwrite-noninteger.mf:3:1: bwrite expects a list of numbers, found invalid byte value 105.5
-bwrite [72; 105.5]
-^^^^^^^^^^^^^^^^^^

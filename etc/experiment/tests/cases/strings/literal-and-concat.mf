@@ -1,3 +1,0 @@
--- Strings are code-point lists; concat joins them; write renders them.
-import core, list in
-write (concat 'foo' 'bar')

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"thunky/internal/source"
-	"thunky/internal/value"
+	"github.com/Castux/thunky/internal/source"
+	"github.com/Castux/thunky/internal/value"
 )
 
 // dumpbytecode.go disassembles the flat bytecode (bytecode.go) to text, reached by

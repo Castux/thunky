@@ -23,8 +23,9 @@ const PAGES = [
     { id: "tut10", title: "10. Lazy evaluation", file: "docs/tutorial/10-lazy-evaluation.md", group: "Tutorial" },
     { id: "tut11", title: "11. Performance & space", file: "docs/tutorial/11-performance-and-space.md", group: "Tutorial" },
     { id: "tut12", title: "12. Standard library", file: "docs/tutorial/12-standard-library.md", group: "Tutorial" },
-    { id: "tut13", title: "13. Modules", file: "docs/tutorial/13-modules.md", group: "Tutorial" },
-    { id: "tut14", title: "14. A program end to end", file: "docs/tutorial/14-program-end-to-end.md", group: "Tutorial" },
+    { id: "tut13", title: "13. Point-free style", file: "docs/tutorial/13-point-free-style.md", group: "Tutorial" },
+    { id: "tut14", title: "14. Modules", file: "docs/tutorial/14-modules.md", group: "Tutorial" },
+    { id: "tut15", title: "15. A program end to end", file: "docs/tutorial/15-program-end-to-end.md", group: "Tutorial" },
 ];
 
 // The implementation notes (docs/implementation/) are deliberately not part of
@@ -84,7 +85,14 @@ function addHeadingIds(root) {
 
 // Where to send repository links the site does not host itself — the
 // implementation notes, LICENSE, and any source file referenced from prose.
-const REPO_BLOB = "https://github.com/Castux/thunky/blob/master/";
+//
+// web/build.sh substitutes the two placeholders; it is the single place the
+// repository URL and branch are configured, so a rename or a transfer does not
+// leave every doc link 404ing. The guards keep this file working when it is
+// read straight off disk, unbuilt.
+const REPO = "__REPO_URL__".startsWith("__") ? "https://github.com/Castux/thunky" : "__REPO_URL__";
+const BRANCH = "__REPO_BRANCH__".startsWith("__") ? "master" : "__REPO_BRANCH__";
+const REPO_BLOB = REPO + "/blob/" + BRANCH + "/";
 
 // Rewrite relative links between the markdown files to ?page= URLs. Links are
 // resolved against the linking page's own directory, so `../LANGUAGE.md` from a
@@ -124,6 +132,11 @@ function rewriteLinks(root, fromFile) {
 
 // Shared editor settings. Thunky sources are indented with tabs, displayed
 // four columns wide; Tab inserts a real tab rather than spaces.
+//
+// Binding Tab to indent means Tab no longer moves focus, which on a tutorial
+// page holding dozens of these is a keyboard trap (WCAG 2.1.2). Esc blurs, so
+// there is always a way out with the keyboard alone; the placeholder text under
+// each editor says so.
 const EDITOR_INDENT = {
     indentUnit: 4,
     tabSize: 4,
@@ -131,6 +144,7 @@ const EDITOR_INDENT = {
     extraKeys: {
         Tab: cm => cm.execCommand(cm.somethingSelected() ? "indentMore" : "insertTab"),
         "Shift-Tab": cm => cm.execCommand("indentLess"),
+        Esc: cm => cm.getInputField().blur(),
     },
 };
 
@@ -185,6 +199,10 @@ function buildSnippet(box, opts) {
         lineWrapping: true,
         ...EDITOR_INDENT,
     });
+    editor.getWrapperElement().setAttribute("aria-label",
+        opts.runnable
+            ? "Editable Thunky snippet. Press Escape to leave the editor."
+            : "Thunky code");
 
     if (!opts.runnable) return;
 
@@ -211,6 +229,9 @@ function buildSnippet(box, opts) {
     const output = document.createElement("pre");
     output.className = "snippet-output";
     output.hidden = true;
+    // Output appears without the focus moving, so announce it.
+    output.setAttribute("role", "log");
+    output.setAttribute("aria-live", "polite");
     box.appendChild(output);
 
     runBtn.addEventListener("click", async () => {

@@ -10,22 +10,22 @@ import (
 	"path/filepath"
 	"strings"
 
-	"thunky/internal/backend"
-	"thunky/internal/core"
-	"thunky/internal/source"
-	"thunky/internal/syntax"
-	"thunky/internal/types"
+	"github.com/Castux/thunky/internal/backend"
+	"github.com/Castux/thunky/internal/core"
+	"github.com/Castux/thunky/internal/source"
+	"github.com/Castux/thunky/internal/syntax"
+	"github.com/Castux/thunky/internal/types"
 )
 
 func LoadProgram(path string) *syntax.Program {
 	tokens := syntax.Lex(path)
 	if tokens == nil {
-		os.Exit(1)
+		os.Exit(exitError)
 	}
 
 	prog := syntax.ParseProgram(tokens)
 	if prog == nil {
-		os.Exit(1)
+		os.Exit(exitError)
 	}
 
 	return prog
@@ -61,7 +61,7 @@ func LexModule(name string) []syntax.Token {
 				return syntax.LexContent(path, string(text))
 			}
 			if !errors.Is(err, fs.ErrNotExist) {
-				fmt.Printf("Could not read %s: %v\n", path, err)
+				fmt.Fprintf(os.Stderr, "Could not read %s: %v\n", path, err)
 				return nil
 			}
 		}
@@ -75,7 +75,7 @@ func LexModule(name string) []syntax.Token {
 		}
 	}
 
-	fmt.Printf("Module not found: %s (looked for %s.th/%s.þ in %s, and in the embedded library)\n",
+	fmt.Fprintf(os.Stderr, "Module not found: %s (looked for %s.th/%s.þ in %s, and in the embedded library)\n",
 		name, name, name, strings.Join(moduleDirs, ", "))
 	return nil
 }
@@ -92,13 +92,13 @@ func LoadModules(imports []*syntax.Name) map[string]*syntax.Module {
 		tokens := LexModule(name.Value)
 		if tokens == nil {
 			source.Log("imported here", name.Pos, source.SeverityInfo)
-			os.Exit(1)
+			os.Exit(exitError)
 		}
 
 		module := syntax.ParseModule(tokens)
 		if module == nil {
 			source.Log("imported here", name.Pos, source.SeverityInfo)
-			os.Exit(1)
+			os.Exit(exitError)
 		}
 		module.Name = name.Value
 
@@ -128,9 +128,40 @@ type dumpFlags struct {
 
 func (d dumpFlags) any() bool { return d.ast || d.core || d.bytecode || d.types || d.typesAll }
 
+const usage = `thunky — the Thunky (Þunky) compiler and runtime
+
+Usage:
+  thunky [flags] <path>
+
+Runs the program at <path> on the G-machine. Modules are searched for beside
+the program, then in the working directory (name.th or name.þ), then in the
+standard library embedded in this binary.
+
+Flags:
+  --dump-ast         print the parsed AST and do not run
+  --dump-core        print the lowered Core IR and do not run
+  --dump-bytecode    print the compiled bytecode and do not run
+  --types            print the inferred type of each binding and do not run
+  --types-all        print the inferred type of every expression and do not run
+  --to-file          write each dump to a sibling file (.ast, .ir, .bc, .types,
+                     .types-all) instead of to stdout; only meaningful with a
+                     dump flag
+  --version          print the version and exit
+  --help, -h         print this and exit
+
+The program's own output goes to stdout; diagnostics go to stderr. Exit codes:
+0 success, 1 an error in the program, 2 a bad command line, 70 a bug in the
+compiler.
+
+Documentation: %s#readme
+`
+
 func main() {
+	defer catchInternalError()
+
 	var path string
 	var dump dumpFlags
+	paths := 0
 	for _, arg := range os.Args[1:] {
 		switch {
 		case arg == "--dump-ast":
@@ -145,17 +176,34 @@ func main() {
 			dump.typesAll = true
 		case arg == "--to-file":
 			dump.toFile = true
+		case arg == "--version" || arg == "-v":
+			fmt.Println(versionString())
+			return
+		case arg == "--help" || arg == "-h":
+			fmt.Printf(usage, repoURL)
+			return
 		case len(arg) > 0 && arg[0] == '-':
-			fmt.Printf("Unknown flag: %s\n", arg)
-			os.Exit(1)
+			fmt.Fprintf(os.Stderr, "thunky: unknown flag %s (try --help)\n", arg)
+			os.Exit(exitUsage)
 		default:
 			path = arg
+			paths++
 		}
 	}
 
 	if path == "" {
-		fmt.Println("Usage: thunky [--dump-ast] [--dump-core] [--dump-bytecode] [--types] [--types-all] [--to-file] <path>")
-		os.Exit(1)
+		fmt.Fprintf(os.Stderr, usage, repoURL)
+		os.Exit(exitUsage)
+	}
+	// Silently running the last of several paths is a good way to run the
+	// wrong program.
+	if paths > 1 {
+		fmt.Fprintln(os.Stderr, "thunky: expected one program, got several (try --help)")
+		os.Exit(exitUsage)
+	}
+	if dump.toFile && !dump.any() {
+		fmt.Fprintln(os.Stderr, "thunky: --to-file needs a dump flag to write (try --help)")
+		os.Exit(exitUsage)
 	}
 
 	setModuleDirs(path)
@@ -171,8 +219,8 @@ func main() {
 	if dump.core || dump.bytecode || dump.types || dump.typesAll || !dump.any() {
 		resolution := syntax.Resolve(program, modules)
 		if resolution.Errors > 0 {
-			fmt.Printf("Analyzer found %d errors\n", resolution.Errors)
-			os.Exit(1)
+			fmt.Fprintf(os.Stderr, "Analyzer found %d errors\n", resolution.Errors)
+			os.Exit(exitError)
 		}
 
 		if dump.types || dump.typesAll {
@@ -207,8 +255,8 @@ func main() {
 }
 
 // emitDump writes one stage's textual representation. With --to-file it goes to a
-// sibling file named after the input with the stage's extension (.ast/.ir/.bc);
-// otherwise it is printed to stdout.
+// sibling file named after the input with the stage's extension
+// (.ast/.ir/.bc/.types/.types-all); otherwise it is printed to stdout.
 func emitDump(inputPath, ext, content string, toFile bool) {
 	if !toFile {
 		fmt.Print(content)
@@ -216,8 +264,8 @@ func emitDump(inputPath, ext, content string, toFile bool) {
 	}
 	outPath := strings.TrimSuffix(inputPath, filepath.Ext(inputPath)) + "." + ext
 	if err := os.WriteFile(outPath, []byte(content), 0644); err != nil {
-		fmt.Printf("Could not write %s: %v\n", outPath, err)
-		os.Exit(1)
+		fmt.Fprintf(os.Stderr, "Could not write %s: %v\n", outPath, err)
+		os.Exit(exitError)
 	}
 	fmt.Printf("wrote %s\n", outPath)
 }

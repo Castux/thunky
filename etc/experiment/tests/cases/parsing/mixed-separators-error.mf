@@ -1,3 +1,0 @@
--- A bracket uses ',' (tuple) or ';' (list), never both: mixing is a parse error.
-import core in
-show [1, 2; 3]

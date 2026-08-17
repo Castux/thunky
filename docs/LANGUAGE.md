@@ -27,7 +27,7 @@ constructed type, functions are pure, and evaluation is lazy throughout.
 
 - **A program is an expression.** There are no statements. Running a program
   evaluates its single body expression; output happens only through the
-  side-effecting builtins `peek`, `show`, and `write`.
+  side-effecting builtins `peek`, `show`, `write`, and `bwrite`.
 - **One primitive, one constructor.** The only primitive type is the number; the
   only way to build compound data is the tuple. Lists and strings are not
   separate types — they are conventions built on tuples (see
@@ -58,6 +58,19 @@ prints via `peek`, `show`, `write`, or `bwrite` appears on standard output. A
 lexical, syntactic, or name-resolution error is reported with a located diagnostic
 and the program does not run; a run-time error is reported with a source location
 and a reduction trace.
+
+Diagnostics go to **standard error**, so a program's output can be redirected on
+its own: `thunky prog.þ > out.txt` puts only what the program printed in the
+file. The exit code is `0` on success, `1` for any error in the program (compile
+or run time), `2` for a bad command line, and `70` for a failed assertion inside
+the compiler — that last one is a bug in Thunky and asks to be reported.
+
+`thunky --help` lists the flags, of which the interesting ones are the stage
+dumps (`--dump-ast`, `--dump-core`, `--dump-bytecode`), the type reports
+(`--types`, `--types-all` — the language is dynamic, but the shapes are
+recoverable; see
+[7.Type Analysis](implementation/7.Type%20Analysis.md)), and `--to-file` to
+write any of them beside the program. `thunky --version` reports the build.
 
 **Module search order.** For each import `name`, the runtime looks for
 `name.th` (or `name.þ`) in, in order: the **directory holding the program being
@@ -136,7 +149,8 @@ Source must be UTF-8. Whitespace separates tokens but is otherwise insignificant
 - **Keywords** are reserved and may not be used as identifiers: `let`, `in`,
   `module`, `import`.
 - **Numbers** match `[0-9]+(\.[0-9]+)?`. There is a single numeric type; integer
-  and fractional literals both denote it.
+  and fractional literals both denote it. A literal too large for a 64-bit float
+  is a lexical error.
 - **Strings** are enclosed in matching single quotes `'…'` or double quotes
   `"…"`. A string denotes a list of its Unicode code points (see
   [§11](#11-lists-strings-and-other-sugar)). A string cannot contain its own
@@ -540,10 +554,10 @@ comparison builtins follow the same **threshold-first, value-second** convention
 | `add a b` | 2 | `a + b` | |
 | `mul a b` | 2 | `a * b` | |
 | `sub a b` | 2 | `b - a` | argument order: `sub 1 x = x - 1` |
-| `div a b` | 2 | `b / a` (integer) | truncating integer division |
-| `fdiv a b` | 2 | `b / a` (real) | floating-point division |
-| `mod a b` | 2 | `b mod a` (integer) | `mod 10 x = x mod 10` |
-| `fmod a b` | 2 | `b mod a` (real) | floating-point remainder |
+| `div a b` | 2 | `b / a` (integer) | truncating integer division; `a = 0` is a runtime error |
+| `fdiv a b` | 2 | `b / a` (real) | floating-point division; `a = 0` yields an infinity or a NaN |
+| `mod a b` | 2 | `b mod a` (integer) | `mod 10 x = x mod 10`; `a = 0` is a runtime error |
+| `fmod a b` | 2 | `b mod a` (real) | floating-point remainder; `a = 0` yields a NaN |
 | `pow a b` | 2 | `b ^ a` (real) | `pow 2 x = x²` |
 | `sqrt a` | 1 | `√a` | |
 | `eq a b` | 2 | `1` if `a = b` else `0` | numbers only |
@@ -670,11 +684,17 @@ that run.
 
 Each module can be imported directly when only part of the library is needed.
 
-The tables below list each module's public interface. Thunky has no privacy
-mechanism — every binding in a module is importable — so a few implementation
-helpers are reachable but deliberately undocumented and not covered by any
-stability promise: `heap.rankOf`, `heap.makeNode`, `hashmap.minNode`,
-`hashmap.removeMin`, and `text.parsePositive`.
+The tables below list each module's **public interface**: the bindings that are
+supported and will not change shape without notice.
+
+Thunky has no privacy mechanism — every binding in a module is importable — so
+each module's internals are reachable too. Around sixty bindings are in that
+position, most of them in `big` (its limb arithmetic: `magAdd`, `magDivMod`,
+`normalize`, …) and `json` (its recursive-descent parser: `parseValue`,
+`parseEscape`, …), where the interesting code is naturally written as a stack of
+small helpers. **Anything not in a table below is an implementation detail**:
+usable if you are reading the source anyway, but undocumented, unstable, and
+not something to build on.
 
 ---
 
@@ -691,9 +711,25 @@ stability promise: `heap.rankOf`, `heap.makeNode`, `hashmap.minNode`,
 | `uncurry f` | `uncurry f [x, y] = f x y` |
 | `const c` | constant function: `const c x = c` |
 | `on f g` | apply `g` to two arguments then `f`: `(on f g) x y = f (g x) (g y)` |
+| `ap f g` | apply both to one argument, `f x` consuming `g x`: `(ap f g) x = f x (g x)` |
+| `fork h f g` | apply `f` and `g` to one argument, combine with `h`: `(fork h f g) x = h (f x) (g x)` |
 | `fix f` | fixed-point combinator: `fix f = f (fix f)` |
 | `first [a, b]` | first element of a 2-tuple |
 | `second [a, b]` | second element of a 2-tuple |
+
+`on`, `ap`, and `fork` are the three ways to run a value through inner functions
+before combining the results, and they are what make a pipeline point-free where
+`compose` alone cannot. `on` applies the *same* `g` to *two* arguments — the
+comparator idiom, `sortWith (on lt second)`. `ap` and `fork` apply *two different*
+functions to the *same* argument: `ap` lets `f x` be the combining function, while
+`fork` names the combiner up front, which is usually what you want. They are
+interdefinable — `fork h f g` is `ap (f *> h) g`.
+
+```
+import core, list in
+let mean = fork fdiv length sum in    -- fdiv a b = b / a, so this is sum / length
+show [ap add (mul 2) 5, mean [1; 2; 3; 4]]    -- [15, 2.5]
+```
 
 **Booleans / control flow**
 
@@ -1068,6 +1104,17 @@ in
 show [hashmap.get "x" m; hashmap.getOr 0 "z" m]   -- [[10]; 0]
 ```
 
+**`hashmap` and `table` are not drop-in replacements for one another.** They
+share eleven names with the same meaning (`empty`, `singleton`, `get`, `getOr`,
+`set`, `remove`, `update`, `updateOr`, `keys`, `values`, `fromList`), but:
+
+- The pairs-as-a-list operation is `table.toList` and `hashmap.keyValues`. The
+  names differ because the operations do: a table *is* a list of pairs, so
+  `toList` is the identity, while `keyValues` walks a tree.
+- `containsKey`, `containsValue`, `mapValues`, `filterByKey`, `filterByValue`
+  and `merge` exist only for `table`. On a hashmap, go through `keyValues` and
+  rebuild with `fromList`.
+
 ---
 
 #### `bit` — bitwise operations on 32-bit integers
@@ -1154,11 +1201,11 @@ makes the estimate safe rather than hopeful.
 | `floatToString digits x` | decimal rendering with that many places, truncated |
 
 ```
-import big in
+import big, text in
 [
-  big.intToString (big.intPow (big.intFromNumber 2) 100);
+  big.intToString (big.intPow 100 (big.intFromNumber 2));
   big.floatToString 20 (big.floatSqrt (big.floatFromNumber 200 2))
-] > map write > eval
+] > text.writeList
 ```
 
 ---
@@ -1257,6 +1304,17 @@ The named constants cover the characters that cannot be written literally:
 | `trim s` | remove leading/trailing whitespace |
 | `padLeft n fill s` | left-pad `s` with code point `fill` to minimum width `n` |
 | `padRight n fill s` | right-pad `s` with code point `fill` to minimum width `n` |
+| `format template values` | fill `template` from `values`, left to right: `%s` takes a string, `%v` takes any value and renders it with `string` |
+
+In a `format` template, `%%s` and `%%v` are those two characters literally and any
+other `%` is itself, so `"5% of"` needs no escaping. A placeholder with no value
+left is copied through unchanged and surplus values are ignored. String literals
+may span lines, so a template can be a whole block of text.
+
+```
+import text in
+text.format "%s scored %v out of %v" ["Ada"; 449; 461] > write
+```
 
 **Character classification and conversion**
 
@@ -1324,4 +1382,32 @@ eval < map write [
 ```
 import text in
 show [text.stringToInt "123", text.split "," "one,two,three"]
+```
+
+**Output**
+
+| Name | Description |
+|------|-------------|
+| `render v` | `v` as text: a number becomes its digits, a string passes through unchanged |
+| `writeList l` | print one element of `l` per line, rendering numbers; returns `l` |
+| `tableLines rows` | rows of cells as a list of aligned lines, columns separated by two spaces |
+| `writeTable rows` | print `rows` as an aligned table; returns `rows` |
+
+`writeList` and `writeTable` return their argument, so they sit in a pipeline the
+way `write` and `show` do. `tableLines` is the pure counterpart of `writeTable`,
+for a report assembled before it is printed; `render` is the cell renderer both
+use.
+
+Each row is a list of cells, `[a; b]`. Columns are padded to the widest cell,
+right-aligned when every cell in the column reads as a number and left-aligned
+otherwise; short rows are padded with empty cells. A list meant as data rather
+than as text must be rendered by the caller: `xs > map string > writeList`.
+
+```
+import text in
+text.writeTable [
+  ["word"; "count"];
+  ["the"; 1204];
+  ["extraordinarily"; 5]
+]
 ```

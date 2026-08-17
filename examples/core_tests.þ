@@ -6,13 +6,22 @@ let
 			[flatten ["PASS: "; name; [text.lf;]], 1]
 			[flatten ["FAIL: "; name; " (expected "; string expected; ", got "; string expr; ")"; [text.lf;]], 0],
 
+	-- A pure program has no way to set an exit code, and a suite that always
+	-- exits 0 cannot fail a CI run — the whole point of running it there. So on
+	-- any failure the suite refuses to reduce: applying this lambda to 0 matches
+	-- no case, which is a runtime error and so exit 1. The diagnostic's caret
+	-- lands on the line below, after the FAIL lines have been printed.
+	someAssertionsFailed = { 1 -> 1 },
+
 	runTests = l -> let
 		total = length l,
 		passed = map second l > sum,
 		lines = map first l > flatten,
-		message = flatten [[lf;]; string passed; " passed out of "; string total]
+		message = flatten [[lf;]; string passed; " passed out of "; string total; [lf;]]
 	in
-		write < prepend lines message
+		-- seq forces the report out before the verdict is examined, so the
+		-- PASS/FAIL lines are printed either way.
+		if (eq passed total) 1 (someAssertionsFailed 0) > seq (write < prepend lines message)
 in
 
 runTests [
@@ -34,6 +43,11 @@ runTests [
 	assert "core.not-1" (core.not 1) 0;
 	assert "core.not-0" (core.not 0) 1;
 	assert "core.on" (core.on add (mul 2) 3 4) 14;
+	assert "core.ap" (core.ap add (mul 2) 5) 15;
+	assert "core.ap-string" (core.ap (list.take 1 *> list.append) (list.length *> string) "aaaa") "4a";
+	assert "core.fork" (core.fork add (mul 2) (add 1) 5) 16;
+	assert "core.fork-mean" (core.fork fdiv list.length list.sum [1; 2; 3; 4]) 2.5;
+	assert "core.fork-is-ap" (core.fork add (mul 2) (add 1) 5) (core.ap (mul 2 *> add) (add 1) 5);
 	assert "core.fix" (core.fix (f -> n -> if (eq n 0) 1 (mul n (f (sub 1 n)))) 5) 120;
 	assert "core.case" (core.case false 0 false 1 true 2 false 3 true 4 else 5) 2;
 	assert "core.case-else" (core.case false 0 false 1 false 2 false 3 false 4 else 5) 5;
@@ -497,6 +511,42 @@ runTests [
 	assert "text.words-blank" (words "   ") [];
 	assert "text.unwords" (unwords ["a"; "b"; "c"]) "a b c";
 
+	assert "text.format-s" (text.format "hello %s" ["world";]) "hello world";
+	assert "text.format-v" (text.format "%v + %v" [1; 2.5]) "1 + 2.5";
+	assert "text.format-v-string" (text.format "%v" ["ab";]) "[97; 98]";
+	assert "text.format-mixed" (text.format "%s = %v" ["n"; 42]) "n = 42";
+	assert "text.format-bare-percent" (text.format "5% of %v" [10;]) "5% of 10";
+	assert "text.format-escaped" (text.format "%%s %%v %s" ["x";]) "%s %v x";
+	assert "text.format-starved" (text.format "%s %v" []) "%s %v";
+	assert "text.format-surplus" (text.format "%v" [1; 2; 3]) "1";
+	assert "text.format-no-placeholder" (text.format "plain" [1;]) "plain";
+	assert "text.format-empty" (text.format "" [1;]) "";
+
+	-- Output: render and tableLines are the pure halves of writeList/writeTable.
+	assert "text.render-number" (text.render 42) "42";
+	assert "text.render-float" (text.render 3.5) "3.5";
+	assert "text.render-string" (text.render "abc") "abc";
+	assert "text.render-empty" (text.render "") "";
+	assert "text.tableLines-empty" (text.tableLines []) [];
+	assert "text.tableLines-align"
+		(text.tableLines [["a"; 1]; ["bbb"; 22]; ["cc"; 333]])
+		["a      1"; "bbb   22"; "cc   333"];
+	assert "text.tableLines-text-column-left"
+		(text.tableLines [["x"; "yy"]; ["zzz"; "w"]])
+		["x    yy"; "zzz  w"];
+	assert "text.tableLines-ragged"
+		(text.tableLines [["a"; "b"; "c"]; ["longer";]])
+		["a       b  c"; "longer"];
+	assert "text.tableLines-no-trailing-space"
+		(text.tableLines [["a"; "bb"]; ["cc"; ""]])
+		["a   bb"; "cc"];
+	assert "text.tableLines-single-column"
+		(text.tableLines [["one";]; ["three";]])
+		["one"; "three"];
+	-- The writers return their argument, so they drop into a pipeline.
+	assert "text.writeList-empty" (text.writeList []) [];
+	assert "text.writeTable-empty" (text.writeTable []) [];
+
 	-- big.þ division: checked by the identity a = q*b + r, 0 <= r < b
 	assert "big.intDiv-large" (big.intToString (big.intDiv
 		(big.intFromString "987654321098765432") (big.intFromString "123456789012345678901234567890")))
@@ -524,5 +574,155 @@ runTests [
 	assert "big.intGte" (big.intFromNumber 9 > big.intGte (big.intFromNumber 9)) 1;
 	assert "big.pipe-mod" (big.intToString (big.intFromNumber 100 > big.intMod (big.intFromNumber 7))) "2";
 	assert "big.pipe-sub" (big.intToString (big.intFromNumber 100 > big.intSub (big.intFromNumber 30))) "70";
-	assert "big.pipe-pow" (big.intToString (big.intFromNumber 2 > big.intPow 10)) "1024"
+	assert "big.pipe-pow" (big.intToString (big.intFromNumber 2 > big.intPow 10)) "1024";
+
+	-- Bindings documented in LANGUAGE.md that had no assertion until an API audit
+	-- went looking. All of them worked; none of them were covered.
+
+	-- list ------------------------------------------------------------------
+	assert "list.emptyList" list.emptyList [];
+	assert "list.findIndex-found" (list.findIndex (eq 5) [1; 2; 5; 7]) (maybe.some 2);
+	assert "list.findIndex-missing" (list.findIndex (eq 9) [1; 2]) maybe.none;
+	assert "list.andList-true" (list.andList [1; 1; 1]) 1;
+	assert "list.andList-false" (list.andList [1; 0; 1]) 0;
+	assert "list.andList-empty" (list.andList []) 1;
+	assert "list.orList-true" (list.orList [0; 0; 1]) 1;
+	assert "list.orList-false" (list.orList [0; 0; 0]) 0;
+	assert "list.orList-empty" (list.orList []) 0;
+	assert "list.splitAt" (list.splitAt 2 [1; 2; 3; 4]) [[1; 2], [3; 4]];
+	assert "list.splitAt-zero" (list.splitAt 0 [1; 2]) [[], [1; 2]];
+	assert "list.splitAt-past-end" (list.splitAt 9 [1; 2]) [[1; 2], []];
+	assert "list.splitEqual" (list.splitEqual 2 [1; 2; 3; 4; 5]) [[1; 2]; [3; 4]; [5;]];
+	assert "list.splitEqual-exact" (list.splitEqual 2 [1; 2; 3; 4]) [[1; 2]; [3; 4]];
+	assert "list.spans-count" (length (list.spans [1; 2; 3])) 4;
+	assert "list.spans-first" (head (list.spans [1; 2])) [[], [1; 2]];
+	assert "list.spans-last" (last (list.spans [1; 2])) [[1; 2], []];
+	assert "list.zipWith3" (list.zipWith3 (a -> b -> c -> add a (add b c)) [1; 2] [10; 20] [100; 200]) [111; 222];
+	assert "list.zipWith3-ragged" (list.zipWith3 (a -> b -> c -> add a (add b c)) [1; 2] [10;] [100; 200]) [111;];
+	assert "list.iterate" (list.iterate (mul 2) 1 > take 4) [1; 2; 4; 8];
+	assert "list.downFrom" (list.downFrom 3 > take 3) [3; 2; 1];
+	assert "list.repeat" (list.repeat 7 > take 3) [7; 7; 7];
+	assert "list.cycle" (list.cycle [1; 2] > take 5) [1; 2; 1; 2; 1];
+
+	-- comb ------------------------------------------------------------------
+	assert "comb.subsetsWithRest-count" (length (comb.subsetsWithRest 2 [1; 2; 3])) 3;
+	assert "comb.subsetsWithRest-shape" (head (comb.subsetsWithRest 1 [1; 2])) [[1;], [2;]];
+
+	-- heap ------------------------------------------------------------------
+	assert "heap.popSafe-empty" (heap.popSafe lt heap.emptyHeap) maybe.none;
+	assert "heap.popSafe-some" (heap.popSafe lt (heap.singleton 5) > maybe.value > heap.toList lt) [];
+
+	-- table -----------------------------------------------------------------
+	assert "table.fromList" (table.fromList [[1, 10]; [2, 20]] > table.get 2) (maybe.some 20);
+	assert "table.toList" (table.toList (table.fromList [[1, 10];])) [[1, 10];];
+
+	-- hashmap ---------------------------------------------------------------
+	assert "hashmap.update-present"
+		(hashmap.empty > hashmap.set 1 10 > hashmap.update 1 (add 5) > hashmap.get 1)
+		(maybe.some 15);
+	assert "hashmap.update-missing"
+		(hashmap.empty > hashmap.set 1 10 > hashmap.update 2 (add 5) > hashmap.get 2)
+		maybe.none;
+	assert "hashmap.updateOr-present"
+		(hashmap.empty > hashmap.set 1 10 > hashmap.updateOr 1 (add 5) 99 > hashmap.get 1)
+		(maybe.some 15);
+	assert "hashmap.updateOr-missing"
+		(hashmap.empty > hashmap.updateOr 2 (add 5) 99 > hashmap.get 2)
+		(maybe.some 99);
+
+	-- bit -------------------------------------------------------------------
+	assert "bit.width" bit.width 32;
+	assert "bit.size" bit.size 4294967296;
+	assert "bit.maxValue" bit.maxValue 4294967295;
+	assert "bit.bitAt-low" (bit.bitAt 0 1) 1;
+	assert "bit.bitAt-high" (bit.bitAt 1 1) 0;
+	assert "bit.bitAt-eq-testBit" (bit.bitAt 3 8) (bit.testBit 3 8);
+	assert "bit.flipBit-set" (bit.flipBit 0 0) 1;
+	assert "bit.flipBit-clear" (bit.flipBit 0 1) 0;
+
+	-- text ------------------------------------------------------------------
+	assert "text.isLower-true" (text.isLower (text.char "a")) 1;
+	assert "text.isLower-false" (text.isLower (text.char "A")) 0;
+	assert "text.isUpper-true" (text.isUpper (text.char "Z")) 1;
+	assert "text.isUpper-false" (text.isUpper (text.char "z")) 0;
+	assert "text.isAlpha-letter" (text.isAlpha (text.char "q")) 1;
+	assert "text.isAlpha-digit" (text.isAlpha (text.char "7")) 0;
+	assert "text.isAlphaNum-letter" (text.isAlphaNum (text.char "q")) 1;
+	assert "text.isAlphaNum-digit" (text.isAlphaNum (text.char "7")) 1;
+	assert "text.isAlphaNum-other" (text.isAlphaNum (text.char "-")) 0;
+	assert "text.digitToInt" (text.digitToInt (text.char "5")) 5;
+	assert "text.intToDigit" (text.intToDigit 5) (text.char "5");
+	assert "text.digit-roundtrip" (text.digitToInt (text.intToDigit 3)) 3;
+	assert "text.nul" text.nul 0;
+	assert "text.tab" text.tab 9;
+	assert "text.cr" text.cr 13;
+	assert "text.esc" text.esc 27;
+	assert "text.space" text.space 32;
+	assert "text.dquote" text.dquote 34;
+	assert "text.quote" text.quote 39;
+	assert "text.backslash" text.backslash 92;
+
+	-- json ------------------------------------------------------------------
+	assert "json.typeOf-number" (json.parse "5" > maybe.value > json.typeOf) "number";
+	assert "json.typeOf-object" (json.parse "{}" > maybe.value > json.typeOf) "object";
+	assert "json.jsonNull" (json.stringify json.jsonNull) "null";
+	assert "json.jsonTrue" (json.stringify json.jsonTrue) "true";
+	assert "json.jsonFalse" (json.stringify json.jsonFalse) "false";
+	assert "json.jsonBool" (json.stringify (json.jsonBool 1)) "true";
+	assert "json.jsonNumber" (json.stringify (json.jsonNumber 42)) "42";
+	assert "json.jsonArray" (json.stringify (json.jsonArray [json.jsonNumber 1; json.jsonNumber 2])) "[1,2]";
+	assert "json.jsonObject" (json.stringify (json.jsonObject [["a", json.jsonNumber 1];])) '{"a":1}';
+	assert "json.asNumber" (json.parse "7" > maybe.value > json.asNumber) (maybe.some 7);
+	assert "json.asArray-count"
+		(json.parse "[1,2,3]" > maybe.value > json.asArray > maybe.value > length) 3;
+	assert "json.asArray-wrong-type" (json.parse "7" > maybe.value > json.asArray) maybe.none;
+	assert "json.asObject-count"
+		(json.parse '{"a":1}' > maybe.value > json.asObject > maybe.value > length) 1;
+	assert "json.toTable"
+		(json.parse '{"a":1}' > maybe.value > json.toTable > table.get "a" > maybe.value > json.asNumber)
+		(maybe.some 1);
+	assert "json.stringifyPretty"
+		(json.parse "[1,2]" > maybe.value > json.stringifyPretty 2)
+		(text.unlines ["["; "  1,"; "  2"; "]"] > text.trim);
+
+	-- big: integers ---------------------------------------------------------
+	assert "big.intZero" (big.intToString big.intZero) "0";
+	assert "big.intOne" (big.intToString big.intOne) "1";
+	assert "big.intToNumber" (big.intToNumber (big.intFromNumber 12345)) 12345;
+	assert "big.intNegate" (big.intToString (big.intNegate (big.intFromNumber 7))) "-7";
+	assert "big.intAbs" (big.intToString (big.intAbs (big.intFromNumber 7 > big.intNegate))) "7";
+	assert "big.intSign-pos" (big.intSign (big.intFromNumber 7)) 1;
+	assert "big.intSign-neg" (big.intSign (big.intFromNumber 7 > big.intNegate)) (math.negate 1);
+	assert "big.intSign-zero" (big.intSign big.intZero) 0;
+	assert "big.intIsZero-true" (big.intIsZero big.intZero) 1;
+	assert "big.intIsZero-false" (big.intIsZero big.intOne) 0;
+	assert "big.intMulSmall" (big.intToString (big.intMulSmall 3 (big.intFromNumber 14))) "42";
+	assert "big.intDivMod" (big.intDivMod (big.intFromNumber 7) (big.intFromNumber 30)
+		> (x -> [big.intToString (first x), big.intToString (second x)])) ["4", "2"];
+	assert "big.intGt" (big.intFromNumber 9 > big.intGt (big.intFromNumber 5)) 1;
+	assert "big.intLte" (big.intFromNumber 5 > big.intLte (big.intFromNumber 5)) 1;
+
+	-- big: floats -----------------------------------------------------------
+	assert "big.floatFromInt"
+		(big.floatToString 2 (big.floatFromInt 64 (big.intFromNumber 3))) "3.00";
+	assert "big.floatWithPrecision"
+		(big.floatToString 2 (big.floatWithPrecision 128 (big.floatFromNumber 64 2.5))) "2.50";
+	assert "big.floatSub"
+		(big.floatToString 2 (big.floatSub (big.floatFromNumber 64 1.5) (big.floatFromNumber 64 4))) "2.50";
+	assert "big.floatNegate"
+		(big.floatToString 2 (big.floatNegate (big.floatFromNumber 64 2.5))) "-2.50";
+	assert "big.floatIsZero-true" (big.floatIsZero (big.floatFromNumber 64 0)) 1;
+	assert "big.floatIsZero-false" (big.floatIsZero (big.floatFromNumber 64 1)) 0;
+	assert "big.floatCompare-lt"
+		(big.floatCompare (big.floatFromNumber 64 1) (big.floatFromNumber 64 2)) (math.negate 1);
+	assert "big.floatCompare-eq"
+		(big.floatCompare (big.floatFromNumber 64 2) (big.floatFromNumber 64 2)) 0;
+	assert "big.floatLt" (big.floatFromNumber 64 1 > big.floatLt (big.floatFromNumber 64 2)) 1;
+	assert "big.floatLte" (big.floatFromNumber 64 2 > big.floatLte (big.floatFromNumber 64 2)) 1;
+	assert "big.floatGt" (big.floatFromNumber 64 3 > big.floatGt (big.floatFromNumber 64 2)) 1;
+	assert "big.floatGte" (big.floatFromNumber 64 2 > big.floatGte (big.floatFromNumber 64 2)) 1;
+
+	-- core constants used structurally by core.case --------------------------
+	assert "core.true" (core.case core.true 1 else 0) 1;
+	assert "core.false" (core.case core.false 1 else 0) 0
 ]

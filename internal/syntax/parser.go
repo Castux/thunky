@@ -3,7 +3,7 @@ package syntax
 import (
 	"fmt"
 
-	"thunky/internal/source"
+	"github.com/Castux/thunky/internal/source"
 )
 
 type Parser struct {
@@ -13,7 +13,7 @@ type Parser struct {
 }
 
 func (p *Parser) Is(kind string) bool {
-	if p.Head > len(p.Tokens) {
+	if p.Head >= len(p.Tokens) {
 		return false
 	}
 	return p.Tokens[p.Head].Kind == kind

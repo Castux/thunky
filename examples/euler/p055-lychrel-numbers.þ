@@ -14,7 +14,7 @@ import core, list, math, text, big in
 let
 	reverseDigits = big.intToString *> reverse *> big.intFromString,
 
-	isPalindrome = n -> let s = big.intToString n in equal s (reverse s),
+	isPalindrome = big.intToString *> ap equal reverse,
 
 	-- Lychrel until proven otherwise: fifty additions without a palindrome.
 	isLychrel = start ->

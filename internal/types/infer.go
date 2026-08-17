@@ -3,8 +3,8 @@ package types
 import (
 	"sort"
 
-	"thunky/internal/source"
-	"thunky/internal/syntax"
+	"github.com/Castux/thunky/internal/source"
+	"github.com/Castux/thunky/internal/syntax"
 )
 
 // The inference walk. Every expression gets a type node; every binder — a

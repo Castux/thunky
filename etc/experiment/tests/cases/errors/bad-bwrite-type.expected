@@ -1,3 +1,0 @@
-Hitests/cases/errors/bad-bwrite-type.mf:3:1: bwrite expects a list of numbers, found a non-number element
-bwrite [72; 105; 'z']
-^^^^^^^^^^^^^^^^^^^^^

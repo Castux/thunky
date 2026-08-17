@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"sort"
 
-	"thunky/internal/core"
-	"thunky/internal/source"
-	"thunky/internal/syntax"
-	"thunky/internal/value"
+	"github.com/Castux/thunky/internal/core"
+	"github.com/Castux/thunky/internal/source"
+	"github.com/Castux/thunky/internal/syntax"
+	"github.com/Castux/thunky/internal/value"
 )
 
 // compile.go translates the Core IR (core.go) into the flat bytecode of
@@ -223,6 +223,17 @@ func (c *compiler) compileValue(expr core.Expr) {
 
 	case core.Const:
 		c.emit(PushConst, c.internConst(e.Val))
+
+	case core.Stdin:
+		// Its own opcode rather than a pooled constant: the stream is created on
+		// demand by the machine (and memoised there, so every reference shares
+		// one stream), which keeps a mutable value out of the constant pool and
+		// makes the two streams distinguishable in a disassembly.
+		if e.Bytes {
+			c.emit(PushBstdin, 0)
+		} else {
+			c.emit(PushStdin, 0)
+		}
 
 	case core.Var:
 		c.compileAddr(e.Addr)

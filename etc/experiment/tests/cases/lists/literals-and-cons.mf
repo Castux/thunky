@@ -1,3 +1,0 @@
--- List literals, concat, and a range.
-import core, list in
-show [[1; 2; 3]; concat [1; 2] [3; 4]; range 1 5]

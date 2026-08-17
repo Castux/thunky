@@ -1,3 +1,0 @@
-Htests/cases/errors/bad-bwrite-byte.mf:3:1: bwrite expects a list of numbers, found invalid byte value 256
-bwrite [72; 256]
-^^^^^^^^^^^^^^^^

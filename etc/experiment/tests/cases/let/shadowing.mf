@@ -1,6 +1,0 @@
--- Inner bindings and lambda parameters shadow outer names.
-import core in
-let x = 1 in
-let f = x -> add x 100 in
-let g = y -> let z = mul y 2 in z in
-show [x; f 5; g 5; let x = 99 in x]

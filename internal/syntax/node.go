@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"regexp"
 
-	"thunky/internal/source"
+	"github.com/Castux/thunky/internal/source"
 )
 
 type Node interface {

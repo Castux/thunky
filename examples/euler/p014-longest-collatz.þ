@@ -18,7 +18,7 @@
 -- The table is a hashmap threaded through a strict fold: the lengths of all
 -- smaller starts are always present by the time a start needs them.
 
-import core, list, math, hashmap in
+import core, list, math, hashmap, text in
 
 let
 	limit = 1000000,
@@ -45,8 +45,7 @@ let
 	-- The fold only visits odd starts, and no odd number is a multiple of
 	-- progressEvery — so the milestone is one past it, which is odd.
 	progress = n -> best -> bestLength -> if (eq 1 (mod progressEvery n))
-		(write (flatten ["  at "; string n; ": best so far "; string best;
-			" with "; string bestLength]))
+		(write (format "  at %v: best so far %v with %v" [n; best; bestLength]))
 		[],
 
 	step = [known, best, bestLength] -> n ->

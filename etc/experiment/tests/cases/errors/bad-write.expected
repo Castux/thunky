@@ -1,3 +1,0 @@
-hitests/cases/errors/bad-write.mf:3:1: write expects a list of code points, found a non-number element
-write [104; 105; 'z']
-^^^^^^^^^^^^^^^^^^^^^

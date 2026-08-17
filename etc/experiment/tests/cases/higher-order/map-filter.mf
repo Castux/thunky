@@ -1,4 +1,0 @@
--- Functions as arguments: map and filter with a predicate.
-import core, list, math in
-let inc = add 1 in
-show [map inc (range 1 5); filter even (range 1 10)]

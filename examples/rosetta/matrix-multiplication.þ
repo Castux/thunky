@@ -24,4 +24,4 @@ in
 		render "B" b;
 		render "A x B" (multiply a b);
 		render "A x I" (multiply a (identity 3))
-	] > map write > eval
+	] > writeList

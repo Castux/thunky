@@ -1,3 +1,3 @@
-tests/cases/lexing/unterminated-string-error.þ:3:7: unexpected character '''
+tests/cases/lexing/unterminated-string-error.þ:3:7: unterminated string literal
 write 'hello
       ^

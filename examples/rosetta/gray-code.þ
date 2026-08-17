@@ -9,7 +9,7 @@
 import core, list, math, text, bit in
 
 let
-	encode = n -> bit.bXor n (bit.shiftRight 1 n),
+	encode = ap bit.bXor (bit.shiftRight 1),
 
 	decode = g -> foldl (acc -> shift -> bit.bXor acc (bit.shiftRight shift acc))
 		g [1; 2; 4; 8; 16],
@@ -25,10 +25,10 @@ let
 		"  ("; padLeft 3 space (string g); ")  decoded "; string (decode g)
 	],
 
-	roundTrips = rangeIncl 0 1000 > allMatch (n -> eq n (decode (encode n)))
+	roundTrips = rangeIncl 0 1000 > allMatch (ap eq (encode *> decode))
 in
 	flatten [
 		["  n  binary   gray        decoded";];
 		rangeIncl 0 15 > map row;
-		[flatten ["round trip holds for 0..1000: "; string roundTrips];]
-	] > map write > eval
+		[format "round trip holds for 0..1000: %v" [roundTrips;];]
+	] > writeList

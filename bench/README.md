@@ -1,17 +1,17 @@
 # Thunky — performance benchmarks
 
 A small set of heavy programs used to measure the Thunky engine: the flat
-bytecode ([5.Bytecode and Compiler](../docs/5.Bytecode%20and%20Compiler.md)) run
+bytecode ([5.Bytecode and Compiler](../docs/implementation/5.Bytecode%20and%20Compiler.md)) run
 by the spineless-tagless G-machine
-([6.The G-machine](../docs/6.The%20G-machine.md)). Thunky has a **single
+([6.The G-machine](../docs/implementation/6.The%20G-machine.md)). Thunky has a **single
 execution engine**, so there is no cross-backend comparison — the headline number
 is wall-clock per case.
 
 These are **not** regression tests. The correctness suite lives in
-[tests/](../tests/) (fast, byte-exact, differential + golden) and the in-language
-standard-library unit tests in [examples/core_tests.þ](../examples/core_tests.þ).
-The programs here are deliberately slow — each runs roughly **10–30 s** — so they
-are run by hand, not in CI.
+[tests/](../tests/) (fast, byte-exact goldens) and the in-language
+standard-library unit tests in [examples/core_tests.þ](../examples/core_tests.þ);
+both run in CI. The programs here are deliberately slow — each runs roughly
+**10–30 s** — so they are run by hand.
 
 ## Running
 
@@ -39,7 +39,7 @@ Timings are wall-clock; close other load for stable numbers, and prefer
 ## What each case stresses
 
 Each program isolates a particular runtime cost. Several are **sentinels** for the
-optimizations proposed in [IMPROVEMENTS.md](../docs/IMPROVEMENTS.md): their
+optimizations proposed in [IMPROVEMENTS.md](../docs/implementation/IMPROVEMENTS.md): their
 absolute time (or, with an oracle, their ratio) is the number to watch when that
 work lands.
 
@@ -48,9 +48,9 @@ work lands.
 | `fib` | common algorithm | raw β-reduction + number-pattern dispatch; touches no module, so the cleanest test of closure application and matching |
 | `ackermann` | common algorithm | very deep non-tail recursion; the closure-apply path and reducer spine |
 | `collatz` | common algorithm | integer-arithmetic builtins + user-driven conditionals + per-number recursion |
-| `sort` | common algorithm | compound-data allocation (quicksort cons churn), comparison closures, and cross-module references (now resolved to direct slot indexes, not a name lookup — see [5.Bytecode and Compiler §Module and program layout](../docs/5.Bytecode%20and%20Compiler.md#module-and-program-layout)) |
-| `list-churn` | **sentinel** | per-activation graph allocation — the dominant cost the eager-evaluation / frame-reuse work ([IMPROVEMENTS.md §1, §5](../docs/IMPROVEMENTS.md)) would cut |
-| `match-dispatch` | **sentinel** | matcher worst case — 19 literal clauses failing before a catch-all ([IMPROVEMENTS.md §5, fail-fast matcher](../docs/IMPROVEMENTS.md)) |
+| `sort` | common algorithm | compound-data allocation (quicksort cons churn), comparison closures, and cross-module references (now resolved to direct slot indexes, not a name lookup — see [5.Bytecode and Compiler §Module and program layout](../docs/implementation/5.Bytecode%20and%20Compiler.md#module-and-program-layout)) |
+| `list-churn` | **sentinel** | per-activation graph allocation — the dominant cost the eager-evaluation / frame-reuse work ([IMPROVEMENTS.md §1, §5](../docs/implementation/IMPROVEMENTS.md)) would cut |
+| `match-dispatch` | **sentinel** | matcher worst case — 19 literal clauses failing before a catch-all ([IMPROVEMENTS.md §5, fail-fast matcher](../docs/implementation/IMPROVEMENTS.md)) |
 
 ## Sizing
 

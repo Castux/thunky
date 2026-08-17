@@ -1,3 +1,0 @@
--- text.join and text.toString.
-import core, list, text in
-write (join '-' [toString 1; toString 2; toString 3])

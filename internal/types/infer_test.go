@@ -3,8 +3,8 @@ package types_test
 import (
 	"testing"
 
-	"thunky/internal/syntax"
-	"thunky/internal/types"
+	"github.com/Castux/thunky/internal/syntax"
+	"github.com/Castux/thunky/internal/types"
 )
 
 // analyze runs the whole front end over one source string and returns the

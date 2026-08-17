@@ -25,9 +25,9 @@ import core, list, math, text, hashmap in
 let
 	-- The store: fresh cells, read and write. state = [nextId, cells].
 	-- Named newCell/readCell/writeCell rather than the obvious new/read/write:
-	-- a binding called `write` shadows the output builtin, and the first
-	-- version of this file did exactly that — `map write` at the end then
-	-- mapped the store function over the report and printed nothing at all.
+	-- a binding called `write` shadows the output builtin for every other
+	-- binding in the file, so anything printing through it would reach the
+	-- store function instead and produce no output at all.
 	newCell   = value -> [nextId, cells] ->
 		[nextId, [succ nextId, hashmap.set nextId value cells]],
 	readCell  = id -> [nextId, cells] -> hashmap.getOr 0 id cells,
@@ -66,6 +66,5 @@ in
 	rangeIncl 0 10
 	> map (k -> let got = manOrBoy k in flatten [
 		"k = "; padLeft 2 space (string k); " -> "; padLeft 4 space (string got);
-		if (eq got (nth k expected)) "" (flatten ["  EXPECTED "; string (nth k expected)])])
-	> map write
-	> eval
+		if (eq got (nth k expected)) "" (format "  EXPECTED %v" [nth k expected;])])
+	> writeList

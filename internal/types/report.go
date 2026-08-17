@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"thunky/internal/source"
+	"github.com/Castux/thunky/internal/source"
 )
 
 // Report renders the inferred types: one line per module binding, then the

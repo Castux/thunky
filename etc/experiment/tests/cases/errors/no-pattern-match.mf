@@ -1,4 +1,0 @@
--- Non-exhaustive match raises a located runtime error.
-import core in
-let f = { 1 -> 10, 2 -> 20 } in
-f 3 > eval

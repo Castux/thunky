@@ -1,3 +1,0 @@
--- Empty standard input is the empty list.
-import core, list in
-stdin > show

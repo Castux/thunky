@@ -6,9 +6,13 @@
 
 importScripts("wasm_exec.js");
 
+// The compiled module normally arrives with the run, already compiled by the
+// main thread and shared across every worker this page spawns (see runner.js).
+// The fallback is for a host that drives the worker directly.
 let modulePromise = null;
 
-function getModule() {
+function getModule(supplied) {
+    if (supplied) return Promise.resolve(supplied);
     if (!modulePromise) {
         modulePromise = fetch("thunky.wasm").then(resp => {
             if (!resp.ok) throw new Error("could not fetch thunky.wasm (" + resp.status + ")");
@@ -77,7 +81,7 @@ class ExitSignal extends Error {
 }
 
 onmessage = async event => {
-    const { id, source, path, stdin, dump, modules } = event.data;
+    const { id, module: suppliedModule, source, path, stdin, dump, modules } = event.data;
 
     // An uncaught async throw from inside the Go runtime would otherwise reach
     // worker.onerror as an unlabelled "worker error"; claim it for this run.
@@ -89,7 +93,7 @@ onmessage = async event => {
 
     let exitCode = 0;
     try {
-        const module = await getModule();
+        const module = await getModule(suppliedModule);
 
         stdinBytes = new TextEncoder().encode(stdin || "");
         stdinPos = 0;

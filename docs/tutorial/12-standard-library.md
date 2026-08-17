@@ -46,6 +46,28 @@ in
 - `const c x = c` — ignores its second argument.
 - `on f g x y = f (g x) (g y)` — applies `g` to both arguments before comparing with `f`.
 
+### `ap` and `fork`
+
+`on` runs *one* function over *two* arguments. `ap` and `fork` do the opposite: they
+run *two* functions over the *same* argument and combine the results.
+
+```
+import core, list in
+let mean = core.fork fdiv list.length list.sum in
+show [
+  core.ap add (mul 2) 5,    -- add 5 (mul 2 5) = 15
+  mean [1; 2; 3; 4]         -- fdiv (length xs) (sum xs) = 10 / 4 = 2.5
+]
+```
+
+- `fork h f g x = h (f x) (g x)` — apply `f` and `g` to `x`, combine with `h`.
+- `ap f g x = f x (g x)` — the same, except `f x` *is* the combining function.
+
+These two are the reason a pipeline can stay point-free when a value has to be
+used twice, which `compose`, `flip` and `const` cannot manage on their own.
+[Chapter 13](13-point-free-style.md) is about when that is worth doing — and, at
+least as often, when it is not.
+
 ### Conditionals
 
 ```
@@ -342,6 +364,93 @@ show [
 ]
 ```
 
+### Building a message with `format`
+
+Assembling a line out of `flatten` and `string` gets noisy as soon as there is
+more than one value in it. `format` takes a template instead: `%s` inserts a
+value that is already a string, `%v` inserts any value rendered with `string`.
+
+```
+import text in
+text.format "%s scored %v out of %v" ["Ada"; 449; 461] > write
+```
+
+Output:
+
+```text
+Ada scored 449 out of 461
+```
+
+Any `%` that does not begin `%s` or `%v` is an ordinary character, so `"5% of"`
+needs nothing special; write `%%s` or `%%v` for those two characters literally.
+Since string literals may span lines, one template can hold a whole block:
+
+```
+import text in
+text.format "sample:  %s
+%v characters, %v distinct" ["abracadabra"; 11; 5] > write
+```
+
+Output:
+
+```text
+sample:  abracadabra
+11 characters, 5 distinct
+```
+
+### Printing lists and tables
+
+A program that ends by printing several lines does not need to write them one at
+a time. `writeList` prints one element per line, turning numbers into digits and
+leaving strings alone:
+
+```
+import text in
+text.writeList ["first"; "second"; 42]
+```
+
+Output:
+
+```text
+first
+second
+42
+```
+
+`writeTable` does the same for rows of cells, sizing each column to its widest
+entry. Columns that hold only numbers are right-aligned:
+
+```
+import text in
+text.writeTable [
+  ["word"; "count"];
+  ["the"; 1204];
+  ["quick"; 37];
+  ["extraordinarily"; 5]
+]
+```
+
+Output:
+
+```text
+word             count
+the              1204
+quick            37
+extraordinarily  5
+```
+
+Each row is a list of cells, written with semicolons — `["the"; 1204]`. As
+Chapter 4 describes, `["x", "y"]` is the same value as the list `["x"; 121]`,
+so the separator is what selects a row of two cells.
+
+A column is right-aligned when every cell in it reads as a number. `"count"` is
+text, so that column is left-aligned here; a table without the header row would
+line its counts up on the units digit.
+
+Both functions return their argument, so they fit in a pipeline. `text.tableLines`
+is the pure counterpart of `writeTable`, returning the lines instead of printing
+them, for a report assembled before it is written.
+
 ### Character classification
 
 ```
@@ -538,11 +647,70 @@ Use `sortAsc` / `sortDesc` when you just want a sorted list without thinking abo
 
 ---
 
+## `bit`, `big`, `json` — the three specialist modules
+
+The remaining three modules solve one problem each, and are worth knowing exist
+even before you need them. All three are written in Thunky, with no builtin
+added for any of them — which is the point: `bit` and `big` in particular are
+built entirely out of the ordinary float64 arithmetic of Chapter 2.
+
+**`bit`** — bitwise operations on 32-bit integers, for hashing, checksums, and
+anything that thinks in words. Chapter 13 uses it without introduction; this is
+that introduction.
+
+```
+import bit, text in
+[
+  string (bit.bAnd 12 10);      -- 8, from 1100 & 1010
+  string (bit.bXor 12 10);      -- 6
+  string (bit.shiftLeft 3 1);   -- 8; threshold-first, so this shifts 1 by 3
+  string (bit.popCount 255);    -- 8
+  bit.toHex 48879               -- 0000beef
+] > text.writeList
+```
+
+**`big`** — arbitrary-precision integers and floats, for when 2⁵³ is not enough.
+Values are opaque: build them with `intFromNumber` / `intFromString`, combine
+them with `intAdd` and friends, and read them back with `intToString`.
+
+```
+import big in
+big.intPow 100 (big.intFromNumber 2) > big.intToString > write
+```
+
+That is 2¹⁰⁰ exactly, all thirty-one digits of it. `big` also carries floats at
+a chosen precision — `floatSqrt`, `floatDiv`, `floatToString` — which is how the
+Project Euler solutions that need a thousand digits of a square root get them.
+
+**`json`** — a parser and printer. A parsed value is a tagged 2-tuple —
+`["number", n]`, `["object", pairs]`, and so on — so a JSON document is ordinary
+Thunky data you can pattern-match on. `get`, `at` and `path` reach into it
+without unpacking the tags by hand. Both `parse` and the accessors return
+maybe values, since either can fail, which is why `maybe.value` appears twice
+here.
+
+```
+import json, maybe, text in
+let doc = json.parse '{"name": "Ada", "scores": [7, 9, 8]}' > maybe.value in
+[
+  json.path ["name";] doc > maybe.value > json.stringify;      -- "Ada"
+  json.path ["scores"; 1] doc > maybe.value > json.stringify   -- 9
+] > text.unlines > write
+```
+
+Note the single quotes around the document: Thunky strings have no escape
+sequences, so a string holding double quotes is written with single ones.
+
+The full interface of all three is in
+[the language reference](../LANGUAGE.md#14-standard-library).
+
+---
+
 ## Summary
 
 | Module | What it provides |
 |--------|-----------------|
-| `core` | `id`, `flip`, `compose`, `const`, `on`, `if`, `case`, `and`, `or`, `not`, `curry`, `uncurry`, `fix` |
+| `core` | `id`, `flip`, `compose`, `const`, `on`, `ap`, `fork`, `if`, `case`, `and`, `or`, `not`, `curry`, `uncurry`, `fix` |
 | `math` | `succ`, `pred`, `abs`, `max`, `min`, `clamp`, `even`, `odd`, `gcd`, `factorial`, `digits`, rounding |
 | `maybe` | Optional values: `none`, `some`, `fmap`, `andThen`, `default`, `value`, `orElse` |
 | `list` | Complete list library: construction, higher-order, folding, slicing, sorting, infinite lists |
@@ -551,6 +719,9 @@ Use `sortAsc` / `sortDesc` when you just want a sorted list without thinking abo
 | `hashmap` | Hash maps (O(log n)): `get`, `set`, `remove`, `update`, `updateOr`, `keys`, `values`, `keyValues` |
 | `comb` | `choose`, `permutations`, `crossPairs`, `subsets` |
 | `heap` | Priority queues: `insert`, `top`, `pop`, `sortAsc`, `sortDesc` |
+| `bit` | 32-bit bitwise operations: `bAnd`, `bOr`, `bXor`, `shiftLeft`, `popCount`, `toHex` |
+| `big` | Arbitrary precision: `intFromString`, `intAdd`, `intPow`, `intToString`, `floatSqrt` |
+| `json` | `parse`, `stringify`, `get`, `at`, `path` over tagged 2-tuples |
 
 ---
 

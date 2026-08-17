@@ -30,7 +30,7 @@ let
 	report = target -> flatten [
 		"search "; padLeft 4 space (string target); " -> ";
 		search target sorted > maybe.mapDefault "not found" (i ->
-			flatten ["index "; string i])
+			format "index %v" [i;])
 	]
 in
-	[3; 60; 120; 61] > map report > map write > eval
+	[3; 60; 120; 61] > map report > writeList

@@ -1,4 +1,0 @@
--- List transforms.
-import core, list in
-let inc = add 1 in
-show [map inc [1; 2; 3]; filter (lt 2) [1; 2; 3; 4; 5]; concat [1; 2] [3; 4]]

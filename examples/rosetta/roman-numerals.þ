@@ -34,5 +34,4 @@ in
 	> map (n -> let roman = encode n in
 		flatten [padLeft 4 space (string n); " -> "; padRight 16 space roman;
 			"-> "; string (decode roman)])
-	> map write
-	> eval
+	> writeList

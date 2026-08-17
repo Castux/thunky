@@ -34,5 +34,4 @@ in
 	pairs
 	> map ([a, b] -> flatten [
 		padRight 14 space a; padRight 16 space b; string (distance a b)])
-	> map write
-	> eval
+	> writeList

@@ -1,4 +1,0 @@
--- Forward pipe: a > f applies f to a.
-import core, list in
-let inc = add 1, dbl = mul 2 in
-show [5 > inc > dbl; [1; 2; 3] > map inc > sum]

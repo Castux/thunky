@@ -21,7 +21,7 @@ is lazy throughout.
   a lambda with multiple cases `{ pat -> body, … }` is the primary control-flow
   construct.
 - **Purity** — no mutable state, no implicit effects; output is produced only
-  via the `show`, `write`, and `peek` builtins.
+  via the `show`, `write`, `bwrite`, and `peek` builtins.
 - **Four operators** — `>` (pipe), `<` (reverse-pipe), `*>` and `<*` (forward
   and backward composition) — cover the common function-chaining idioms.
 - **Standard library in Thunky** — `core`, `list`, `math`, `text`, `maybe`,
@@ -33,6 +33,25 @@ is lazy throughout.
 
 For the full language reference see [docs/LANGUAGE.md](docs/LANGUAGE.md).
 
+## Installing
+
+Prebuilt binaries for Linux, macOS and Windows (amd64 and arm64) are attached
+to every [release](https://github.com/Castux/thunky/releases). Each archive
+holds a single `thunky` executable with the standard library embedded in it;
+there is nothing else to install.
+
+With a Go toolchain (1.25 or newer), building it yourself is one line:
+
+```sh
+go install github.com/Castux/thunky@latest     # installs `thunky` into $GOBIN
+```
+
+Or from a clone:
+
+```sh
+go build -o thunky .
+```
+
 ## Usage
 
 ```sh
@@ -43,7 +62,9 @@ Runs the program at `<path>` on the G-machine. Modules are searched for first
 beside the program, then in the current directory (`name.th` or `name.þ`), then
 in the embedded standard library — so a program can be shipped with its helper
 modules and run by path from anywhere. Errors are reported with source
-locations; runtime errors include a reduction trace.
+locations on standard error; runtime errors include a reduction trace. Only what
+the program itself prints goes to standard output, so `thunky prog.þ > out.txt`
+captures the program's output alone.
 
 To inspect the compiler's intermediate forms instead of running the program, pass
 one or more dump flags:
@@ -61,6 +82,10 @@ Any dump flag emits the requested stage(s) to stdout and skips execution. Add
 `.types`, `.types-all`).
 See [docs/implementation/0.Overview.md](docs/implementation/0.Overview.md#inspecting-the-stages) for the format.
 
+`thunky --help` lists every flag; `thunky --version` reports the build. The
+exit code is `0` on success, `1` for an error in the program, `2` for a bad
+command line, and `70` for a bug in the compiler.
+
 ## Example
 
 The program below demonstrates imports, recursive and mutually-visible `let`
@@ -74,7 +99,7 @@ let
 
   -- Primality test: n is prime when no divisor exists in [2, sqrt n]
   divides = d -> n -> eq 0 (mod n d),
-  isPrime = n -> range 2 (floor (sqrt n)) > noneMatch (divides n) > and (gte 2 n),
+  isPrime = n -> rangeIncl 2 (floor (sqrt n)) > noneMatch (divides n) > and (gte 2 n),
   primes  = upFrom 2 > filter isPrime,    -- lazy infinite stream of primes
 
   -- Fibonacci as a self-referential lazy stream (laziness makes this safe)
@@ -83,7 +108,7 @@ let
   -- Insertion sort: lambda with cases for structural dispatch, foldr to build result
   insert = x -> {
     []     -> [x;],
-    [h, t] -> if (lte h x) [h, insert x t] [x, [h, t]]
+    [h, t] -> if (lte h x) [x, [h, t]] [h, insert x t]
   },
   isort = foldr insert []
 
@@ -113,18 +138,20 @@ Key things illustrated:
 
 | Document | Contents |
 |----------|----------|
-| [docs/tutorial/](docs/tutorial/README.md) | Hands-on tutorial: 14 chapters from first program to a complete build, with exercises |
+| [docs/tutorial/](docs/tutorial/README.md) | Hands-on tutorial: 15 chapters from first program to a complete build, with exercises |
 | [docs/LANGUAGE.md](docs/LANGUAGE.md) | Full language reference: grammar, types, operators, builtins, standard library |
 | [docs/implementation/](docs/implementation/0.Overview.md) | How the compiler works, stage by stage: lexer, parser, resolver, Core IR, bytecode, G-machine |
-| [docs/implementation/IMPROVEMENTS.md](docs/implementation/IMPROVEMENTS.md) | Proposals for future optimization |
+| [docs/implementation/IMPROVEMENTS.md](docs/implementation/IMPROVEMENTS.md) | Optimization worklog: what was proposed, tried, measured, and rejected |
+| [CHANGELOG.md](CHANGELOG.md) | What changed between releases |
 
 ## Try it in the browser
 
 The compiler and runtime also build to WebAssembly (`main_wasm.go`), powering a
 static documentation site with a playground: every Thunky code snippet in the
-language reference and tutorial is editable and runnable in place, and the
-playground offers a full editor with example programs, stdin, stage dumps
-(AST / Core IR / bytecode), and shareable URLs.
+language reference and tutorial is editable, and every one that is a whole
+program is runnable in place (fragments are editable but have no Run button).
+The playground itself offers a full editor with example programs, stdin, stage
+dumps (AST / Core IR / bytecode), and shareable URLs.
 
 Its example picker carries everything in `examples/`, including all of
 [Project Euler](examples/euler/README.md) and
@@ -139,19 +166,38 @@ setup on the GitHub repository:
 
 1. **Settings → Pages → Build and deployment → Source: "GitHub Actions"**
    (not "Deploy from a branch").
-2. The workflow deploys on pushes to `v1` (the current main development
-   branch); adjust the `branches:` trigger if that changes. The *Run workflow*
-   button (workflow_dispatch) deploys manually from any state.
+2. The workflow deploys on pushes to `master`; adjust the `branches:` trigger
+   if that changes. The *Run workflow* button (workflow_dispatch) deploys
+   manually from any state.
 
-The workflow builds the wasm binary with the pinned Go version, assembles the
-site, smoke-tests the wasm build under Node against `examples/core_tests.þ`,
-and publishes. To build and preview locally:
+The workflow runs `go vet` and the golden suite, builds the wasm binary with the
+pinned Go version, assembles the site, smoke-tests the wasm build under Node
+against `examples/core_tests.þ`, and publishes — so a red test suite does not
+deploy. To build and preview locally:
 
 ```sh
 web/build.sh            # assembles the site (incl. the wasm build) into _site/
 python -m http.server -d _site
 node web/smoke.mjs _site examples/core_tests.þ   # headless check of the wasm build
+node web/page-smoke.mjs _site                    # headless check of the pages themselves
 ```
+
+The two smoke tests cover different things: `smoke.mjs` runs a Thunky program
+through the wasm binary under Node, while `page-smoke.mjs` drives a headless
+Chrome over the DevTools protocol and checks that the documentation renders, a
+snippet runs, the playground runs, and a share link round-trips its program and
+its standard input. Both run in CI, and neither needs anything installed.
+
+## Contributing
+
+Thunky is a learning project — built to explore compiler construction, not to be
+depended on. Issues and pull requests are welcome all the same; expect replies
+to be leisurely.
+
+If you change the compiler, `tests/run.sh` (or `tests/run.ps1` on Windows) must
+stay green and `examples/core_tests.þ` must exit 0. Both run in CI, along with
+`go vet`, the documentation snippet checker, and the two site smoke tests. A deliberate change to output
+means re-blessing the golden files — review that diff before committing it.
 
 ## License
 

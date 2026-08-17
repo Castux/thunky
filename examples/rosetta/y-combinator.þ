@@ -29,9 +29,9 @@ let
 	factorialFix = core.fix factorialStep
 in
 	[
-		flatten ["Y factorial 0..10:  "; rangeIncl 0 10 > map factorial > string];
-		flatten ["Y fibonacci 0..10:  "; rangeIncl 0 10 > map fibonacci > string];
-		flatten ["fix factorial 0..10: "; rangeIncl 0 10 > map factorialFix > string];
-		flatten ["Y and fix agree:    "; string (rangeIncl 0 12
-			> allMatch (n -> eq (factorial n) (factorialFix n)))]
-	] > map write > eval
+		format "Y factorial 0..10:  %v" [rangeIncl 0 10 > map factorial;];
+		format "Y fibonacci 0..10:  %v" [rangeIncl 0 10 > map fibonacci;];
+		format "fix factorial 0..10: %v" [rangeIncl 0 10 > map factorialFix;];
+		format "Y and fix agree:    %v"
+			[rangeIncl 0 12 > allMatch (fork eq factorial factorialFix);]
+	] > writeList

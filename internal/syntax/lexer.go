@@ -6,8 +6,9 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
-	"thunky/internal/source"
+	"github.com/Castux/thunky/internal/source"
 )
 
 var (
@@ -27,10 +28,12 @@ type Token struct {
 	Pos   source.SourcePos
 }
 
+// Number returns a number token's value. LexContent validates every literal it
+// admits, so this cannot fail on a token the lexer produced.
 func (t Token) Number() float64 {
 	v, err := strconv.ParseFloat(t.Value, 64)
 	if err != nil {
-		panic("Could not parse float: " + t.Value)
+		panic("Token.Number: not a valid number literal: " + t.Value)
 	}
 	return v
 }
@@ -51,7 +54,7 @@ var symbols = []string{
 func Lex(path string) []Token {
 	text, err := os.ReadFile(path)
 	if err != nil {
-		fmt.Printf("Could not read file: %s\n", path)
+		fmt.Fprintf(os.Stderr, "Could not read file: %s\n", path)
 		return nil
 	}
 	return LexContent(path, string(text))
@@ -123,6 +126,18 @@ lexLoop:
 		// 6. Number literals
 		if match := reNumber.FindString(src[head:]); len(match) > 0 {
 			pos := source.SourcePos{File: file, Start: head, Length: len(match)}
+
+			// The literal is well-formed by construction (reNumber admits only
+			// digits and one dot), so the only way ParseFloat can fail is
+			// ErrRange — a literal too large for a float64. Catch it here, where
+			// there is a position to report: Token.Number() has none, and its
+			// assertion panic is not the parser's "expect" sentinel, so
+			// Recover() would re-raise it as a Go stack dump.
+			if _, err := strconv.ParseFloat(match, 64); err != nil {
+				source.Log("number literal out of range for a 64-bit float", pos, source.SeverityError)
+				return nil
+			}
+
 			token := Token{Kind: "number", Value: match, Pos: pos}
 
 			tokens = append(tokens, token)
@@ -130,9 +145,23 @@ lexLoop:
 			continue lexLoop
 		}
 
-		// 7. Fail state (unexpected character)
-		pos := source.SourcePos{File: file, Start: head, Length: 1}
-		source.Log(fmt.Sprintf("unexpected character '%s'", src[head:head+1]), pos, source.SeverityError)
+		// 7. Fail state. A quote here means reString found no closing one:
+		// naming that beats reporting the quote as an unexpected character.
+		if c := src[head]; c == '\'' || c == '"' {
+			pos := source.SourcePos{File: file, Start: head, Length: 1}
+			source.Log("unterminated string literal", pos, source.SeverityError)
+			return nil
+		}
+
+		// Report the offending character as a whole rune: slicing one byte
+		// would cut a multi-byte character into mojibake.
+		r, size := utf8.DecodeRuneInString(src[head:])
+		pos := source.SourcePos{File: file, Start: head, Length: size}
+		if r == utf8.RuneError && size == 1 {
+			source.Log(fmt.Sprintf("invalid UTF-8 byte 0x%02x", src[head]), pos, source.SeverityError)
+		} else {
+			source.Log(fmt.Sprintf("unexpected character '%c'", r), pos, source.SeverityError)
+		}
 		return nil
 	}
 

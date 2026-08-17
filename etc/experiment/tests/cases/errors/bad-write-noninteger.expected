@@ -1,3 +1,0 @@
-Atests/cases/errors/bad-write-noninteger.mf:3:1: write expects a list of code points, found invalid code point 66.5
-write [65; 66.5]
-^^^^^^^^^^^^^^^^

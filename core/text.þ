@@ -91,6 +91,28 @@ in
 -- trim s: remove leading and trailing whitespace from string s
 trim = s -> dropWhile isSpace (reverse (dropWhile isSpace (reverse s))),
 
+-- format template values: fill a template from a list of values, left to right.
+-- `%s` takes a value that is already a string; `%v` takes any value and renders
+-- it with `string`. `%%s` and `%%v` are those two characters literally, and any
+-- other `%` is itself, so "5% of" needs no escaping. A placeholder with no value
+-- left is copied through unchanged, and values past the last placeholder are
+-- ignored. String literals may span lines, so a template can be a whole block.
+format = template -> values -> template > {
+	[] -> [],
+	[c, rest] -> core.case
+		(startsWith "%%s" template) (prepend "%s" (format (drop 3 template) values))
+		(startsWith "%%v" template) (prepend "%v" (format (drop 3 template) values))
+		(startsWith "%s" template) (values > {
+			[]     -> prepend "%s" (format (drop 2 template) []),
+			[v, t] -> prepend v (format (drop 2 template) t)
+		})
+		(startsWith "%v" template) (values > {
+			[]     -> prepend "%v" (format (drop 2 template) []),
+			[v, t] -> prepend (string v) (format (drop 2 template) t)
+		})
+		core.else (prepend [c;] (format rest values))
+},
+
 -- Character classification — all functions take a Unicode code point (integer)
 
 isDigit    = c -> and (lte c (char '0')) (lte (char '9') c), -- 1 if c is a digit
@@ -220,4 +242,60 @@ ltString = a -> b -> [a, b] > {
 gtString = a -> b -> ltString b a,
 
 -- sortStrings l: the strings of l in ascending lexicographic order.
-sortStrings = sortWith ltString
+sortStrings = sortWith ltString,
+
+-- Output ---------------------------------------------------------------------
+--
+-- A number and a string are distinguishable — a string is a cons cell, a number
+-- is not — so these render each cell without being told which it is. What is
+-- *not* distinguishable is a string from any other list of numbers: `[104; 105]`
+-- is both "hi" and a two-element list. A list meant as data, not as text, has to
+-- be rendered by the caller: `xs > map string > writeList`.
+
+-- render v: v as text. A number becomes its digits; a string is already text and
+-- passes through untouched. Any other list is treated as text, which is the one
+-- case the caller has to disambiguate.
+render = v -> v > {
+	[]     -> [],       -- the empty string, not the value "[]"
+	[h, t] -> v,        -- a cons cell: already a list of code points
+	n      -> string n  -- a number: render it
+},
+
+-- writeList l: print one element of l per line, rendering numbers. Returns l, so
+-- it drops into a pipeline. This is `map write > eval` without the `eval`: one
+-- write instead of one per element, and no forcing hack to make the effects run.
+writeList = {
+	[] -> [],
+	l  -> seq (l > map render > unlines > write) l
+},
+
+-- numericColumn cells: 1 when every cell is a number's rendering, so the column
+-- should be right-aligned. Digits, at most one leading '-', and dots for floats.
+numericColumn = allMatch (c -> let digits = c > dropWhile (eq (char '-')) in
+	and (isEmpty digits > not) (digits > allMatch (d -> or (isDigit d) (eq (char '.') d)))),
+
+-- tableLines rows: rows of cells as a list of aligned lines, columns separated by
+-- two spaces. Every row is a *list* of cells — `[a; b]`, not `[a, b]`, which for
+-- two strings would be the same value as a two-element list and split wrongly.
+-- Short rows are padded with empty cells; columns of numbers are right-aligned;
+-- no line carries trailing spaces.
+tableLines = {
+	[]   -> [],
+	rows -> let
+		grid    = rows > map (map render),
+		columns = grid > map length > maximum,
+		square  = grid > map (r -> append (replicate (sub (length r) columns) []) r),
+		cells   = transpose square,
+		specs   = zip (cells > map (map length *> maximum)) (cells > map numericColumn),
+		pad     = [width, numeric] -> c -> if numeric (padLeft width space c) (padRight width space c)
+	in
+		square > map (r -> zipWith pad specs r
+			> join "  "
+			> reverse > dropWhile isSpace > reverse)
+},
+
+-- writeTable rows: print rows as an aligned table. Returns rows.
+writeTable = {
+	[]   -> [],
+	rows -> seq (rows > tableLines > unlines > write) rows
+}

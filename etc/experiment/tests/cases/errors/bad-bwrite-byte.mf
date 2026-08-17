@@ -1,3 +1,0 @@
--- bwrite of an out-of-range byte value is a runtime error.
-import core in
-bwrite [72; 256]

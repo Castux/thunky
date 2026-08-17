@@ -8,7 +8,7 @@
 import core, list, math, text in
 
 let
-	isPalindrome = n -> let digits = string n in equal digits (reverse digits)
+	isPalindrome = string *> ap equal reverse
 in
 	rangeIncl 100 999
 	> flatMap (a -> rangeIncl a 999 > map (mul a))

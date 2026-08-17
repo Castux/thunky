@@ -30,7 +30,7 @@ let
 	primes = rangeIncl 2 limit > filter (isMarked composites *> not)
 in
 	[
-		flatten ["primes below 100: "; primes > takeWhile (lt 100) > map string > join " "];
-		flatten ["count below "; string limit; ": "; string (length primes)];
-		flatten ["largest: "; string (last primes)]
-	] > map write > eval
+		format "primes below 100: %s" [primes > takeWhile (lt 100) > map string > join " ";];
+		format "count below %v: %v" [limit; length primes];
+		format "largest: %v" [last primes;]
+	] > writeList

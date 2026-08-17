@@ -186,7 +186,7 @@ import list in
 whole expression, both qualified as `list.sort` and unqualified as `sort`. You
 can import several modules at once: `import list, math in …`. The library
 modules are `core`, `list`, `math`, `text`, `maybe`, `table`, `hashmap`, `comb`
-and `heap`; Chapter 12 tours them, and Chapter 13 covers writing your own.
+and `heap`; Chapter 12 tours them, and Chapter 14 covers writing your own.
 
 That is all you need for now — an import clause at the top, and the names are
 in scope.
@@ -326,6 +326,8 @@ in
 Output: `[15, 15, -5, -5]`
 
 Reading the nested version inside-out gives `sub 3`, `mul 2`, `add 1` — exactly the left-to-right order of the `*>` chain. A lambda whose argument is used once, at the innermost position, is always a composition in disguise.
+
+The condition matters: *used once, innermost*. When the argument appears twice, or anywhere but the bottom of the nest, no chain of `*>` can reach it and `core` has to supply a combinator instead. [Chapter 13](13-point-free-style.md) picks that up.
 
 </details>
 

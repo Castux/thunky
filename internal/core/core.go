@@ -1,14 +1,15 @@
 package core
 
 import (
-	"thunky/internal/source"
-	"thunky/internal/value"
+	"github.com/Castux/thunky/internal/source"
+	"github.com/Castux/thunky/internal/value"
 )
 
 type Expr interface{ coreExpr() }
 
 func (Num) coreExpr()     {}
 func (Const) coreExpr()   {}
+func (Stdin) coreExpr()   {}
 func (Var) coreExpr()     {}
 func (App) coreExpr()     {}
 func (Compose) coreExpr() {}
@@ -21,6 +22,15 @@ func (Thunk) coreExpr()   {}
 
 type Num struct{ Val float64 }
 type Const struct{ Val value.Value }
+
+// Stdin is a reference to one of the two standard-input streams: the code-point
+// stream, or the byte stream when Bytes is set. It is a node of its own rather
+// than a Const holding the stream value, because the stream is a stateful thunk
+// that is created on demand at run time — a constant pool is for immutable
+// values, and one holding a live stream has nothing sensible to render in the
+// AST or bytecode dumps.
+type Stdin struct{ Bytes bool }
+
 type Var struct{ Addr Addr }
 
 type App struct {

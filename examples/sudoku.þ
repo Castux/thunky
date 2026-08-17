@@ -4,7 +4,7 @@ let
 
 	rowOf = div 9,
 	colOf = mod 9,
-	boxOf = i -> add (i > rowOf > div 3 > mul 3) (i > colOf > div 3),
+	boxOf = fork add (rowOf *> div 3 *> mul 3) (colOf *> div 3),
 
 	rowCells = r -> drop (mul r 9) *> take 9,
 
@@ -75,6 +75,6 @@ let
 	initEmpties = zip (rangeIncl 0 80) puzzle > filter (second *> eq 0) > map first
 in
 
-eval < map write < prepend
+text.writeList < prepend
 	["Puzzle:"; boardStr puzzle; "Solutions:"]
 	(solutions [initBoard, initEmpties] > map ([b, _] -> boardStr (boardList b)))

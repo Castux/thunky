@@ -90,11 +90,11 @@ let
 			]),
 
 	report = flatten [
-		[flatten ["shortest paths from "; source; ":"]; "node    dist   path"];
+		[text.format "shortest paths from %s:" [source;]; "node    dist   path"];
 		map row settled;
-		[flatten [string (length settled); " of "; string (length graph); " nodes reachable"];];
+		[text.format "%v of %v nodes reachable" [length settled; length graph];];
 		[pathTo "G"; pathTo "H"]     -- H is isolated: no route, and the search still terminates
 	]
 
 in
-	report > map write > eval
+	report > text.writeList

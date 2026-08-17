@@ -32,8 +32,8 @@ let
 	],
 
 	show = width -> flatten [
-		[flatten ["-- wrapped at "; string width; " --"];];
+		[format "-- wrapped at %v --" [width;];];
 		wrap width sample
 	]
 in
-	flatten [show 72; show 40] > map write > eval
+	flatten [show 72; show 40] > writeList

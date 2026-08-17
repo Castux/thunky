@@ -1,4 +1,4 @@
-# Regression harness for the Thunky front-end and the G-machine backend (PowerShell).
+﻿# Regression harness for the Thunky front-end and the G-machine backend (PowerShell).
 #
 # Thunky now has a single execution engine, so this is a GOLDEN harness: for
 # every tests/cases/<category>/<name>.þ it runs the engine and checks that the
@@ -23,6 +23,22 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Process.Start gives a redirected child's stdin a StreamWriter built from
+# Console.InputEncoding, with AutoFlush set — and setting AutoFlush flushes that
+# encoding's preamble immediately. On a UTF-8 console (chcp 65001) that is a BOM
+# written into every test program's standard input before it has read a byte,
+# which the stdin cases duly reported as a leading code point 65279. Swap in a
+# preamble-free UTF-8 for the run; ProcessStartInfo.StandardInputEncoding would
+# be the direct fix but does not exist in .NET Framework.
+$savedInputEncoding = $null
+try {
+    $savedInputEncoding = [Console]::InputEncoding
+    [Console]::InputEncoding = New-Object System.Text.UTF8Encoding($false)
+} catch {
+    # No console attached (a CI host, say): nothing to correct.
+}
+
 $root = Resolve-Path (Join-Path $PSScriptRoot '..')
 Set-Location $root
 $bin = Join-Path $root 'thunky.test.exe'
@@ -43,11 +59,19 @@ function Invoke-MF([string]$relPath, [string]$inFile) {
     $psi.RedirectStandardError = $true
     $psi.UseShellExecute = $false
     $p = [System.Diagnostics.Process]::Start($psi)
+    # Write and close the raw BaseStream, never the StreamWriter wrapping it.
+    # Its encoding comes from the console's, and closing it flushes that
+    # encoding's preamble — on a UTF-8 console that fed every program a BOM it
+    # never sent, which the stdin cases then read as a first code point.
+    # ProcessStartInfo.StandardInputEncoding would fix it, but it does not exist
+    # in the .NET Framework that Windows PowerShell 5.1 runs on.
+    $stdin = $p.StandardInput.BaseStream
     if ($inFile -and (Test-Path $inFile)) {
         $bytes = [System.IO.File]::ReadAllBytes($inFile)
-        $p.StandardInput.BaseStream.Write($bytes, 0, $bytes.Length)
+        $stdin.Write($bytes, 0, $bytes.Length)
     }
-    $p.StandardInput.Close()
+    $stdin.Flush()
+    $stdin.Close()
     $ms = New-Object System.IO.MemoryStream
     $p.StandardOutput.BaseStream.CopyTo($ms)
     $p.StandardError.BaseStream.CopyTo($ms)
@@ -64,7 +88,24 @@ $pass = 0
 $fail = 0
 $cur = ''
 
-Get-ChildItem -Path 'tests/cases' -Recurse -Filter '*.þ' | Sort-Object FullName | ForEach-Object {
+# The extension is built from its code point rather than written literally.
+# Windows PowerShell 5.1 decodes a BOM-less script as the system ANSI codepage,
+# which turns a literal 'þ' into a byte that matches no file — the harness then
+# found zero cases and cheerfully reported success. This form cannot be
+# corrupted by however the script itself is decoded.
+$ext = '.' + [char]0x00FE
+
+$cases = @(Get-ChildItem -Path 'tests/cases' -Recurse -File |
+    Where-Object { $_.Name.EndsWith($ext, [System.StringComparison]::Ordinal) } |
+    Sort-Object FullName)
+
+if ($cases.Count -eq 0) {
+    Write-Host "no test cases found under tests/cases (looked for *$ext)"
+    Remove-Item $bin -ErrorAction SilentlyContinue
+    exit 1
+}
+
+$cases | ForEach-Object {
     $catd = Split-Path (Split-Path $_.FullName -Parent) -Leaf
     if ($Category -ne '' -and $catd -ne $Category) { return }
     if ($catd -ne $cur) { $cur = $catd; Write-Host ''; Write-Host "[$cur]" }
@@ -108,9 +149,13 @@ Get-ChildItem -Path 'tests/cases' -Recurse -Filter '*.þ' | Sort-Object FullName
 }
 
 Remove-Item $bin -ErrorAction SilentlyContinue
+if ($null -ne $savedInputEncoding) { try { [Console]::InputEncoding = $savedInputEncoding } catch { } }
 
 if ($Bless) { Write-Host ''; Write-Host '=== blessed expectations ==='; exit 0 }
 
 Write-Host ''
 Write-Host "=== $pass passed, $fail failed ==="
+# A run that checked nothing is a failure, not a success: without this, a
+# mistyped category reports "0 passed, 0 failed" and exits 0.
+if ($pass + $fail -eq 0) { Write-Host "no cases ran (category '$Category' matched nothing)"; exit 1 }
 if ($fail -ne 0) { exit 1 }

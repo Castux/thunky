@@ -46,5 +46,5 @@ in
 		flatten ["encrypted:  "; big.intToString cipher];
 		flatten ["decrypted:  "; big.intToString recovered];
 		flatten ["recovered:  "; toText recovered];
-		flatten ["round trip: "; string (equal (toText recovered) message)]
-	] > map write > eval
+		format "round trip: %v" [equal (toText recovered) message;]
+	] > writeList

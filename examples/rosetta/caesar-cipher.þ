@@ -20,4 +20,4 @@ in
 		prepend "plain:   " message;
 		prepend "cipher:  " secret;
 		prepend "back:    " (decode 3 secret)
-	] > map write > eval
+	] > writeList

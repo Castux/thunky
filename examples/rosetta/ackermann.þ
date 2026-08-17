@@ -14,6 +14,5 @@ in
 	> map (m -> rangeIncl 0 4
 		> map (n -> padLeft 4 space (string (ackermann m n)))
 		> flatten
-		> prepend (flatten ["m="; string m; ":"]))
-	> map write
-	> eval
+		> prepend (format "m=%v:" [m;]))
+	> writeList

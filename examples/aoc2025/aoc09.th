@@ -1,0 +1,77 @@
+-- Advent of Code 2025, day 9: red tiles at the corners of a rectilinear loop.
+-- Part 1 takes the largest rectangle with two red tiles at opposite corners.
+-- Part 2 keeps only those rectangles lying entirely on red or green tiles — the
+-- loop itself and everything it encloses.
+-- Answer: [4749929916; 1572047142]
+--
+--   thunky examples/aoc2025/aoc09.th < examples/aoc2025/aoc09.txt
+--
+-- Part 1 is every pair of corners; there are 123k of them, which is a sweep.
+--
+-- Part 2 turns on one observation: a rectangle whose four *edges* lie inside a
+-- simple closed loop lies inside it entirely. The outside of a loop is all one
+-- piece and reaches infinity, so if any point inside the rectangle were outside
+-- the loop, a path from it to infinity would have to cross the rectangle's
+-- border — which is inside the loop. So no interior test is needed at all.
+--
+-- That makes each pair a matter of four comparisons, given, for every corner,
+-- how far the tiles stay inside the loop along its row and along its column.
+-- Those runs are found by crossing counts on the lines half a tile above and
+-- below the corner: no corner sits on a half-integer line, so the ordinary
+-- even/odd rule applies with none of the usual trouble about lines that graze a
+-- vertex or run along an edge. A tile on the loop has the inside on at least one
+-- of its two sides, so the run through a corner is the union of the two.
+--
+-- Columns are the same problem with the coordinates swapped, so `runs` is run
+-- twice, once over the loop and once over its mirror image.
+
+import core, list, math, text, maybe in
+
+let
+	corners = stdin > lines > map (split "," *> map stringToInt *> ([x; y] -> [x, y])),
+
+	runs = points ->
+		let
+			-- each corner joined to the next, the last one back to the first
+			verticals = zip points (append [head points;] (tail points))
+				> mapFilter ([[ax, ay], [bx, by]] ->
+					if (eq ax bx) (some [ax, min ay by, max ay by]) none),
+
+			-- where the line y = row enters and leaves the loop, in order
+			spans = row -> verticals
+				> mapFilter ([x, ylo, yhi] -> if (and (lt row ylo) (lt yhi row)) (some x) none)
+				> sort > splitEqual 2 > map ([a; b] -> [a, b]),
+
+			-- the stretch of that line containing x, if the line is inside there
+			spanAt = row -> x -> spans row > find ([a, b] -> and (lte x a) (lte b x)),
+
+			through = [x, y] -> [add 0.5 y; sub 0.5 y] > mapFilter (row -> spanAt row x)
+				> (found -> [found > map first > minimum, found > map second > maximum])
+		in
+			points > map through,
+
+	tiles = zip3 corners (runs corners) (runs (corners > map ([x, y] -> [y, x]))),
+
+	covers = [lo, hi] -> [a, b] -> and (lte a lo) (lte hi b),
+
+	consider = [widest, fitting] -> [[ux, uy], uRow, uColumn] -> [[vx, vy], vRow, vColumn] ->
+		let
+			xlo = min ux vx, xhi = max ux vx,
+			ylo = min uy vy, yhi = max uy vy,
+			area = mul (succ (sub xlo xhi)) (succ (sub ylo yhi))
+		in
+			[
+				max widest area,
+				if (and
+						(and (covers uRow [xlo, xhi]) (covers vRow [xlo, xhi]))
+						(and (covers uColumn [ylo, yhi]) (covers vColumn [ylo, yhi])))
+					(max fitting area)
+					fitting
+			]
+in
+
+tiles > tails > foldl (best -> {
+	[] -> best,
+	[tile, rest] -> rest > foldl (acc -> other -> consider acc tile other) best
+}) [0, 0]
+	> ([widest, fitting] -> show [widest; fitting])

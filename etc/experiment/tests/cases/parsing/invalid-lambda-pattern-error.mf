@@ -1,4 +1,0 @@
--- The left of '->' must reinterpret as a pattern; an application cannot, so this
--- is a parse error rather than a silent reinterpretation.
-import core in
-show ((add 1 2 -> x) 5)

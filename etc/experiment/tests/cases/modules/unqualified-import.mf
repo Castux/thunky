@@ -1,3 +1,0 @@
--- Unqualified use of imported module names.
-import core, list in
-show [reverse [1; 2; 3]; length [4; 5; 6; 7]; sum [1; 2; 3; 4]]

@@ -48,13 +48,13 @@ let
 
 	sample = [5; 3; 9; 1; 4; 1; 8; 2; 7; 6],
 
-	report = name -> sorted -> flatten [padRight 15 space name; string sorted]
+	row = name -> sorted -> [name; string sorted]
 in
 	[
-		report "input"     sample;
-		report "quick"     (quickSort sample);
-		report "insertion" (insertionSort sample);
-		report "merge"     (mergeSort sample);
-		report "bubble"    (bubbleSort sample);
-		report "list.sort"  (sort sample)
-	] > map write > eval
+		row "input"     sample;
+		row "quick"     (quickSort sample);
+		row "insertion" (insertionSort sample);
+		row "merge"     (mergeSort sample);
+		row "bubble"    (bubbleSort sample);
+		row "list.sort" (sort sample)
+	] > writeTable

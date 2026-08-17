@@ -1,3 +1,0 @@
--- Primitive comparisons eq, lt, gt (threshold-first convention).
-import core in
-show [eq 3 3; eq 3 4; lt 5 2; lt 2 5; gt 5 2; gt 2 5]

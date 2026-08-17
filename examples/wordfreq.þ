@@ -62,30 +62,22 @@ let
 
 	bar = count -> replicate (mul barWidth count > div maxCount > max 1) (char '#'),
 
-	row = index -> [word, count] -> flatten [
-		padLeft 3 space (string (succ index)); ". ";
-		padRight 18 space word;
-		padLeft 6 space (string count); "  ";
-		bar count
-	],
+	row = index -> [word, count] -> [format "%v." [succ index;]; word; count; bar count],
 
 	charCount = length input,
 	lineCount = input > count (eq lf),
 	wordCount = length words,
 
-	stat = name -> value -> flatten [padRight 18 space name; string value],
-
 	report = case
 		(eq wordCount 0) ["(no words on standard input)";]
 		else (flatten [
-			[stat "characters" charCount;
-			 stat "lines" lineCount;
-			 stat "words" wordCount;
-			 stat "distinct words" (length ranked);
-			 ""];
-			[flatten ["top "; string (length top); ":"];];
-			mapIndex row top
+			[["characters"; charCount];
+			 ["lines"; lineCount];
+			 ["words"; wordCount];
+			 ["distinct words"; length ranked]] > tableLines;
+			[""; format "top %v:" [length top;]];
+			mapIndex row top > tableLines
 		])
 
 in
-	report > map write > eval
+	report > writeList

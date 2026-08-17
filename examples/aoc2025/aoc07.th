@@ -1,0 +1,48 @@
+-- Advent of Code 2025, day 7: the tachyon manifold.
+-- A beam enters at S and moves downward; a splitter (^) stops it and starts a
+-- new beam immediately to its left and to its right. Part 1 counts how many
+-- splitters are ever hit. Part 2 sends a single quantum particle through, which
+-- takes both paths at every splitter, and counts the timelines it ends up on.
+-- Answer: [1543; 3223365367809]
+--
+--   thunky examples/aoc2025/aoc07.th < examples/aoc2025/aoc07.txt
+--
+-- A row is one step: the beams a splitter stops, the beams that pass it by, and
+-- what the stopped ones hand to either side — that last part being day 4's
+-- trick again, lining a row up against shifted copies of itself rather than
+-- indexing into it. A beam that runs off an edge simply falls out of the row.
+--
+-- One sweep answers both parts, because a column carries a count of timelines
+-- rather than a flag. Beams that meet in a column are one beam from then on —
+-- which is why part 1 counts splitters rather than arrivals — but the timelines
+-- they carry add up, since the same place reached by different paths is
+-- different timelines. Nor does part 2 need to know where a particle leaves the
+-- manifold: every split turns one timeline into two, so the answer is one plus
+-- the number of timelines that ever arrive at a splitter.
+
+import core, list, math, text in
+
+let
+	manifold = stdin > lines,
+
+	-- a single timeline, in the column marked S
+	start = head manifold > map (eq (char 'S')),
+
+	shiftRight = row -> prepend [0;] (init row),
+	shiftLeft  = row -> append [0;] (tail row),
+	sum3 = a -> b -> c -> add a (add b c),
+
+	step = [beams, splitters, timelines] -> row ->
+		let
+			stopped = zipWith (cell -> n -> if (eq cell (char '^')) n 0) row beams,
+			passing = zipWith sub stopped beams
+		in
+			[
+				zipWith3 sum3 (shiftRight stopped) passing (shiftLeft stopped),
+				add splitters (count (gt 0) stopped),
+				add timelines (sum stopped)
+			]
+in
+
+manifold > foldl step [start, 0, 0]
+	> ([beams, splitters, timelines] -> show [splitters; succ timelines])

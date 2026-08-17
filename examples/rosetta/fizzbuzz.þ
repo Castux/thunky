@@ -10,5 +10,4 @@ import core, list, math, text in
 		(eq 0 (mod 3 n))  "Fizz"
 		(eq 0 (mod 5 n))  "Buzz"
 		else              (string n))
-	> map write
-	> eval
+	> writeList

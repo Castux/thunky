@@ -35,4 +35,4 @@ let
 	row = j -> let cy = scale top bottom height j in
 		range 0 width > map (i -> shadeFor (escapeTime (scale left right width i) cy))
 in
-	range 0 height > map row > map write > eval
+	range 0 height > map row > writeList

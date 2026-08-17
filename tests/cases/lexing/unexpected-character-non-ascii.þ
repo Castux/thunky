@@ -1,0 +1,5 @@
+-- A non-ASCII stray character is reported as one whole character, with the
+-- caret under it: the lexer used to slice a single byte (mojibake) and the
+-- column/caret arithmetic used to count bytes rather than characters.
+import core in
+show (add 1 × 2)

@@ -64,7 +64,11 @@ a:hover { text-decoration: underline; }
     border-right: 1px solid var(--border);
     position: sticky;
     top: 0;
+    /* dvh, with vh as the fallback for browsers that lack it: on mobile, vh is
+       the viewport with the URL bar hidden, so the last rows are cut off until
+       you scroll. */
     height: 100vh;
+    height: 100dvh;
     overflow-y: auto;
 }
 
@@ -244,6 +248,7 @@ select {
     display: flex;
     flex-direction: column;
     height: 100vh;
+    height: 100dvh;   /* see the note on #sidebar */
 }
 
 .pg-header {
@@ -333,4 +338,58 @@ select {
 @media (max-width: 800px) {
     .pg-main { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
     .pg-editor { border-right: none; border-bottom: 1px solid var(--border); }
+}
+
+/* --- accessibility --- */
+
+/* First thing in the tab order on every page: a way past the sidebar (or the
+   playground toolbar) straight to the content. Off-screen until focused. */
+.skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 10;
+    padding: 0.5rem 0.9rem;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 0 0 4px 0;
+}
+
+.skip-link:focus {
+    left: 0;
+}
+
+/* Keyboard focus must be visible everywhere. :focus-visible rather than
+   :focus so a mouse click does not draw a ring. */
+a:focus-visible,
+button:focus-visible,
+select:focus-visible,
+summary:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible,
+.CodeMirror-focused {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* CodeMirror draws its own focus treatment inside the editor pane, where an
+   outline offset would be clipped. */
+.pg-editor .CodeMirror-focused {
+    outline-offset: -2px;
+}
+
+.loading {
+    color: var(--muted);
+}
+
+noscript .noscript-note,
+noscript {
+    display: block;
+}
+
+.noscript-note {
+    margin: 0;
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--code-bg);
 }
