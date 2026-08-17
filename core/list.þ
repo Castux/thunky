@@ -8,17 +8,22 @@ module
 
 -- Construction and inspection
 
+--> cons : a -> List a -> List a
 cons      = h -> t -> [h,t], -- construct a new list cell: h:t
+--> emptyList : List a
 emptyList = [],               -- the empty list
+--> singleton : a -> List a
 singleton = x -> [x;],       -- a one-element list
 
 -- isList x: 1 if x is a proper list, else 0
+--> isList : a -> Num
 isList = {
 	[] -> 1,
 	[x,xs] -> isList xs,
 	n -> 0
 },
 
+--> isEmpty : List a -> Num
 isEmpty = { [] -> 1, l -> 0 }, -- 1 if list is empty, else 0
 
 -- length l: number of elements in list l.
@@ -75,6 +80,7 @@ initSafe = {
 },
 
 -- tails l: all successive suffixes of a list
+--> tails : List a -> List (List a)
 tails = {
 	[] -> [[];],
 	[h,t] -> [[h,t], tails t]
@@ -90,17 +96,20 @@ tails = {
 -- Indexing into l instead keeps the spine O(n) and charges each prefix its own
 -- length, and only if it is forced. Forcing them all is O(n^2) either way: that
 -- is the size of the answer.
+--> inits : List a -> List (List a)
 inits = l -> prepend [[];] (mapIndex (i -> _ -> take (succ i) l) l),
 
 -- Modification
 
 -- prepend prefix xs: prefix followed by xs (first arg is fixed for partial application)
+--> prepend : List a -> List a -> List a
 prepend = {
 	[] -> xs -> xs,
 	[h,t] -> xs -> [h, prepend t xs]
 },
 
 -- append suffix xs: xs followed by suffix; natural in a pipe: xs > append suffix
+--> append : List a -> List a -> List a
 append = flip prepend,
 
 -- reverse the order of elements in a list. Lazy on purpose: the accumulator is
@@ -110,6 +119,7 @@ append = flip prepend,
 reverse = foldl (flip cons) [],
 
 -- intersperse sep l: place sep between every element in list l
+--> intersperse : a -> List a -> List a
 intersperse = sep -> {
 	[] -> [],
 	[x, []] -> [x;],
@@ -117,18 +127,22 @@ intersperse = sep -> {
 },
 
 -- intercalate sep lists: flatten lists with sep inserted between each one
+--> intercalate : List a -> List (List a) -> List a
 intercalate = sep -> intersperse sep *> flatten,
 
 -- remove e l: remove the first occurrence of e from list l
+--> remove : a -> List a -> List a
 remove = e -> {
 	[] -> [],
 	[h,t] -> if (equal e h) t [h, remove e t]
 },
 
 -- removeAll val l: remove every occurrence of val from list l
+--> removeAll : a -> List a -> List a
 removeAll = val -> filter (equal val *> not),
 
 -- replace old new l: replace the first occurrence of old with new in list l
+--> replace : a -> a -> List a -> List a
 replace = old -> new -> {
 	[] -> [],
 	[h,t] -> if (equal h old)
@@ -137,18 +151,22 @@ replace = old -> new -> {
 },
 
 -- replaceAll old new l: replace every occurrence of old with new in list l
+--> replaceAll : a -> a -> List a -> List a
 replaceAll = old -> new ->
 	map (x -> if (equal x old) new x),
 
 -- replaceAt idx val list: overwrite the element at index idx (zero-based)
+--> replaceAt : Num -> a -> List a -> List a
 replaceAt = idx -> val -> list ->
 	prepend (take idx list) [val, drop (succ idx) list],
 
 -- insertAt idx val list: insert val before index idx, shifting the rest right
+--> insertAt : Num -> a -> List a -> List a
 insertAt = idx -> val -> list ->
 	prepend (take idx list) [val, drop idx list],
 
 -- removeAt idx list: remove the element at index idx (zero-based)
+--> removeAt : Num -> List a -> List a
 removeAt = idx -> list ->
 	prepend (take idx list) (drop (succ idx) list),
 
@@ -162,6 +180,7 @@ map = f -> {
 },
 
 -- mapIndex f l: replace every element with `f index element` with zero-based indices
+--> mapIndex : (Num -> a -> b) -> List a -> List b
 mapIndex = f -> l ->
 	zipWith f (upFrom 0) l,
 
@@ -173,11 +192,13 @@ filter = f -> {
 },
 
 -- filterIndex f l: keep elements for which `f index element` returns 1 with zero-based indices
+--> filterIndex : (Num -> a -> Num) -> List a -> List a
 filterIndex = f ->
 	zip (upFrom 0) *> filter (uncurry f) *> map second,
 
 -- mapFilter f l: apply f (returning maybe) to each element; keep the some values unwrapped.
 -- Single-pass; more efficient than map *> filter *> map.
+--> mapFilter : (a -> Maybe b) -> List a -> List b
 mapFilter = f -> {
 	[] -> [],
 	[h, t] -> f h > {
@@ -187,12 +208,15 @@ mapFilter = f -> {
 },
 
 -- flatMap f l: map f over l then flatten the results
+--> flatMap : (a -> List b) -> List a -> List b
 flatMap = f -> map f *> flatten,
 
 -- find p l: first element of l matching predicate p (returns maybe)
+--> find : (a -> Num) -> List a -> Maybe a
 find = p -> filter p *> headSafe,
 
 -- findIndex p l: index of first element of l matching predicate p (returns maybe)
+--> findIndex : (a -> Num) -> List a -> Maybe Num
 findIndex = p -> l -> let
 	rec = i -> {
 		[] -> maybe.none,
@@ -209,6 +233,7 @@ foldr = f -> acc -> {
 },
 
 -- foldl f acc l: left-associative reduction: f (... (f (f acc l1) l2) ...) ln
+--> foldl : (a -> b -> a) -> a -> List b -> a
 foldl = f -> acc -> {
 	[] -> acc,
 	[h,t] -> foldl f (f acc h) t
@@ -225,6 +250,7 @@ foldl = f -> acc -> {
 -- forcing each such thunk would stack an update frame per element — no better than
 -- foldl). Use it whenever the combiner is strict in the accumulator and the list is
 -- long.
+--> foldlStrict : (a -> b -> a) -> a -> List b -> a
 foldlStrict = f -> acc -> seq acc {
 	[] -> acc,
 	[h,t] -> foldlStrict f (f acc h) t
@@ -232,6 +258,7 @@ foldlStrict = f -> acc -> seq acc {
 
 -- scanl f acc l: list of successive left-fold results, starting with acc.
 -- scanl f z [a;b;c] = [z; f z a; f (f z a) b; f (f (f z a) b) c]
+--> scanl : (a -> b -> a) -> a -> List b -> List a
 scanl = f -> acc -> {
 	[] -> [acc;],
 	[h, t] -> [acc, scanl f (f acc h) t]
@@ -239,6 +266,7 @@ scanl = f -> acc -> {
 
 -- scanr f acc l: list of successive right-fold results, ending with acc.
 -- scanr f z [a;b;c] = [f a r0; f b r1; f c z; z] where each r is the next scan value
+--> scanr : (a -> b -> b) -> b -> List a -> List b
 scanr = f -> acc -> {
 	[] -> [acc;],
 	[h, t] -> let rest = scanr f acc t in [f h (head rest), rest]
@@ -253,23 +281,32 @@ scanr = f -> acc -> {
 -- besides bounding the depth. It is not free — `length` and `reverse` are left
 -- lazy because for them the `seq` costs more than the chain does.
 -- One-liner equivalents: foldr add 0, foldr mul 1, foldl (…) 0.
+--> sum : List Num -> Num
 sum      = foldlStrict add 0, -- sum of a list of numbers
+--> product : List Num -> Num
 product  = foldlStrict mul 1, -- product of a list of numbers
 
 -- These two stay lazy and right-associative on purpose: `or` and `and` short-
 -- circuit, so anyMatch/allMatch stop at the first decisive element and work on
 -- infinite lists. A strict fold would always walk the whole list.
+--> orList : List Num -> Num
 orList   = foldr or 0,  -- logical OR over a list of booleans
+--> andList : List Num -> Num
 andList  = foldr and 1, -- logical AND over a list of booleans
 
+--> anyMatch : (a -> Num) -> List a -> Num
 anyMatch  = f -> l -> orList (map f l),       -- 1 if f returns 1 for any element
+--> allMatch : (a -> Num) -> List a -> Num
 allMatch  = f -> l -> andList (map f l),       -- 1 if f returns 1 for all elements
+--> noneMatch : (a -> Num) -> List a -> Num
 noneMatch = f -> l -> not (anyMatch f l),      -- 1 if f returns 0 for all elements
+--> count : (a -> Num) -> List a -> Num
 count     = p -> foldlStrict (acc -> x -> if (p x) (succ acc) acc) 0, -- count elements satisfying p
 
 -- Zipping
 
 -- zipWith f a b: combine two lists using function f element-wise
+--> zipWith : (a -> b -> c) -> List a -> List b -> List c
 zipWith = f -> {
 	[]		-> b -> [],
 	[a,as]	-> {
@@ -278,9 +315,11 @@ zipWith = f -> {
 	}
 },
 
+--> zip : List a -> List b -> List [a, b]
 zip = zipWith cons, -- zip two lists into a list of 2-tuples
 
 -- zipWith3 f a b c: combine three lists using function f element-wise
+--> zipWith3 : (a -> b -> c -> d) -> List a -> List b -> List c -> List d
 zipWith3 = f -> {
 	[] -> b -> c -> [],
 	[a, as] -> {
@@ -292,11 +331,13 @@ zipWith3 = f -> {
 	}
 },
 
+--> zip3 : List a -> List b -> List c -> List [a, b, c]
 zip3 = zipWith3 (a -> b -> c -> [a, b, c]), -- zip three lists into a list of 3-tuples
 
 -- Slicing
 
 -- take n l: first n elements of list l
+--> take : Num -> List a -> List a
 take = {
 	0 -> l -> [],
 	n -> {
@@ -306,6 +347,7 @@ take = {
 },
 
 -- drop n l: list l without its first n elements
+--> drop : Num -> List a -> List a
 drop = {
 	0 -> l -> l,
 	n -> {
@@ -315,10 +357,12 @@ drop = {
 },
 
 -- slice a b l: the sub list between indices a and b (exclusive)
+--> slice : Num -> Num -> List a -> List a
 slice = start -> end ->
 	drop start *> take (sub start end),
 
 -- takeWhile f l: the prefix of list l for which f returns 1
+--> takeWhile : (a -> Num) -> List a -> List a
 takeWhile = f -> {
 	[] -> [],
 	[x,xs] -> if (f x)
@@ -327,6 +371,7 @@ takeWhile = f -> {
 },
 
 -- dropWhile f l: list l without the prefix for which f returns 1
+--> dropWhile : (a -> Num) -> List a -> List a
 dropWhile = f -> {
 	[] -> [],
 	[x,xs] -> if (f x)
@@ -335,6 +380,7 @@ dropWhile = f -> {
 },
 
 -- span f l: splits l into [taken while f holds, rest of list]
+--> span : (a -> Num) -> List a -> [List a, List a]
 span = f -> {
 	[] -> [[], []],
 	[x, xs] -> if (f x)
@@ -343,16 +389,20 @@ span = f -> {
 },
 
 -- splitAt n l: split l into [first n elements, rest]
+--> splitAt : Num -> List a -> [List a, List a]
 splitAt = n -> l -> [take n l, drop n l],
 
 -- splitEqual n l: split l into sublists of length n
+--> splitEqual : Num -> List a -> List (List a)
 splitEqual = n ->
 	iterate (drop n) *> map (take n) *> takeWhile (not <* isEmpty),
 
 -- all successive splits of the list in two parts
+--> spans : List a -> List [List a, List a]
 spans = l -> zip (inits l) (tails l),
 
 -- groupBy f l: split l into runs of consecutive elements where f h x = 1 (h is the first in each group)
+--> groupBy : (a -> a -> Num) -> List a -> List [a, List a]
 groupBy = f -> {
 	[] -> [],
 	[h, t] -> span (f h) t > {
@@ -361,16 +411,20 @@ groupBy = f -> {
 },
 
 -- flatten l: concatenate a list of lists into one list
+--> flatten : List (List a) -> List a
 flatten = foldr prepend [],
 
 -- range a b: [a; a+1; ...; b-1], half open interval
+--> range : Num -> Num -> List Num
 range = a -> b -> upFrom a > take (sub a b),
 
 -- rangeIncl a b: [a; a+1; ...; b], both endpoints inclusive
+--> rangeIncl : Num -> Num -> List Num
 rangeIncl = a -> b -> range a (succ b),
 
 -- Search and set-like
 
+--> contains : a -> List a -> Num
 contains = elem -> anyMatch (equal elem), -- 1 if list contains elem, else 0
 
 -- maximum l: largest element in list l (crashes on empty list)
@@ -386,12 +440,14 @@ minimum = [h,t] -> foldlStrict min h t,
 nth = n -> drop n *> head,
 
 -- nub l: remove duplicates, keeping only the first occurrence of each value
+--> nub : List a -> List a
 nub = {
 	[] -> [],
 	[h, t] -> [h, nub (filter (x -> not (equal x h)) t)]
 },
 
 -- lookup key l: search association list [[key, val]; ...]; returns maybe.some val or maybe.none
+--> lookup : k -> List [k, v] -> Maybe v
 lookup = key -> {
 	[] -> maybe.none,
 	[[k, v], rest] -> if (equal k key) (maybe.some v) (lookup key rest)
@@ -400,9 +456,11 @@ lookup = key -> {
 -- Replication and structure
 
 -- replicate n x: list of n copies of x
+--> replicate : Num -> a -> List a
 replicate = n -> repeat *> take n,
 
 -- unzip l: converts [[a1,b1]; ...] into [[a1; ...], [b1; ...]]
+--> unzip : List [a, b] -> [List a, List b]
 unzip = {
 	[] -> [[], []],
 	[[a,b], rest] ->
@@ -410,6 +468,7 @@ unzip = {
 },
 
 -- transpose rows: turn a list of rows into a list of columns; stops at the shortest row
+--> transpose : List (List a) -> List (List a)
 transpose = {
 	[] -> [],
 	rows -> if (isEmpty (head rows)) [] [map head rows, transpose (map tail rows)]
@@ -418,12 +477,14 @@ transpose = {
 -- Sorting
 
 -- partition p l: splits l into [matching, rest]
+--> partition : (a -> Num) -> List a -> [List a, List a]
 partition = p ->
 	foldr
 	( x -> [ts,fs] -> if (p x) [[x,ts],fs] [ts,[x,fs]] )
 	[[],[]],
 
 -- sortWith f l: quicksort; f pivot elem = 1 if elem belongs before pivot
+--> sortWith : (a -> a -> Num) -> List a -> List a
 sortWith = f -> {
 	[] -> [],
 	[x,xs] -> partition (f x) xs > {
@@ -431,13 +492,20 @@ sortWith = f -> {
 	}
 },
 
+--> sort : List Num -> List Num
 sort = sortWith lt, -- sort in ascending order using lt
 
 -- Infinite lists
 
+--> iterate : (a -> a) -> a -> Stream a
 iterate  = f -> x -> [x, iterate f (f x)], -- lazy infinite list: [x; f x; f (f x); ...]
+--> times : Num -> (a -> a) -> a -> a
 times    = n -> f -> iterate f *> nth n,    -- apply function f n times
+--> downFrom : Num -> Stream Num
 downFrom = iterate pred, -- lazy infinite list: [n; n-1; n-2; ...]
+--> upFrom : Num -> Stream Num
 upFrom   = iterate succ, -- lazy infinite list: [n; n+1; n+2; ...]
+--> repeat : a -> Stream a
 repeat   = iterate id,   -- lazy infinite list of x
+--> cycle : List a -> Stream a
 cycle    = l -> prepend l (cycle l) -- lazy infinite cycle of list l
