@@ -6,7 +6,7 @@ import list, maybe, core in
 
 module
 
--- Table k v = List [k, v]
+--> Table k v = List [k, v]
 
 empty     = [],                   -- the empty table
 singleton = k -> v -> [[k, v];],  -- single-entry table

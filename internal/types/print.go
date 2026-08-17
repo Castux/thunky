@@ -104,6 +104,40 @@ func (n *Namer) byName(name string) (Decl, bool) {
 	return Decl{}, false
 }
 
+// definedInTermsOf reports whether a's body names b, which makes any shape
+// agreement between them deliberate rather than a coincidence worth flagging.
+func definedInTermsOf(a, b Decl) bool {
+	for _, ref := range referencedTypes(a.Body) {
+		if ref == b.Name {
+			return true
+		}
+		if mod, name, ok := splitQualified(ref); ok && name == b.Name && mod == b.Mod {
+			return true
+		}
+	}
+	return false
+}
+
+// preferred returns the declarations in match order, with those declared in mod
+// first so a module's own name wins for a shape two declarations both describe.
+func (n *Namer) preferred(mod string) []Decl {
+	if mod == "" {
+		return n.decls
+	}
+	out := make([]Decl, 0, len(n.decls))
+	for _, d := range n.decls {
+		if d.Mod == mod {
+			out = append(out, d)
+		}
+	}
+	for _, d := range n.decls {
+		if d.Mod != mod {
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
 // Notes reports remarks about the declarations: shapes that more than one name
 // matched, and names declared more than once. In a structural system two
 // declarations of one shape denote one type, so a name is a view rather than a
@@ -114,11 +148,21 @@ func (n *Namer) Notes() []Warning { return n.notes }
 // order they were first needed.
 func (n *Namer) Equations() []Equation { return n.eqs }
 
-// String renders one type. Variable names restart at `a` for each call — they
-// are local to a signature — while equation names are shared.
-func (n *Namer) String(t *Type) string {
+// String renders one type with no module preference.
+func (n *Namer) String(t *Type) string { return n.StringIn("", t) }
+
+// StringIn renders one type as it should read inside module `mod`. Variable names
+// restart at `a` for each call — they are local to a signature — while equation
+// names are shared.
+//
+// The preference matters because two declarations can name one shape:
+// `Table k v = List [k, v]` *is* a list of pairs, so without a preference every
+// list of pairs in the library reads as `Table`, including list's own `zip` and
+// `lookup`. A module's own name wins inside that module.
+func (n *Namer) StringIn(mod string, t *Type) string {
 	p := &printer{
 		namer:   n,
+		prefer:  mod,
 		names:   map[*Type]string{},
 		onPath:  map[*Type]bool{},
 		recNeed: map[*Type]bool{},
@@ -141,6 +185,7 @@ func String(t *Type) string {
 
 type printer struct {
 	namer   *Namer // nil to inline recursion as mu instead of naming it
+	prefer  string // module whose own declarations win a tie
 	names   map[*Type]string
 	onPath  map[*Type]bool
 	recNeed map[*Type]bool
@@ -358,15 +403,17 @@ func (p *printer) declared(t *Type) (string, bool) {
 	if p.namer == nil {
 		return "", false
 	}
-	for i, d := range p.namer.decls {
+	for i, d := range p.namer.preferred(p.prefer) {
 		args, ok := matchDecl(t, d)
 		if !ok {
 			continue
 		}
 		// Another declaration of the same shape is not wrong, but the reader
 		// should know their name applies here too.
-		for _, other := range p.namer.decls[i+1:] {
-			if other.Name == d.Name {
+		for _, other := range p.namer.preferred(p.prefer)[i+1:] {
+			if other.Name == d.Name || definedInTermsOf(d, other) || definedInTermsOf(other, d) {
+				// An alias by construction — `Table k v = List [k, v]` — is the same
+				// shape on purpose. Saying so would be noise on every use.
 				continue
 			}
 			if _, also := matchDecl(t, other); also {

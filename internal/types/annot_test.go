@@ -329,3 +329,131 @@ func TestSignatureRejectsTop(t *testing.T) {
 		t.Errorf("expected `?` to be rejected, got %s", messages(warns))
 	}
 }
+
+// TestDeclCrossReference checks that a declaration body may name another
+// declared type, resolved in dependency order.
+func TestDeclCrossReference(t *testing.T) {
+	// Grid is defined through Row, which is defined through List: all three have to
+	// resolve, deepest first, for this to parse at all.
+	_, _, warns := run(t, "--> List a = [] | [a, List a]\n"+
+		"--> Row = [Num, List Num]\n"+
+		"--> Grid = [Row, Num]\n"+
+		"add 1 2")
+	if len(warns) != 0 {
+		t.Fatalf("dependency-ordered resolution failed: %s", messages(warns))
+	}
+
+	// And one that genuinely matches. Both pair fields are used, so both are
+	// pinned to Num — matching is exact, and an unused field would stay an
+	// unconstrained variable that `List [Num, Num]` does not describe.
+	got, eqs, warns := run(t, "--> List a = [] | [a, List a]\n"+
+		"--> Pairs = List [Num, Num]\n"+
+		"let f = { [] -> 0, [[a, b], t] -> add (add a b) (f t) } in f")
+	if len(warns) != 0 {
+		t.Fatalf("unexpected warnings: %s", messages(warns))
+	}
+	if got != "Pairs -> Num" {
+		t.Errorf("expected the cross-referencing name to be used\n  got  %s\n  eqs  %s", got, eqs)
+	}
+}
+
+// TestDeclCrossReferenceScope checks that a declaration body obeys the same
+// import rules as a signature.
+func TestDeclCrossReferenceScope(t *testing.T) {
+	modSrc := "module\n\n--> Box a = [a]\n\nwrap = x -> [x]\n"
+
+	// Imported, unqualified and qualified both fine.
+	for _, prog := range []string{
+		"import boxes in\n--> Pair a = [Box a, Box a]\nlet p = [[1], [2]] in p",
+		"import boxes in\n--> Pair a = [boxes.Box a, boxes.Box a]\nlet p = [[1], [2]] in p",
+	} {
+		if ws := runWithModule(t, "boxes", modSrc, prog); len(ws) != 0 {
+			t.Errorf("expected no warnings for\n%s\n  got %s", prog, messages(ws))
+		}
+	}
+
+	// Not imported: out of scope, exactly as for a value.
+	ws := runWithModule(t, "boxes", modSrc, "--> Pair a = [Box a, Box a]\nlet p = [[1], [2]] in p")
+	if len(ws) != 1 || !strings.Contains(ws[0].Message, `unknown type "Box"`) {
+		t.Errorf("expected Box out of scope, got %s", messages(ws))
+	}
+}
+
+// TestDeclMutualRecursionRejected checks that two declarations defined through
+// each other are reported rather than looping.
+func TestDeclMutualRecursionRejected(t *testing.T) {
+	_, _, warns := run(t, "--> A = [B]\n--> B = [A]\nadd 1 2")
+	if len(warns) == 0 || !strings.Contains(messages(warns), "mutual recursion") {
+		t.Errorf("expected a mutual-recursion complaint, got %s", messages(warns))
+	}
+}
+
+// TestDeclCyclicPatternTerminates is a regression test. Expanding a reference
+// ties the recursive knot with a real pointer rather than a marker, so every walk
+// over a pattern needs a cycle guard; one of them did not have it and the
+// analyser overflowed its stack on `Table k v = List [k, v]`.
+func TestDeclCyclicPatternTerminates(t *testing.T) {
+	_, _, warns := run(t,
+		"--> List a = [] | [a, List a]\n--> Table k v = List [k, v]\nlet t = [[1, 2];] in t")
+	for _, w := range warns {
+		if strings.Contains(w.Message, "annotation") {
+			t.Errorf("unexpected annotation warning: %s", w.Message)
+		}
+	}
+}
+
+// TestDeclModulePreference checks that a module's own name wins for a shape two
+// declarations both describe. Without it, `Table k v = List [k, v]` makes every
+// list of pairs in the library read as Table — list's own zip and lookup included.
+func TestDeclModulePreference(t *testing.T) {
+	modSrc := "module\n\n" +
+		"--> List a = [] | [a, List a]\n" +
+		"--> Table k v = List [k, v]\n\n" +
+		"count = { [] -> 0, [[a, b], t] -> add (add a b) (count t) }\n"
+	progSrc := "import tables in\n" +
+		"--> List a = [] | [a, List a]\n" +
+		"--> Pairs = List [Num, Num]\n" +
+		"let g = { [] -> 0, [[a, b], t] -> add (add a b) (g t) } in g"
+
+	a := analyzeWithModule(t, "tables", modSrc, progSrc)
+	for _, w := range a.Warnings {
+		if strings.Contains(w.Message, "annotation:") {
+			t.Fatalf("unexpected annotation error: %s", w.Message)
+		}
+	}
+
+	// The module's binding uses the module's name for the shape...
+	var inModule string
+	for _, m := range a.Modules {
+		for _, e := range m.Entries {
+			if e.Name == "count" {
+				inModule = e.Type
+			}
+		}
+	}
+	if !strings.Contains(inModule, "Table") {
+		t.Errorf("module binding should prefer its own name, got %q", inModule)
+	}
+	// ...and the program's uses the program's.
+	if !strings.Contains(a.Program, "Pairs") {
+		t.Errorf("program should prefer its own name, got %q", a.Program)
+	}
+}
+
+// analyzeWithModule is runWithModule, returning the whole analysis.
+func analyzeWithModule(t *testing.T, modName, modSrc, progSrc string) *types.Analysis {
+	t.Helper()
+	modTokens := syntax.LexContent(modName+".th", modSrc)
+	mod := syntax.ParseModule(modTokens)
+	if mod == nil {
+		t.Fatalf("parsing module failed:\n%s", modSrc)
+	}
+	mod.Name = modName
+	tokens := syntax.LexContent("test.th", progSrc)
+	program := syntax.ParseProgram(tokens)
+	if program == nil {
+		t.Fatalf("parsing program failed:\n%s", progSrc)
+	}
+	modules := map[string]*syntax.Module{modName: mod}
+	return types.Infer(program, modules, syntax.Resolve(program, modules))
+}

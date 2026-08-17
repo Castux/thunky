@@ -105,12 +105,19 @@ func Infer(program *syntax.Program, modules map[string]*syntax.Module, res *synt
 	// one shape. (Checking a signature will need the module's own import scope.)
 	in.namer = NewNamer()
 	units := unitsOf(program, modules)
-	perModule := map[string][]Decl{}
+
+	// Two passes, because a declaration body may name another declared type:
+	// heads first so arities are known, then bodies in dependency order.
+	var raws []rawDecl
 	for _, u := range units {
-		decls, warns := CollectDecls(u.file)
-		perModule[u.mod] = append(perModule[u.mod], decls...)
-		in.namer.Declare(decls)
+		rs, warns := CollectRawDecls(u)
+		raws = append(raws, rs...)
 		in.warnings = append(in.warnings, warns...)
+	}
+	perModule, declWarns := resolveDecls(units, raws)
+	in.warnings = append(in.warnings, declWarns...)
+	for _, u := range units {
+		in.namer.Declare(perModule[u.mod])
 	}
 
 	// The program body pulls in whatever it needs; a second pass over every
@@ -137,17 +144,22 @@ func Infer(program *syntax.Program, modules map[string]*syntax.Module, res *synt
 			entry.Entries = append(entry.Entries, Entry{
 				Name: b.Name.Value,
 				Pos:  b.Name.Pos,
-				Type: namer.String(t),
+				Type: namer.StringIn(mod.Name, t),
 			})
 		}
 		analysis.Modules = append(analysis.Modules, entry)
 	}
 
+	modOfFile := map[*source.Source]string{}
+	for _, u := range units {
+		modOfFile[u.file] = u.mod
+	}
 	for node, t := range in.types {
+		pos := syntax.NodePos(node)
 		analysis.Exprs = append(analysis.Exprs, ExprType{
 			Kind: syntax.NodeType(node),
-			Pos:  syntax.NodePos(node),
-			Type: namer.String(t),
+			Pos:  pos,
+			Type: namer.StringIn(modOfFile[pos.File], t),
 		})
 	}
 	// Signatures are checked after the walk, against the finished types. Type
