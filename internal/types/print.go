@@ -600,3 +600,16 @@ func (p *printer) body(t *Type) string {
 	}
 	return strings.Join(parts, " | ")
 }
+
+// UseNamed lists these declarations in the preamble. Needed because a report
+// that displays an author's signature never *renders* the shapes it names, so
+// nothing else would pull their equations in.
+func (n *Namer) UseNamed(decls []Decl) {
+	for _, d := range decls {
+		if n.used[d.Name] {
+			continue
+		}
+		n.used[d.Name] = true
+		n.eqs = append(n.eqs, Equation{Name: d.Name, Params: d.Params, Body: d.Body, Declared: true})
+	}
+}

@@ -42,6 +42,12 @@ type Entry struct {
 	Name string
 	Pos  source.SourcePos
 	Type string
+
+	// Given is true when Type is the author's signature rather than the inferred
+	// shape. Inferred is filled in only when a given signature is contradicted, so
+	// the report can show the disagreement in place.
+	Given    bool
+	Inferred string
 }
 
 // ExprType is one expression's inferred type, for the full dump.
@@ -133,6 +139,12 @@ func Infer(program *syntax.Program, modules map[string]*syntax.Module, res *synt
 	in.expr(program.Body)
 
 	namer := in.namer
+	// Signatures are resolved and checked before the report is assembled, because
+	// an annotated binding is *displayed* as its signature: the report is then the
+	// documented interface, verified, rather than a restatement of what inference
+	// happened to find.
+	given := in.checkSignatures(units, perModule)
+
 	analysis := &Analysis{Program: namer.String(bodyType), Warnings: in.warnings}
 	for _, mod := range sortedModules(modules) {
 		entry := ModuleEntry{Name: mod.Name}
@@ -141,11 +153,19 @@ func Infer(program *syntax.Program, modules map[string]*syntax.Module, res *synt
 			if !ok {
 				continue
 			}
-			entry.Entries = append(entry.Entries, Entry{
-				Name: b.Name.Value,
-				Pos:  b.Name.Pos,
-				Type: namer.StringIn(mod.Name, t),
-			})
+			e := Entry{Name: b.Name.Value, Pos: b.Name.Pos, Type: namer.StringIn(mod.Name, t)}
+			if g, ok := given[b]; ok {
+				// The author's words win. Any declared type the signature names has
+				// to reach the preamble, which rendering the inferred shape would
+				// otherwise have been what did it.
+				e.Given = true
+				if g.conflicted {
+					e.Inferred = e.Type
+				}
+				e.Type = g.text
+				namer.UseNamed(g.names)
+			}
+			entry.Entries = append(entry.Entries, e)
 		}
 		analysis.Modules = append(analysis.Modules, entry)
 	}
@@ -166,8 +186,6 @@ func Infer(program *syntax.Program, modules map[string]*syntax.Module, res *synt
 	// names resolve in the unit's own scope — its declarations plus those of the
 	// modules it imports, qualified or not — which is the rule the language
 	// already uses for values.
-	in.checkSignatures(units, perModule)
-
 	analysis.Warnings = in.warnings
 	analysis.Equations = namer.Equations()
 	analysis.Warnings = append(analysis.Warnings, namer.Notes()...)
@@ -532,9 +550,20 @@ func unitsOf(program *syntax.Program, modules map[string]*syntax.Module) []unit 
 	return out
 }
 
+// A givenSig is a signature that attached to a binding: the text to display, the
+// declared type names it mentions, and whether the check contradicted it.
+type givenSig struct {
+	text       string
+	names      []Decl
+	conflicted bool
+}
+
 // checkSignatures resolves every `--> name : Type` annotation in its own unit's
-// scope, attaches it to the binding below it, and reports contradictions.
-func (in *inferrer) checkSignatures(units []unit, perModule map[string][]Decl) {
+// scope, attaches it to the binding below it, reports contradictions, and returns
+// the signatures that found a binding so the report can display them.
+func (in *inferrer) checkSignatures(units []unit, perModule map[string][]Decl) map[*syntax.Binding]givenSig {
+	out := map[*syntax.Binding]givenSig{}
+
 	// Every binding the walk gave a type to, so a signature can be matched to one.
 	var bindings []*syntax.Binding
 	for node := range in.env {
@@ -563,13 +592,54 @@ func (in *inferrer) checkSignatures(units []unit, perModule map[string][]Decl) {
 			if !ok {
 				continue
 			}
+			g := givenSig{text: sig.Text, names: namedIn(sig.Text, scope)}
 			if msg, bad := conflict(sig.Pat, t, in.namer, "", map[[2]any]bool{}); bad {
+				g.conflicted = true
 				in.warnings = append(in.warnings, Warning{
 					Message: fmt.Sprintf("%s : %s does not hold — %s (inferred %s)",
 						sig.Name, sig.Text, msg, in.namer.String(t)),
 					Pos: sig.Pos,
 				})
 			}
+			out[b] = g
 		}
 	}
+	return out
+}
+
+// namedIn resolves the declared types a signature mentions, so that displaying
+// the signature still puts their equations in the preamble.
+func namedIn(text string, scope typeScope) []Decl {
+	var out []Decl
+	seen := map[string]bool{}
+	for _, ref := range referencedTypes(text) {
+		if mod, name, ok := splitQualified(ref); ok {
+			if tbl, exists := scope.byMod[mod]; exists {
+				if d, found := tbl[name]; found && !seen[d.Name] {
+					seen[d.Name] = true
+					out = append(out, d)
+				}
+			}
+			continue
+		}
+		if d, found := scope.byName[ref]; found && !seen[d.Name] {
+			seen[d.Name] = true
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
+// Coverage counts how many reported module bindings show an author's signature
+// rather than an inferred shape.
+func (a *Analysis) Coverage() (given, total int) {
+	for _, m := range a.Modules {
+		for _, e := range m.Entries {
+			total++
+			if e.Given {
+				given++
+			}
+		}
+	}
+	return given, total
 }

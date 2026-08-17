@@ -53,12 +53,25 @@ func Report(a *Analysis, programPath string) string {
 		}
 		for _, e := range mod.Entries {
 			fmt.Fprintf(&out, "  %-*s : %s\n", width, e.Name, e.Type)
+			// A contradicted signature is still shown as written — it is what the
+			// author claims — with the finding underneath, where the disagreement is
+			// impossible to miss.
+			if e.Inferred != "" {
+				fmt.Fprintf(&out, "  %-*s   ^ does not hold; inferred %s\n", width, "", e.Inferred)
+			}
 		}
 		out.WriteString("\n")
 	}
 
 	fmt.Fprintf(&out, "-- %s\n", programPath)
 	fmt.Fprintf(&out, "  %s : %s\n", "<program>", a.Program)
+
+	// Provenance once, rather than a marker on every line: after a library is
+	// annotated most types are the author's, and saying so per line is noise.
+	if given, total := a.Coverage(); total > 0 {
+		fmt.Fprintf(&out, "\n-- %d of %d module types are given signatures; %d inferred\n",
+			given, total, total-given)
+	}
 
 	if len(a.Warnings) > 0 {
 		fmt.Fprintf(&out, "\n-- %d place(s) the shapes did not line up\n", len(a.Warnings))
