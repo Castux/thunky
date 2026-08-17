@@ -38,61 +38,93 @@ import core, list, math, maybe, text, table in
 
 module
 
+-- A JSON value is a tagged pair: the tag is a string, and what the content is
+-- depends on which tag. The analysis joins the branches rather than keeping them
+-- apart, so it cannot say "content is a number *when* the tag is \"number\"";
+-- leaving the content a parameter says exactly as much as is true, and keeps the
+-- signatures below readable.
+--> Value a = [List Num, a]
+
 -- --- constructors ---------------------------------------------------------
 
+--> jsonNull : Value Num
 jsonNull   = ["null", 0],
+--> jsonTrue : Value Num
 jsonTrue   = ["bool", 1],
+--> jsonFalse : Value Num
 jsonFalse  = ["bool", 0],
+--> jsonBool : Num -> Value Num
 jsonBool   = b -> ["bool", if b 1 0],
+--> jsonNumber : a -> Value a
 jsonNumber = n -> ["number", n],
+--> jsonString : a -> Value a
 jsonString = s -> ["string", s],
+--> jsonArray : a -> Value a
 jsonArray  = items -> ["array", items],
+--> jsonObject : a -> Value a
 jsonObject = pairs -> ["object", pairs],
 
 -- --- inspection -----------------------------------------------------------
 
 -- typeOf value: one of "null", "bool", "number", "string", "array", "object".
+--> typeOf : Value a -> List Num
 typeOf = [tag, content] -> tag,
 
+--> isNull : Value a -> Num
 isNull = [tag, content] -> equal tag "null",
 
 -- get key value: the value for a key of an object, or none.
+--> get : List Num -> Value (Table (List Num) v) -> Maybe v
 get = key -> [tag, content] -> if (equal tag "object")
 	(content > find ([k, v] -> equal k key) > maybe.fmap second)
 	maybe.none,
 
 -- at index value: the element at a zero-based index of an array, or none.
+--> at : Num -> Value (List v) -> Maybe v
 at = index -> [tag, content] -> if (equal tag "array")
 	(if (gte 0 index) (content > drop index > headSafe) maybe.none)
 	maybe.none,
 
 -- path keys value: follow a chain of object keys and array indices. A number in
 -- the path indexes an array, a string looks up an object key.
+-- The value is left a variable rather than claimed as a Value: path walks with
+-- both `get` and `at`, and joining an object step with an array step loses the
+-- tag pair, so `Value b` here would be a claim the code does not support.
+--> path : List a -> b -> Maybe b
 path = steps -> value -> foldl (current -> step ->
 	current > maybe.andThen (v -> if (isList step) (get step v) (at step v)))
 	(maybe.some value) steps,
 
 -- Extractors, each none if the value is not of that type.
+--> asNumber : Value a -> Maybe a
 asNumber = [tag, content] -> if (equal tag "number") (maybe.some content) maybe.none,
+--> asString : Value a -> Maybe a
 asString = [tag, content] -> if (equal tag "string") (maybe.some content) maybe.none,
+--> asBool : Value a -> Maybe a
 asBool   = [tag, content] -> if (equal tag "bool")   (maybe.some content) maybe.none,
+--> asArray : Value a -> Maybe a
 asArray  = [tag, content] -> if (equal tag "array")  (maybe.some content) maybe.none,
+--> asObject : Value a -> Maybe a
 asObject = [tag, content] -> if (equal tag "object") (maybe.some content) maybe.none,
 
 -- toTable value: an object's pairs as a `table`, for the get/set/update family.
+--> toTable : Value (Table k v) -> Table k v
 toTable = [tag, content] -> if (equal tag "object") (table.fromList content) table.empty,
 
 -- --- parsing --------------------------------------------------------------
 
 -- parse text: some value if the whole of text is one JSON document, else none.
+--> parse : List Num -> Maybe (Value a)
 parse = parseValue *> maybe.andThen ([value, rest] ->
 	if (isEmpty (skipSpace rest)) (maybe.some value) maybe.none),
 
 -- skipSpace text: drop leading JSON whitespace.
+--> skipSpace : List Num -> List Num
 skipSpace = dropWhile isSpace,
 
 -- parseValue text: the value at the head of text, and what follows it.
 
+--> parseValue : List Num -> Maybe [Value a, List Num]
 parseValue = skipSpace *> {
 	[] -> maybe.none,
 	[c, rest] -> case
@@ -105,6 +137,7 @@ parseValue = skipSpace *> {
 		else               (parseNumber [c, rest])
 },
 
+--> parseLiteral : List Num -> a -> List Num -> Maybe [a, List Num]
 parseLiteral = word -> value -> text -> if (startsWith word text)
 	(maybe.some [value, drop (length word) text])
 	maybe.none,
@@ -112,12 +145,15 @@ parseLiteral = word -> value -> text -> if (startsWith word text)
 -- Numbers: the JSON grammar's int/frac/exp, scanned as one span and then
 -- converted. `stringToFloat` handles the sign and the fraction; the exponent is
 -- applied here.
+--> isNumberChar : Num -> Num
 isNumberChar = c -> or (isDigit c) (contains c "+-.eE"),
 
 -- parseNumber text, toNumber digits: a JSON number and its conversion.
+--> parseNumber : List Num -> Maybe [Value Num, List Num]
 parseNumber = span isNumberChar *> ([digits, rest] ->
 	if (isEmpty digits) maybe.none (maybe.some [["number", toNumber digits], rest])),
 
+--> toNumber : List Num -> Num
 toNumber = map (c -> if (eq c (char 'E')) (char 'e') c)
 	*> split "e"
 	*> {
@@ -129,6 +165,7 @@ toNumber = map (c -> if (eq c (char 'E')) (char 'e') c)
 
 -- parseStringBody text: the rest of a string, called with the opening quote
 -- already consumed. parseEscape text: one escape sequence and the rest.
+--> parseStringBody : List Num -> Maybe [List Num, List Num]
 parseStringBody = {
 	[] -> maybe.none,                                   -- unterminated
 	[c, rest] -> case
@@ -138,6 +175,7 @@ parseStringBody = {
 			> maybe.fmap ([chars, r] -> [[c, chars], r]))
 },
 
+--> parseEscape : List Num -> Maybe [List Num, List Num]
 parseEscape = {
 	[] -> maybe.none,
 	[e, rest] -> if (eq e (char 'u'))
@@ -146,6 +184,7 @@ parseEscape = {
 			parseStringBody rest > maybe.fmap ([chars, r] -> [[ch, chars], r])))
 },
 
+--> escapeChar : Num -> Maybe Num
 escapeChar = e -> case
 	(eq e dquote)        (maybe.some dquote)
 	(eq e backslash)     (maybe.some backslash)
@@ -157,12 +196,14 @@ escapeChar = e -> case
 	(eq e (char 'f'))    (maybe.some 12)
 	else                 maybe.none,
 
+--> hexValue : Num -> Maybe Num
 hexValue = c -> case
 	(isDigit c)                          (maybe.some (digitToInt c))
 	(and (lte c (char 'a')) (lte (char 'f') c)) (maybe.some (add 10 (sub (char 'a') c)))
 	(and (lte c (char 'A')) (lte (char 'F') c)) (maybe.some (add 10 (sub (char 'A') c)))
 	else                                 maybe.none,
 
+--> parseHex4 : List Num -> Maybe [List Num, List Num]
 parseHex4 = text -> if (lt 4 (length text)) maybe.none
 	-- allOrNone rather than testing with anyMatch isNone and then unwrapping with
 	-- maybe.value: the test and the unwrap were two statements of the same fact,
@@ -178,6 +219,7 @@ parseHex4 = text -> if (lt 4 (length text)) maybe.none
 -- consumed and whitespace skipped, so an immediate closing bracket is the empty
 -- case. parseElements text and parseMembers text carry the comma-separated
 -- runs, and parseMember text is one "key": value pair.
+--> parseArrayBody : List Num -> Maybe [Value a, List Num]
 parseArrayBody = {
 	[c, rest] -> if (eq c (char ']'))
 		(maybe.some [["array", []], rest])
@@ -185,6 +227,7 @@ parseArrayBody = {
 	[] -> maybe.none
 },
 
+--> parseElements : List Num -> Maybe [List a, List Num]
 parseElements = text -> parseValue text > maybe.andThen ([value, rest] ->
 	skipSpace rest > (t -> t > {
 		[c, more] -> case
@@ -195,6 +238,7 @@ parseElements = text -> parseValue text > maybe.andThen ([value, rest] ->
 		[] -> maybe.none
 	})),
 
+--> parseObjectBody : List Num -> Maybe [Value a, List Num]
 parseObjectBody = {
 	[c, rest] -> if (eq c (char '}'))
 		(maybe.some [["object", []], rest])
@@ -202,6 +246,7 @@ parseObjectBody = {
 	[] -> maybe.none
 },
 
+--> parseMembers : List Num -> Maybe [Table (List Num) a, List Num]
 parseMembers = text -> parseMember (skipSpace text) > maybe.andThen ([pair, rest] ->
 	skipSpace rest > (t -> t > {
 		[c, more] -> case
@@ -212,6 +257,7 @@ parseMembers = text -> parseMember (skipSpace text) > maybe.andThen ([pair, rest
 		[] -> maybe.none
 	})),
 
+--> parseMember : List Num -> Maybe [[List Num, a], List Num]
 parseMember = {
 	[c, rest] -> if (eq c dquote)
 		(parseStringBody rest > maybe.andThen ([key, afterKey] ->
@@ -228,6 +274,7 @@ parseMember = {
 -- --- printing -------------------------------------------------------------
 
 -- stringify value: compact, no spaces.
+--> stringify : Value a -> List Num
 stringify = [tag, content] -> case
 	(equal tag "null")    "null"
 	(equal tag "bool")    (if content "true" "false")
@@ -239,8 +286,10 @@ stringify = [tag, content] -> case
 		"}"]),
 
 -- quote s: s as a quoted JSON string. escapeOne c: one character, escaped.
+--> quote : List Num -> List Num
 quote = s -> flatten [[dquote;]; flatMap escapeOne s; [dquote;]],
 
+--> escapeOne : Num -> List Num
 escapeOne = c -> case
 	(eq c dquote)     (flatten [[backslash;]; [dquote;]])
 	(eq c backslash)  (flatten [[backslash;]; [backslash;]])
@@ -250,15 +299,20 @@ escapeOne = c -> case
 	(lt 32 c)         (flatten [[backslash;]; "u"; padLeft 4 (char '0') (toHex4 c)])
 	else              [c;],
 
+--> hexDigits : List Num
 hexDigits = "0123456789abcdef",
+--> toHex4 : Num -> List Num
 toHex4 = n -> if (eq n 0) "0" (toHexGo n),
 -- `mod 16` is always in [0, 15], so nthOr's default is unreachable.
+--> toHexGo : Num -> List Num
 toHexGo = n -> if (eq n 0) [] (append [nthOr 0 (mod 16 n) hexDigits;] (toHexGo (div 16 n))),
 
 -- stringifyPretty indent value: one member or element per line, indented by
 -- `indent` spaces per level. prettyAt indent depth value does the work.
+--> stringifyPretty : Num -> Value a -> List Num
 stringifyPretty = indent -> prettyAt indent 0,
 
+--> prettyAt : Num -> Num -> Value a -> List Num
 prettyAt = indent -> depth -> [tag, content] ->
 	let
 		pad   = n -> replicate (mul indent n) space,

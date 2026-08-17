@@ -13,17 +13,27 @@ module
 char = head,
 
 -- Named code points for characters that cannot appear in string literals
+--> nul : Num
 nul       = 0,   -- \0  null
+--> tab : Num
 tab       = 9,   -- \t  horizontal tab
+--> lf : Num
 lf        = 10,  -- \n  line feed (newline on Unix)
+--> cr : Num
 cr        = 13,  -- \r  carriage return
+--> esc : Num
 esc       = 27,  -- \e  escape
+--> space : Num
 space     = 32,  --     space
+--> dquote : Num
 dquote    = 34,  -- \"  double quote
+--> quote : Num
 quote     = 39,  -- \'  single quote (string delimiter in Thunky)
+--> backslash : Num
 backslash = 92,  -- \\  backslash
 
 -- join separator strings: intercalate separator between each string in the list
+--> join : List Num -> List (List Num) -> List Num
 join = separator -> {
 	[] -> [],
 	[h,t] -> t > {
@@ -53,6 +63,7 @@ join = separator -> {
 -- with no line feed after it is not a break at all, and that is the one case
 -- that costs anything: the line runs through it, so it has to be joined to
 -- whatever the scan after it produces.
+--> lines : List Num -> List (List Num)
 lines = {
 	[] -> [],
 	s -> s > span (c -> and (neq lf c) (neq cr c)) > {
@@ -71,28 +82,34 @@ lines = {
 
 -- unlines ls: join a list of lines with line feeds, without a trailing one, so
 -- that `unlines (lines s)` returns s for any s not ending in a newline.
+--> unlines : List (List Num) -> List Num
 unlines = join [lf;],
 
 -- words s: split on runs of whitespace, discarding the empty pieces that
 -- leading, trailing or repeated whitespace would otherwise leave.
+--> words : List Num -> List (List Num)
 words = splitWith isSpace *> filter (isEmpty *> not),
 
 -- unwords ws: join a list of words with single spaces.
+--> unwords : List (List Num) -> List Num
 unwords = join " ",
 
 -- padLeft n fill s: left-pad string s with code point fill to minimum width n
+--> padLeft : Num -> Num -> List Num -> List Num
 padLeft = n -> fill -> s -> let
 	padLen = n > sub (length s) > max 0
 in
 	prepend (replicate padLen fill) s,
 
 -- padRight n fill s: right-pad string s with code point fill to minimum width n
+--> padRight : Num -> Num -> List Num -> List Num
 padRight = n -> fill -> s -> let
 	padLen = n > sub (length s) > max 0
 in
 	append (replicate padLen fill) s,
 
 -- trim s: remove leading and trailing whitespace from string s
+--> trim : List Num -> List Num
 trim = s -> dropWhile isSpace (reverse (dropWhile isSpace (reverse s))),
 
 -- format template values: fill a template from a list of values, left to right.
@@ -101,6 +118,7 @@ trim = s -> dropWhile isSpace (reverse (dropWhile isSpace (reverse s))),
 -- other `%` is itself, so "5% of" needs no escaping. A placeholder with no value
 -- left is copied through unchanged, and values past the last placeholder are
 -- ignored. String literals may span lines, so a template can be a whole block.
+--> format : List Num -> List a -> List Num
 format = template -> values -> template > {
 	[] -> [],
 	[c, rest] -> core.case
@@ -119,40 +137,57 @@ format = template -> values -> template > {
 
 -- Character classification — all functions take a Unicode code point (integer)
 
+--> isDigit : Num -> Num
 isDigit    = c -> and (lte c (char '0')) (lte (char '9') c), -- 1 if c is a digit
+--> isLower : Num -> Num
 isLower    = c -> and (lte c (char 'a')) (lte (char 'z') c), -- 1 if c is lowercase
+--> isUpper : Num -> Num
 isUpper    = c -> and (lte c (char 'A')) (lte (char 'Z') c), -- 1 if c is uppercase
+--> isAlpha : Num -> Num
 isAlpha    = c -> or (isLower c) (isUpper c), -- 1 if c is a letter
+--> isAlphaNum : Num -> Num
 isAlphaNum = c -> or (isAlpha c) (isDigit c), -- 1 if c is a letter or digit
+--> isSpace : Num -> Num
 isSpace    = c -> eq c space > or (eq c tab) > or (eq c lf) > or (eq c cr), -- 1 if c is whitespace
 
 -- Character conversion
+--> digitToInt : Num -> Num
 digitToInt = c -> sub (char '0') c, -- convert digit character to its numeric value
+--> intToDigit : Num -> Num
 intToDigit = n -> add (char '0') n, -- convert numeric value to its digit character
+--> toLower : Num -> Num
 toLower    = c -> if (isUpper c) (add (sub (char 'A') (char 'a')) c) c, -- convert to lowercase
+--> toUpper : Num -> Num
 toUpper    = c -> if (isLower c) (sub (sub (char 'A') (char 'a')) c) c, -- convert to uppercase
 
+--> stringToLower : List Num -> List Num
 stringToLower = map toLower, -- convert a whole string to lowercase
+--> stringToUpper : List Num -> List Num
 stringToUpper = map toUpper, -- convert a whole string to uppercase
 
 -- stringToInt s: parse a decimal integer string (optional leading '-') as a number.
 -- No validation; non-digit characters produce wrong results.
 
+--> parsePositive : List Num -> Num
 parsePositive = foldl (acc -> c -> add (mul 10 acc) (digitToInt c)) 0,
 
+--> stringToInt : List Num -> Num
 stringToInt = {
 	[] -> 0,
 	[c, rest] -> if (eq c < char '-') (negate (parsePositive rest)) (parsePositive [c, rest])
 },
 
 -- startsWith prefix s: 1 if string s begins with prefix, else 0
+--> startsWith : List Num -> List Num -> Num
 startsWith = prefix -> s -> equal prefix (take (length prefix) s),
 
 -- endsWith suffix s: 1 if string s ends with suffix, else 0
+--> endsWith : List Num -> List Num -> Num
 endsWith = suffix -> s -> let lenS = length s, lenP = length suffix in equal suffix (drop (sub lenP lenS) s),
 
 -- stringToFloat s: parse a decimal float string (optional leading '-', optional '.').
 -- No validation; non-digit/non-dot characters produce wrong results.
+--> stringToFloat : List Num -> Num
 stringToFloat = s ->
 	let
 		zero         = char '0',
@@ -172,6 +207,7 @@ stringToFloat = s ->
 		},
 
 -- splitOne sep s: split string s on separator sep, but stop at the first occurrence
+--> splitOne : List Num -> List Num -> List (List Num)
 splitOne = sep -> s ->
 	spans s >
 	find ([left,right] -> startsWith sep right) >
@@ -182,6 +218,7 @@ splitOne = sep -> s ->
 -- matches at every position without consuming anything, so it gets its own case:
 -- it cuts s into single-character strings rather than looping forever on a
 -- `splitOne` that hands back everything it was given.
+--> split : List Num -> List Num -> List (List Num)
 split = {
 	[] -> map singleton,
 	sep -> splitOne sep *> {
@@ -190,12 +227,16 @@ split = {
 	}
 },
 
+--> containsSub : List Num -> List Num -> Num
 containsSub = sub -> l -> tails l > anyMatch (startsWith sub),
+--> replaceSub : List Num -> List Num -> List Num -> List Num
 replaceSub = sub -> new -> splitOne sub *> join new,
+--> replaceAllSub : List Num -> List Num -> List Num -> List Num
 replaceAllSub = sub -> new -> split sub *> join new,
 
 -- splitOneWith f s: split on the first run of characters satisfying f.
 -- Returns maybe.some [before, matched, after] or maybe.none.
+--> splitOneWith : (Num -> Num) -> List Num -> Maybe [List Num, List Num, List Num]
 splitOneWith = f -> s ->
 	spans s >
 	mapFilter ([left,right] -> span f right > {
@@ -205,18 +246,21 @@ splitOneWith = f -> s ->
 	headSafe,
 
 -- splitWith f s: split on all runs satisfying f; returns a list of non-matching sections.
+--> splitWith : (Num -> Num) -> List Num -> List (List Num)
 splitWith = f -> s ->
 	splitOneWith f s >
 	maybe.fmap ([left, match, rest] -> prepend [left;] (splitWith f rest)) >
 	maybe.default [s;],
 
 -- replaceOneWith f repl s: replace the first run satisfying f with repl match.
+--> replaceOneWith : (Num -> Num) -> (List Num -> List Num) -> List Num -> List Num
 replaceOneWith = f -> repl -> s ->
 	splitOneWith f s >
 	maybe.fmap ([left, match, right] -> flatten [left; repl match; right]) >
 	maybe.default s,
 
 -- replaceAllWith f repl s: replace every run satisfying f with repl match.
+--> replaceAllWith : (Num -> Num) -> (List Num -> List Num) -> List Num -> List Num
 replaceAllWith = f -> repl -> s ->
 	splitOneWith f s >
 	maybe.fmap ([left, match, right] -> flatten [left; repl match; replaceAllWith f repl right]) >
@@ -234,6 +278,7 @@ replaceAllWith = f -> repl -> s ->
 
 -- ltString a b: 1 when b sorts strictly before a, comparing code point by code
 -- point. A string sorts before any string that extends it, so "ab" < "abc".
+--> ltString : List Num -> List Num -> Num
 ltString = a -> b -> [a, b] > {
 	[[], _]           -> 0,          -- a exhausted: b equals a or extends it, so b is not before a
 	[_, []]           -> 1,          -- b exhausted first: b is a proper prefix of a, so b is before a
@@ -243,9 +288,11 @@ ltString = a -> b -> [a, b] > {
 },
 
 -- gtString a b: 1 when b sorts strictly after a.
+--> gtString : List Num -> List Num -> Num
 gtString = a -> b -> ltString b a,
 
 -- sortStrings l: the strings of l in ascending lexicographic order.
+--> sortStrings : List (List Num) -> List (List Num)
 sortStrings = sortWith ltString,
 
 -- Output ---------------------------------------------------------------------
@@ -259,6 +306,7 @@ sortStrings = sortWith ltString,
 -- render v: v as text. A number becomes its digits; a string is already text and
 -- passes through untouched. Any other list is treated as text, which is the one
 -- case the caller has to disambiguate.
+--> render : a -> List Num
 render = v -> v > {
 	[]     -> [],       -- the empty string, not the value "[]"
 	[h, t] -> v,        -- a cons cell: already a list of code points
@@ -268,6 +316,7 @@ render = v -> v > {
 -- writeList l: print one element of l per line, rendering numbers. Returns l, so
 -- it drops into a pipeline. This is `map write > eval` without the `eval`: one
 -- write instead of one per element, and no forcing hack to make the effects run.
+--> writeList : List a -> List a
 writeList = {
 	[] -> [],
 	l  -> seq (l > map render > unlines > write) l
@@ -275,6 +324,7 @@ writeList = {
 
 -- numericColumn cells: 1 when every cell is a number's rendering, so the column
 -- should be right-aligned. Digits, at most one leading '-', and dots for floats.
+--> numericColumn : List (List Num) -> Num
 numericColumn = allMatch (c -> let digits = c > dropWhile (eq (char '-')) in
 	and (isEmpty digits > not) (digits > allMatch (d -> or (isDigit d) (eq (char '.') d)))),
 
@@ -283,6 +333,7 @@ numericColumn = allMatch (c -> let digits = c > dropWhile (eq (char '-')) in
 -- two strings would be the same value as a two-element list and split wrongly.
 -- Short rows are padded with empty cells; columns of numbers are right-aligned;
 -- no line carries trailing spaces.
+--> tableLines : List (List (List Num)) -> List (List Num)
 tableLines = {
 	[]   -> [],
 	rows -> let
@@ -299,6 +350,7 @@ tableLines = {
 },
 
 -- writeTable rows: print rows as an aligned table. Returns rows.
+--> writeTable : List (List (List Num)) -> List (List (List Num))
 writeTable = {
 	[]   -> [],
 	rows -> seq (rows > tableLines > unlines > write) rows
