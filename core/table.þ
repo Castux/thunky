@@ -8,47 +8,65 @@ module
 
 --> Table k v = List [k, v]
 
+--> empty : Table k v
 empty     = [],                   -- the empty table
+--> singleton : k -> v -> Table k v
 singleton = k -> v -> [[k, v];],  -- single-entry table
+--> fromList : List [k, v] -> Table k v
 fromList  = id,                   -- treat a list of [k, v] pairs as a table (documents intent)
+--> toList : Table k v -> List [k, v]
 toList    = id,                   -- convert a table to a list of [k, v] pairs (identity)
 
 -- get k t: some v for the first entry with key k, or none
+--> get : k -> Table k v -> Maybe v
 get = lookup,
 
 -- getOr def k t: value for key k, or def if absent
+--> getOr : v -> k -> Table k v -> v
 getOr = def -> k -> t -> maybe.default def (get k t),
 
 -- containsKey k t: 1 if any entry has key k
+--> containsKey : k -> Table k v -> Num
 containsKey = k -> anyMatch (first *> equal k),
 
 -- containsValue v t: 1 if any entry has value v
+--> containsValue : v -> Table k v -> Num
 containsValue = v -> anyMatch (second *> equal v),
 
 -- remove k t: remove all entries for key k
+--> remove : k -> Table k v -> Table k v
 remove = k -> filter (first *> equal k *> not),
 
 -- set k v t: upsert — remove existing entries for k, then prepend [k, v]; O(n)
+--> set : k -> v -> Table k v -> Table k v
 set = k -> v -> remove k *> prepend [[k, v];],
 
 -- update k f t: apply f to the value for k if present; no-op if absent
+--> update : k -> (v -> v) -> Table k v -> Table k v
 update = k -> f -> map ([k2, v] -> if (equal k2 k) [k2, f v] [k2, v]),
 
 -- updateOr k f def t: apply f to existing value if k is present, else set k to def
+--> updateOr : k -> (v -> v) -> v -> Table k v -> Table k v
 updateOr = k -> f -> def -> t ->
 	if (containsKey k t) (update k f t) (set k def t),
 
+--> keys : Table k v -> List k
 keys   = map first,   -- list of all keys, in order
+--> values : Table k v -> List v
 values = map second,  -- list of all values, in order
 
 -- mapValues f t: apply f to each value, leaving keys unchanged
+--> mapValues : (v -> w) -> Table k v -> Table k w
 mapValues = f -> map ([k, v] -> [k, f v]),
 
 -- filterByKey p t: keep only entries where p k holds
+--> filterByKey : (k -> Num) -> Table k v -> Table k v
 filterByKey = p -> filter (first *> p),
 
 -- filterByValue p t: keep only entries where p v holds
+--> filterByValue : (v -> Num) -> Table k v -> Table k v
 filterByValue = p -> filter (second *> p),
 
 -- merge t1 t2: left-biased union; for duplicate keys, t1's entry is found first by get
+--> merge : Table k v -> Table k v -> Table k v
 merge = prepend
