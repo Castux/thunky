@@ -6,7 +6,11 @@ import list, math, core, maybe in
 module
 
 -- char s: code point of the first (or only) character of string s
-char = head, -- extract the first code point of a string
+-- char s: the first code point of a string. Partial, and marked: it exists so
+-- that `char '0'` reads well, and a literal discharges the assumption at the call
+-- site. Anywhere the string is computed, use headOr instead.
+--> char : List Num! -> Num
+char = head,
 
 -- Named code points for characters that cannot appear in string literals
 nul       = 0,   -- \0  null

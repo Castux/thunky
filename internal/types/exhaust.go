@@ -31,12 +31,15 @@ import (
 // useful than `headSafe` alone, and the marker says out loud that the caller is
 // responsible for the assumption.
 //
-// Two limits worth knowing. The check sees only a binding's *own* patterns, so a
-// function that is partial by delegation — `nth = n -> drop n *> head`, which
-// never matches on the list at all — is not flagged, and its `!` is documentation
-// the checker can neither demand nor verify. And exhaustiveness is relative to
-// the declared domain, so silence means "the patterns cover what you claimed",
-// not "this function is total".
+// This check sees only a binding's *own* patterns, so a function that is partial
+// by delegation — `nth = n -> drop n *> head`, which never matches on the list at
+// all — has nothing here to find. That case belongs to the assertion pass in
+// assert.go, which propagates a callee's `!` to its callers and so demands nth's
+// mark rather than merely tolerating it.
+//
+// One limit remains: exhaustiveness is relative to the declared domain, so
+// silence means "the patterns cover what you claimed", not "this function is
+// total".
 
 // checkExhaustive reports positions where a signature's claimed domain is not
 // covered by the binding's patterns.

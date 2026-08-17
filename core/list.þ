@@ -491,12 +491,13 @@ minimumOr = def -> {
 
 -- nth n l: zero-based index into list l.
 --
--- The `!` here is different in kind from head's. head's assumption is about the
--- argument's shape, and rebuilding a cell discharges it; nth's is a relation
--- between n and the length, which no type here can state — `nth 0 [1;]` works and
--- `nth 5 [1;]` does not, with the same argument type. So nothing discharges it,
--- and every caller inherits the assumption. Reach for nthSafe or nthOr instead
--- unless the index is already known to be in range for a reason of your own.
+-- The `!` here is different in kind from head's, and the analysis treats it so.
+-- head's assumption is about the argument's shape, so writing a pair at the call
+-- site discharges it. nth's is a relation between n and the length, which no type
+-- here can state — `nth 0 [1;]` works and `nth 5 [1;]` does not, with the same
+-- argument shape. Nothing discharges that, so every caller inherits it and has to
+-- carry a `!` of its own. Reach for nthSafe or nthOr unless the index is already
+-- known to be in range for a reason of your own.
 --> nth : Num -> List a! -> a
 nth = n -> drop n *> head,
 

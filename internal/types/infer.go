@@ -147,6 +147,10 @@ func Infer(program *syntax.Program, modules map[string]*syntax.Module, res *synt
 	// happened to find.
 	given := in.checkSignatures(units, perModule)
 
+	// Assertions propagate once every signature is known: a call site that does
+	// not rule out a callee's assumption passes it to the caller.
+	in.checkAssertions(program, modules, given)
+
 	analysis := &Analysis{Program: namer.String(bodyType), Warnings: in.warnings}
 	for _, mod := range sortedModules(modules) {
 		entry := ModuleEntry{Name: mod.Name}
@@ -560,6 +564,10 @@ type givenSig struct {
 	names      []Decl
 	conflicted bool
 	asserted   int // `!` marks, counted so the report can total them
+
+	// sig is the signature as parsed. Propagating an assertion needs the shape,
+	// not just the text: which argument position carries the mark.
+	sig Signature
 }
 
 // checkSignatures resolves every `--> name : Type` annotation in its own unit's
@@ -596,7 +604,7 @@ func (in *inferrer) checkSignatures(units []unit, perModule map[string][]Decl) m
 			if !ok {
 				continue
 			}
-			g := givenSig{text: sig.Text, names: namedIn(sig.Text, scope),
+			g := givenSig{text: sig.Text, names: namedIn(sig.Text, scope), sig: sig,
 				asserted: countAsserted(sig.Pat, map[*pattern]bool{})}
 			if msg, bad := conflict(sig.Pat, t, in.namer, "", map[[2]any]bool{}); bad {
 				g.conflicted = true

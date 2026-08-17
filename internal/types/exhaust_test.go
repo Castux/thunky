@@ -119,11 +119,12 @@ func TestAssertedCounted(t *testing.T) {
 	}
 }
 
-// TestPartialByDelegationNotFlagged records a limit rather than a feature. `nth`
-// never matches on the list — it calls head — so there is no incomplete pattern
-// to find, and its `!` is documentation the checker can neither demand nor
-// verify. Silence here does not mean the function is total.
-func TestPartialByDelegationNotFlagged(t *testing.T) {
+// TestPartialByDelegationDemanded checks the division of labour between the two
+// checks. Exhaustiveness sees only a binding's own patterns, so it has nothing to
+// say about `nth`, which never matches on the list — it calls head. The demand
+// comes from the assertion pass instead (see assert.go), which is why the mark is
+// required here rather than merely tolerated.
+func TestPartialByDelegationDemanded(t *testing.T) {
 	// Each signature has to sit immediately above its own binding, so the bindings
 	// go on separate lines: attachment is by adjacency.
 	src := listDecl +
@@ -133,8 +134,14 @@ func TestPartialByDelegationNotFlagged(t *testing.T) {
 		"--> nth : Num -> List a -> a\n" +
 		"  nth = n -> l -> head l\n" +
 		"in nth"
+	_, _, warns := run(t, src)
+	if len(warns) != 1 || !strings.Contains(warns[0].Message, "nth inherits it") {
+		t.Fatalf("expected the assertion pass to demand a mark on nth, got %s", messages(warns))
+	}
+
+	// And with the mark, silence — from both checks.
+	src = strings.Replace(src, "--> nth : Num -> List a -> a", "--> nth : Num -> List a! -> a", 1)
 	if _, _, warns := run(t, src); len(warns) != 0 {
-		t.Errorf("delegated partiality is not detected today; if this now warns, the "+
-			"limit has been lifted and the docs need updating. got %s", messages(warns))
+		t.Errorf("a marked nth should be silent, got %s", messages(warns))
 	}
 }
