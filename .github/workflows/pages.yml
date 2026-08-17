@@ -31,7 +31,7 @@ jobs:
         run: bash tests/run.sh
       - name: Build site
         run: bash web/build.sh _site
-      # core_tests.þ exits non-zero if any of its 471 assertions fails, and
+      # core_tests.þ exits non-zero if any of its 575 assertions fails, and
       # smoke.mjs propagates that, so this is a real check on the wasm build
       # and not just proof that it starts.
       - name: Smoke-test the wasm build

@@ -40,7 +40,8 @@ jobs:
         shell: powershell
         run: .\tests\run.ps1
 
-      # 471 assertions written in Thunky against the embedded standard library.
+      # 575 assertions written in Thunky against the embedded standard library,
+      # covering every binding LANGUAGE.md documents.
       # The suite refuses to reduce if any of them fails, so a regression is a
       # non-zero exit here rather than a FAIL line nobody reads.
       - name: Standard library unit tests

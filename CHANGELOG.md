@@ -5,7 +5,9 @@ Notable changes to Thunky. The format follows
 [semantic versioning](https://semver.org/spec/v2.0.0.html), where the public
 interface is the language, the standard library, and the command line.
 
-## [Unreleased]
+## [1.0.0] — 2026-08-17
+
+First public release.
 
 ### Added
 
@@ -20,6 +22,13 @@ interface is the language, the standard library, and the command line.
   local modules, not just the program text.
 - CI runs the golden suite, the standard-library suite and the documentation
   snippet checker on Linux and Windows, and the Pages deploy is gated on them.
+- A headless-browser test of the site (`web/page-smoke.mjs`), covering the
+  documentation shell, a runnable snippet, the playground, and share-link
+  round-trips. No dependencies: it speaks the DevTools protocol directly.
+- The standard-library suite grew from 471 to 575 assertions and now covers
+  every binding documented in the language reference. An API audit found 73
+  documented bindings with no assertion; all of them worked, and all of them
+  are now pinned.
 
 ### Changed
 
@@ -54,6 +63,13 @@ interface is the language, the standard library, and the command line.
 - `tests/run.ps1` silently reported success while running no tests at all under
   Windows PowerShell 5.1, and once that was fixed, fed every program a spurious
   BOM on standard input.
+- Every share link in the older `#code=` format, and the uncompressed `#u=`
+  fallback, failed to load: restoring one touched a `let` binding declared
+  below the bootstrap, and the resulting error was reported to the user as a
+  corrupt link.
+- `stdin` and `bstdin` compiled to an identical `PushConst` of a live stream
+  object, so the two were indistinguishable in a bytecode dump. They now have
+  their own opcodes, which had been implemented but never emitted.
 
 ## [v0] — earlier
 

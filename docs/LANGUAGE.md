@@ -1101,6 +1101,17 @@ in
 show [hashmap.get "x" m; hashmap.getOr 0 "z" m]   -- [[10]; 0]
 ```
 
+**`hashmap` and `table` are not drop-in replacements for one another.** They
+share eleven names with the same meaning (`empty`, `singleton`, `get`, `getOr`,
+`set`, `remove`, `update`, `updateOr`, `keys`, `values`, `fromList`), but:
+
+- The pairs-as-a-list operation is `table.toList` and `hashmap.keyValues`. The
+  names differ because the operations do: a table *is* a list of pairs, so
+  `toList` is the identity, while `keyValues` walks a tree.
+- `containsKey`, `containsValue`, `mapValues`, `filterByKey`, `filterByValue`
+  and `merge` exist only for `table`. On a hashmap, go through `keyValues` and
+  rebuild with `fromList`.
+
 ---
 
 #### `bit` — bitwise operations on 32-bit integers

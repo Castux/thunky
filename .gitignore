@@ -12,3 +12,7 @@ thunky.oracle.exe
 thunky
 _site/
 _site*/
+
+# A local working note, deliberately not tracked (it keeps getting swept up
+# by `git add -A`).
+V1-READINESS.md
