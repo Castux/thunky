@@ -159,6 +159,15 @@ func (n *Namer) String(t *Type) string { return n.StringIn("", t) }
 // `Table k v = List [k, v]` *is* a list of pairs, so without a preference every
 // list of pairs in the library reads as `Table`, including list's own `zip` and
 // `lookup`. A module's own name wins inside that module.
+//
+// Preference only breaks ties; it is deliberately not a visibility rule. A name
+// is used wherever its shape matches, even in a module that does not import its
+// home — because `<program> : List Num` is true and useful for a program that
+// never imports `list`, and scoping the name would push most reports back to
+// generated `T<n>`. The cost is that a declaration is effectively report-wide,
+// so only distinctive shapes are worth naming: `Cmp a = (a -> a -> Num)` looks
+// reasonable in heap and renders `math.max` as `Cmp Num`, since with no Bool
+// type that shape is everywhere. Name data, not arities.
 func (n *Namer) StringIn(mod string, t *Type) string {
 	p := &printer{
 		namer:   n,

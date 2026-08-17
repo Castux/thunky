@@ -14,15 +14,20 @@ module
 
 --> Heap a = [] | [Num, a, Heap a, Heap a]
 
+--> emptyHeap : Heap a
 emptyHeap = [], -- the empty heap
 
+--> isEmpty : Heap a -> Num
 isEmpty = { [] -> 1, h -> 0 }, -- 1 if heap is empty, else 0
 
+--> singleton : a -> Heap a
 singleton = value -> [1, value, [], []], -- a heap containing only one value
 
+--> rankOf : Heap a -> Num
 rankOf = { [] -> 0, [rank, value, left, right] -> rank }, -- shortest path to an empty node
 
 -- makeNode value left right: internal helper to maintain leftist property (right rank <= left rank)
+--> makeNode : a -> Heap a -> Heap a -> Heap a
 makeNode = value -> left -> right ->
 	let
 		rankLeft  = rankOf left,
@@ -33,6 +38,7 @@ makeNode = value -> left -> right ->
 			[succ rankLeft, value, right, left],
 
 -- merge cmp h1 h2: merge two heaps ($O(\log n)$)
+--> merge : (a -> a -> Num) -> Heap a -> Heap a -> Heap a
 merge = cmp -> {
 	[] -> h2 -> h2,
 	[rank1, value1, left1, right1] -> {
@@ -44,28 +50,35 @@ merge = cmp -> {
 	}
 },
 
+--> insert : (a -> a -> Num) -> a -> Heap a -> Heap a
 insert = cmp -> x -> h -> merge cmp (singleton x) h, -- insert x into heap h ($O(\log n)$)
 
 -- top h: return the root value; crashes on empty heap.
+--> top : Heap a! -> a
 top = [rank, value, left, right] -> value,
 
 -- topSafe h: return some value for the root, or none if empty.
+--> topSafe : Heap a -> Maybe a
 topSafe = {
 	[] -> maybe.none,
 	[rank, value, left, right] -> maybe.some value
 },
 
 -- pop cmp h: remove the root and return the new heap; crashes on empty heap ($O(\log n)$).
+--> pop : (a -> a -> Num) -> Heap a! -> Heap a
 pop = cmp -> [rank, value, left, right] -> merge cmp left right,
 
 -- popSafe cmp h: return some (new heap) after removing the root, or none if empty.
+--> popSafe : (a -> a -> Num) -> Heap a -> Maybe (Heap a)
 popSafe = cmp -> {
 	[] -> maybe.none,
 	[rank, value, left, right] -> maybe.some (merge cmp left right)
 },
 
+--> fromList : (a -> a -> Num) -> List a -> Heap a
 fromList = cmp -> foldl (h -> x -> insert cmp x h) [], -- build a heap from a list
 
+--> toList : (a -> a -> Num) -> Heap a -> List a
 toList = cmp -> {
 	[] -> [],
 	h -> [top h, toList cmp (pop cmp h)]
@@ -73,10 +86,13 @@ toList = cmp -> {
 
 -- sortBy cmp l: heapsort using the provided comparator.
 -- Use sortAsc / sortDesc for the common cases.
+--> sortBy : (a -> a -> Num) -> List a -> List a
 sortBy = cmp -> l -> toList cmp (fromList cmp l),
 
 -- sortAsc l: sort ascending (smallest first), equivalent to list.sort.
+--> sortAsc : List a -> List a
 sortAsc = sortBy gt,
 
 -- sortDesc l: sort descending (largest first).
+--> sortDesc : List a -> List a
 sortDesc = sortBy lt
