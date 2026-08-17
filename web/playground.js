@@ -143,6 +143,14 @@ const exampleSelect = document.getElementById("example-select");
 const stdinBox = document.getElementById("stdin");
 const status = document.getElementById("status");
 
+// Local modules for the loaded example, passed to the runtime on every run.
+// Declared up here, above the sharing code, because a shared link restores it
+// during module evaluation: an async function body runs synchronously until its
+// first await, so applyPayload can reach this before the module finishes
+// evaluating. Declared further down, that was a temporal-dead-zone
+// ReferenceError which the bootstrap caught and reported as a corrupt link.
+let currentModules = {};
+
 // --- SHARING ---------------------------------------------------------------
 //
 // The fragment carries the whole state of a run, not just the program. It used
@@ -317,9 +325,6 @@ for (const group of EXAMPLE_GROUPS) {
     }
     exampleSelect.appendChild(optgroup);
 }
-
-// Local modules for the loaded example, passed to the runtime on every run.
-let currentModules = {};
 
 async function fetchExampleFile(path) {
     const resp = await fetch("examples/" + path);

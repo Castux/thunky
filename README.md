@@ -176,7 +176,14 @@ deploy. To build and preview locally:
 web/build.sh            # assembles the site (incl. the wasm build) into _site/
 python -m http.server -d _site
 node web/smoke.mjs _site examples/core_tests.þ   # headless check of the wasm build
+node web/page-smoke.mjs _site                    # headless check of the pages themselves
 ```
+
+The two smoke tests cover different things: `smoke.mjs` runs a Thunky program
+through the wasm binary under Node, while `page-smoke.mjs` drives a headless
+Chrome over the DevTools protocol and checks that the documentation renders, a
+snippet runs, the playground runs, and a share link round-trips its program and
+its standard input. Both run in CI, and neither needs anything installed.
 
 ## Contributing
 
@@ -186,7 +193,7 @@ to be leisurely.
 
 If you change the compiler, `tests/run.sh` (or `tests/run.ps1` on Windows) must
 stay green and `examples/core_tests.þ` must exit 0. Both run in CI, along with
-`go vet` and the documentation snippet checker. A deliberate change to output
+`go vet`, the documentation snippet checker, and the two site smoke tests. A deliberate change to output
 means re-blessing the golden files — review that diff before committing it.
 
 ## License

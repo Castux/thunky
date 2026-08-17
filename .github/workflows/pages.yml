@@ -36,6 +36,10 @@ jobs:
       # and not just proof that it starts.
       - name: Smoke-test the wasm build
         run: node web/smoke.mjs _site examples/core_tests.þ
+      # And the pages around it, in a real browser: a top-level JavaScript error
+      # would deploy a dead shell that every other check here would pass.
+      - name: Smoke-test the pages
+        run: node web/page-smoke.mjs _site
       - name: Check the playground's example catalogue
         # Static check only: every program, data file and module the picker
         # names must be in the site. Adding --run also executes the non-slow
