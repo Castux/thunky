@@ -514,7 +514,16 @@ runTests [
 	assert "json.parse-whitespace" (json.parse ' { "a" : 1 } ' > maybe.value > json.stringify) '{"a":1}';
 	assert "json.parse-escape" (json.parse '"q\"b"' > maybe.value > json.asString > maybe.value)
 		(flatten ["q"; [dquote;]; "b"]);
-	assert "json.parse-unicode" (json.parse '"A"' > maybe.value > json.asString) ["A"];
+	-- The test that used to be here was named "unicode" but parsed a literal A, so
+	-- the \uXXXX path — parseHex4, four hex digits and a code point — had no
+	-- coverage at all. Single-quoted strings are raw, so the escape is written
+	-- straight into the source.
+	assert "json.parse-unicode-literal" (json.parse '"A"' > maybe.value > json.asString) ["A"];
+	assert "json.parse-unicode-escape" (json.parse '"\u0041"' > maybe.value > json.asString) ["A"];
+	assert "json.parse-unicode-mixed" (json.parse '"a\u0041b"' > maybe.value > json.asString) ["aAb"];
+	assert "json.parse-unicode-latin1" (json.parse '"\u00e9"' > maybe.value > json.asString) ["é"];
+	assert "json.parse-unicode-bad-digit" (json.parse '"\uZZZZ"') [];
+	assert "json.parse-unicode-truncated" (json.parse '"\u00"') [];
 	assert "json.parse-invalid" (json.parse "{oops}") [];
 	assert "json.parse-trailing" (json.parse "1 2") [];
 	assert "json.get" (json.parse '{"a":7}' > maybe.value > json.get "a" > maybe.andThen json.asNumber) [7];

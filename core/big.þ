@@ -77,8 +77,8 @@ magAdd = a -> b ->
 	let go = carry -> x -> y -> if (and (isEmpty x) (isEmpty y))
 		(if (eq carry 0) [] [carry;])
 		(let
-			hx = if (isEmpty x) 0 (head x),
-			hy = if (isEmpty y) 0 (head y),
+			hx = headOr 0 x,
+			hy = headOr 0 y,
 			s  = add carry (add hx hy)
 		in
 			[mod base s, go (div base s) (drop 1 x) (drop 1 y)])
@@ -90,8 +90,8 @@ magSub = a -> b ->
 	let go = borrow -> x -> y -> if (isEmpty x)
 		[]
 		(let
-			hx = head x,
-			hy = if (isEmpty y) 0 (head y),
+			hx = headOr 0 x,
+			hy = headOr 0 y,
 			d  = sub (add borrow hy) hx        -- hx - (hy + borrow)
 		in
 			if (lt 0 d)
@@ -119,7 +119,7 @@ magMulSmall = k -> mag ->
 	let go = carry -> m -> if (isEmpty m)
 		(if (eq carry 0) [] [carry;])
 		(let
-			product = mulLimb k (head m),
+			product = mulLimb k (headOr 0 m),
 			low     = add (first product) carry,
 			limb    = mod base low,
 			carry2  = add (second product) (div base low)
@@ -138,13 +138,13 @@ magMul = a -> b -> b
 magDouble = magMulSmall 2,
 
 magBitLength = mag -> if (magIsZero mag) 0
-	(let top = last mag in add (mul limbBits (pred (length mag))) (bitLengthOf top)),
+	(let top = lastOr 0 mag in add (mul limbBits (pred (length mag))) (bitLengthOf top)),
 
 bitLengthOf = n -> if (eq n 0) 0 (succ (bitLengthOf (div 2 n))),
 
 magTestBit = i -> mag ->
 	let limbIndex = div limbBits i in
-		if (gte (length mag) limbIndex) 0 (bit.bitAt (mod limbBits i) (nth limbIndex mag)),
+		bit.bitAt (mod limbBits i) (nthOr 0 limbIndex mag),
 
 -- divTwoByOne high low d: (high * 2^32 + low) / d, for high < d < 2^32, as
 -- [quotient, remainder]. The numerator reaches 2^64, so this cannot be a single
@@ -180,20 +180,20 @@ magDivMod = a -> b -> case
 	(magIsZero b)              [[], []]                      -- caller's error; no crash
 	(eq (negate 1) (magCompare a b)) [[], a]                  -- a < b
 	-- magDivModSmall reports its remainder as a plain number, not a magnitude.
-	(eq 1 (length b))          (magDivModSmall (head b) a
+	(eq 1 (length b))          (magDivModSmall (headOr 0 b) a
 		> ([quotient, remainder] -> [quotient, magFromNumber remainder]))
 	else                       (magDivModLarge a b),
 
 magDivModLarge = a -> b ->
 	let
 		-- Normalise: shift left so the divisor's top limb has its high bit set.
-		shift  = sub (bitLengthOf (last b)) limbBits,
+		shift  = sub (bitLengthOf (lastOr 0 b)) limbBits,
 		scale  = pow shift 2,
 		an     = magMulSmall scale a,
 		bn     = magMulSmall scale b,
 
 		size   = length bn,
-		topB   = last bn,
+		topB   = lastOr 0 bn,
 
 		-- One limb of the dividend, one limb of the quotient.
 		step = [quotient, remainder] -> limb ->
@@ -202,8 +202,8 @@ magDivModLarge = a -> b ->
 				-- The two limbs the estimate is read from: current is at most one
 				-- limb longer than the divisor, so these are its top two aligned
 				-- against the divisor's length, or zero where it is shorter.
-				high     = if (gt size (length current)) (nth size current) 0,
-				low      = if (gte size (length current)) (nth (pred size) current) 0,
+				high     = nthOr 0 size current,
+				low      = nthOr 0 (pred size) current,
 				estimate = if (gte topB high)
 					(sub 1 base)                            -- saturated: clamp to base - 1
 					(first (divTwoByOne high low topB)),
@@ -251,8 +251,8 @@ magDivModSmall = d -> mag ->
 		[
 			quotientHalves
 				> splitEqual 2
-				> map (pair -> add (head pair)
-					(mul halfBase (if (eq 1 (length pair)) 0 (nth 1 pair))))
+				> map (pair -> add (headOr 0 pair)
+					(mul halfBase (nthOr 0 1 pair)))
 				> normalize,
 			second divided
 		],
@@ -376,11 +376,16 @@ chunkBase   = 1000000000,      -- 10^9, the largest power of ten below 2^32
 -- division rather than one.
 intToString = [sign, mag] -> if (magIsZero mag) "0"
 	(let
-		chunks = magToChunks mag,
-		body = flatten [
-			string (head chunks);
-			tail chunks > map (c -> padLeft chunkDigits (char '0') (string c)) > flatten
-		]
+		-- Matching the chunks says what `head`/`tail` said, without assuming the
+		-- list is non-empty. The empty case cannot arise — magIsZero ruled it out
+		-- above — but saying so costs one line and asserts nothing.
+		body = magToChunks mag > {
+			[] -> "",
+			[hd, rest] -> flatten [
+				string hd;
+				rest > map (c -> padLeft chunkDigits (char '0') (string c)) > flatten
+			]
+		}
 	in
 		if (lt 0 sign) (prepend "-" body) body),
 

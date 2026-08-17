@@ -84,4 +84,6 @@ fromBits = bits -> bits > mapIndex (k -> b -> mul b (powerOfTwo k)) > sum,
 -- toHex n: eight lowercase hex digits, most significant first.
 hexDigits = "0123456789abcdef",
 toHex = n -> range 0 8
-	> map (i -> nth (bAnd 15 (shiftRight (mul 4 (sub i 7)) n)) hexDigits)
+	-- `bAnd 15` is always in [0, 15] and hexDigits has sixteen entries, so the
+	-- default is unreachable; nthOr says that without asserting it.
+	> map (i -> nthOr 0 (bAnd 15 (shiftRight (mul 4 (sub i 7)) n)) hexDigits)

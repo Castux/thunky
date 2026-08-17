@@ -283,10 +283,10 @@ tableLines = {
 	[]   -> [],
 	rows -> let
 		grid    = rows > map (map render),
-		columns = grid > map length > maximum,
+		columns = grid > map length > maximumOr 0,
 		square  = grid > map (r -> append (replicate (sub (length r) columns) []) r),
 		cells   = transpose square,
-		specs   = zip (cells > map (map length *> maximum)) (cells > map numericColumn),
+		specs   = zip (cells > map (map length *> maximumOr 0)) (cells > map numericColumn),
 		pad     = [width, numeric] -> c -> if numeric (padLeft width space c) (padRight width space c)
 	in
 		square > map (r -> zipWith pad specs r
