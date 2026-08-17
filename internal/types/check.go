@@ -273,15 +273,25 @@ func attach(sigs []Signature, bindings []*syntax.Binding) (map[*syntax.Binding]S
 	var warns []Warning
 
 	type entry struct {
-		line int
-		b    *syntax.Binding
+		line  int
+		start int
+		b     *syntax.Binding
 	}
 	var byLine []entry
 	for _, b := range bindings {
 		line, _, _ := b.Name.Pos.LineCol()
-		byLine = append(byLine, entry{line, b})
+		byLine = append(byLine, entry{line, b.Name.Pos.Start, b})
 	}
-	sort.Slice(byLine, func(i, j int) bool { return byLine[i].line < byLine[j].line })
+	// Ties on a line are broken by column, because a one-line definition puts more
+	// than one binding there: `floorMod = a -> n -> let r = mod a n in ...` is both
+	// floorMod and r, and a signature above it means the leftmost of them. Sorting
+	// by line alone left the choice to sort.Slice, which does not promise an order.
+	sort.Slice(byLine, func(i, j int) bool {
+		if byLine[i].line != byLine[j].line {
+			return byLine[i].line < byLine[j].line
+		}
+		return byLine[i].start < byLine[j].start
+	})
 
 	for _, s := range sigs {
 		sline, _, _ := s.Pos.LineCol()

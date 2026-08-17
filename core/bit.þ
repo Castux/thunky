@@ -23,24 +23,31 @@ import core, math, list in
 
 module
 
+--> width : Num
 width = 32,                 -- bits per word
+--> size : Num
 size  = 4294967296,         -- 2^32
+--> maxValue : Num
 maxValue = 4294967295,      -- 2^32 - 1
 
 -- wrap n: bring any integer into [0, 2^32) by two's-complement wrapping.
 -- `mod` truncates toward zero, so a negative operand needs the extra step.
+--> wrap : Num -> Num
 wrap = n -> let r = mod size n in if (lt 0 r) (add size r) r,
 
 -- powerOfTwo k: 2^k, for k in [0, 32].
+--> powerOfTwo : Num -> Num
 powerOfTwo = k -> pow k 2,
 
 -- bitAt k n: bit k of n (k = 0 is the least significant), as 0 or 1.
+--> bitAt : Num -> Num -> Num
 bitAt = k -> div (powerOfTwo k) *> mod 2,
 
 -- combine f a b: the general shape of a logical operation. It walks both
 -- operands bit by bit, applying f to the two bits, and rebuilds the result as
 -- it goes; it stops when both operands have run out, so the cost is the width
 -- of the larger operand rather than a fixed 32 steps.
+--> combine : (Num -> Num -> Num) -> Num -> Num -> Num
 combine = f -> a -> b ->
 	let go = weight -> x -> y -> if (and (eq x 0) (eq y 0))
 		0
@@ -52,37 +59,54 @@ combine = f -> a -> b ->
 
 -- bAnd a b, bOr a b, bXor a b: the binary logical operations.
 -- bNot n: the one's complement within 32 bits.
+--> bAnd : Num -> Num -> Num
 bAnd = combine (x -> y -> mul x y),                    -- 1 only when both are 1
+--> bOr : Num -> Num -> Num
 bOr  = combine (x -> y -> max x y),                    -- 1 when either is 1
+--> bXor : Num -> Num -> Num
 bXor = combine (x -> y -> mod 2 (add x y)),            -- 1 when they differ
+--> bNot : Num -> Num
 bNot = n -> sub n maxValue,
 
 -- shiftLeft k n, shiftRight k n: shift n by k bits. A left shift drops the bits
 -- carried past bit 31.
+--> shiftLeft : Num -> Num -> Num
 shiftLeft  = k -> mul (powerOfTwo k) *> mod size,
+--> shiftRight : Num -> Num -> Num
 shiftRight = k -> div (powerOfTwo k),
 
 -- rotateLeft k n, rotateRight k n: rotate n by k bits within its 32.
+--> rotateLeft : Num -> Num -> Num
 rotateLeft  = k -> n -> bOr (shiftLeft k n) (shiftRight (sub k width) n),
+--> rotateRight : Num -> Num -> Num
 rotateRight = k -> n -> rotateLeft (sub k width) n,
 
 -- Single-bit access, all taking the bit index first and the value second:
 -- testBit k n, setBit k n, clearBit k n, flipBit k n.
+--> testBit : Num -> Num -> Num
 testBit  = bitAt,
+--> setBit : Num -> Num -> Num
 setBit   = k -> n -> bOr n (powerOfTwo k),
+--> clearBit : Num -> Num -> Num
 clearBit = k -> n -> bAnd n (bNot (powerOfTwo k)),
+--> flipBit : Num -> Num -> Num
 flipBit  = k -> n -> bXor n (powerOfTwo k),
 
 -- popCount n: how many bits are set.
+--> popCount : Num -> Num
 popCount = n -> if (eq n 0) 0 (add (mod 2 n) (popCount (div 2 n))),
 
 -- toBits n: the bits of n, least significant first, exactly `width` of them.
 -- fromBits bits: the inverse, accepting a list shorter than `width`.
+--> toBits : Num -> List Num
 toBits   = n -> range 0 width > map (k -> bitAt k n),
+--> fromBits : List Num -> Num
 fromBits = bits -> bits > mapIndex (k -> b -> mul b (powerOfTwo k)) > sum,
 
 -- toHex n: eight lowercase hex digits, most significant first.
+--> hexDigits : List Num
 hexDigits = "0123456789abcdef",
+--> toHex : Num -> List Num
 toHex = n -> range 0 8
 	-- `bAnd 15` is always in [0, 15] and hexDigits has sixteen entries, so the
 	-- default is unreachable; nthOr says that without asserting it.

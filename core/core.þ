@@ -4,40 +4,56 @@
 module
 -- Combinators
 
+--> id : a -> a
 id = x -> x, -- identity function: returns its argument unchanged
+--> compose : (a -> b) -> (c -> a) -> c -> b
 compose = f -> g -> x -> f (g x), -- right-to-left function composition: (f . g) x = f (g x)
+--> flip : (a -> b -> c) -> b -> a -> c
 flip = f -> x -> y -> f y x, -- flip the first two arguments of a function
+--> curry : ([a, b] -> c) -> a -> b -> c
 curry = f -> x -> y -> f [x,y], -- convert a function on a 2-tuple into a curried function
+--> uncurry : (a -> b -> c) -> [a, b] -> c
 uncurry = f -> [x,y] -> f x y, -- convert a curried function into a function on a 2-tuple
+--> const : a -> b -> a
 const = c -> x -> c, -- constant function: returns c for any argument
 
 -- on f g x y: apply g to x and y, then apply f to the results.
+--> on : (a -> a -> b) -> (c -> a) -> c -> c -> b
 on = f -> g -> x -> y -> f (g x) (g y),
 
 -- ap f g x: apply f and g to the same x, f x consuming g x. Aka. the S combinator.
+--> ap : (a -> b -> c) -> (a -> b) -> a -> c
 ap = f -> g -> x -> (f x) (g x),
 
 -- fork h f g x: apply f and g to the same x, then combine with h. Aka. the Phi
 -- combinator; fork h f g is ap (f *> h) g.
+--> fork : (a -> b -> c) -> (d -> a) -> (d -> b) -> d -> c
 fork = h -> f -> g -> x -> h (f x) (g x),
 
 -- fix f: the fixed-point combinator (recursive definitions without let)
+--> fix : (a -> a) -> a
 fix = f -> let x = f x in x,
 
 -- Tuple accessors
 
+--> first : [a, b] -> a
 first = [a,b] -> a, -- extract the first element of a 2-tuple
+--> second : [a, b] -> b
 second = [a,b] -> b, -- extract the second element of a 2-tuple
 
 -- Booleans and control flow
 
+--> true : Num
 true = 1,
+--> false : Num
 false = 0,
 
 -- if cond t f: standard conditional (cond must be 1 or 0)
+--> if : Num -> a -> a -> a
 if = cond -> t -> f -> cond > { 1 -> t, 0 -> f },
 
 -- case cond1 val1 cond2 val2 ... else defval
+--> else : Num
 else = 2,
 case = cond -> t -> cond > {
 	0 -> case,
@@ -51,6 +67,14 @@ case = cond -> t -> cond > {
 	2 -> t
 },
 
+--> and : Num -> Num -> Num
 and = a -> b -> if a b 0, -- logical AND (short-circuiting)
+--> or : Num -> Num -> Num
 or  = a -> b -> if a 1 b, -- logical OR (short-circuiting)
-not = { 0 -> 1, 1 -> 0 } -- logical NOT
+-- Defined through `if`, like `and` and `or` above, rather than by matching 0 and
+-- 1. Matching them makes not partial on Num — `not 5` has no case — and marking
+-- that with `!` would push the mark onto every caller of a function this common.
+-- The behaviour is unchanged: a value that is neither 0 nor 1 still fails, inside
+-- `if` rather than here.
+--> not : Num -> Num
+not = a -> if a 0 1 -- logical NOT

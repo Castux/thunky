@@ -9,25 +9,33 @@ module
 
 --> Hashmap a b = [] | [Num, a, b, Hashmap a b, Hashmap a b]
 
+--> empty : Hashmap k v
 empty = [],
 
+--> singleton : k -> v -> Hashmap k v
 singleton = k -> v -> [hash k, k, v, [], []],
 
+--> fromList : List [k, v] -> Hashmap k v
 fromList = foldr ([k,v] -> set k v) empty,
 
 -- minNode t: [hash, key, value] of the leftmost node of non-empty tree t
+--> minNode : Hashmap k v -> Maybe [Num, k, v]
 minNode = {
-	[h, k, v, [], _] -> [h, k, v],
+	[] -> maybe.none,
+	[h, k, v, [], _] -> maybe.some [h, k, v],
 	[h, k, v, left, _] -> minNode left
 },
 
 -- removeMin t: tree t with its leftmost node removed
+--> removeMin : Hashmap k v -> Hashmap k v
 removeMin = {
+	[] -> [],
 	[h, k, v, [], right] -> right,
 	[h, k, v, left, right] -> [h, k, v, removeMin left, right]
 },
 
 -- get k m: some value if key k is in m, none otherwise
+--> get : k -> Hashmap k v -> Maybe v
 get = k ->
 	let
 		h = hash k,
@@ -42,9 +50,11 @@ get = k ->
 	in go,
 
 -- getOr def k m: value for key k, or def if absent
+--> getOr : v -> k -> Hashmap k v -> v
 getOr = def -> k -> m -> maybe.default def (get k m),
 
 -- set k v m: insert or replace the entry for key k
+--> set : k -> v -> Hashmap k v -> Hashmap k v
 set = k -> v ->
 	let
 		h = hash k,
@@ -59,13 +69,14 @@ set = k -> v ->
 	in go,
 
 -- remove k m: remove the entry for key k (no-op if absent)
+--> remove : k -> Hashmap k v -> Hashmap k v
 remove = k ->
 	let
 		h = hash k,
-		removeNode = left -> right -> right > {
-			[] -> left,
-			_ -> minNode right > {[mh, mk, mv] -> [mh, mk, mv, left, removeMin right]}
-		},
+		-- minNode answers none for the empty tree, so it does the emptiness test
+		-- as well as the lookup, and the two-branch match on `right` goes away.
+		removeNode = left -> right -> minNode right
+			> maybe.mapDefault left ([mh, mk, mv] -> [mh, mk, mv, left, removeMin right]),
 
 		go = {
 			[] -> [],
@@ -78,6 +89,7 @@ remove = k ->
 	in go,
 
 -- update k f m: apply f to the value at key k
+--> update : k -> (v -> v) -> Hashmap k v -> Hashmap k v
 update = k -> f ->
 	let
 		h = hash k,
@@ -93,6 +105,7 @@ update = k -> f ->
 		go,
 
 -- updateOr k f def m: apply f to the value at key k, or insert def if not found
+--> updateOr : k -> (v -> v) -> v -> Hashmap k v -> Hashmap k v
 updateOr = k -> f -> def ->
 	let
 		h = hash k,
@@ -108,18 +121,21 @@ updateOr = k -> f -> def ->
 		go,
 
 -- keys m: list of all keys in hash order
+--> keys : Hashmap k v -> List k
 keys = {
 	[] -> [],
 	[h, k, v, left, right] -> prepend (keys left) [k, keys right]
 },
 
 -- values m: list of all values in hash order
+--> values : Hashmap k v -> List v
 values = {
 	[] -> [],
 	[h, k, v, left, right] -> prepend (values left) [v, values right]
 },
 
 -- keyValues m: list of all key-value pairs in hash order
+--> keyValues : Hashmap k v -> List [k, v]
 keyValues = {
 	[] -> [],
 	[h, k, v, left, right] -> prepend (keyValues left) [[k,v], keyValues right]

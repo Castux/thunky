@@ -6,27 +6,38 @@ module
 
 -- builtin: add, mul, sub, div, fdiv, mod, fmod, sqrt, eq, lt, lte, gte, gt, neq
 
+--> succ : Num -> Num
 succ = add 1, -- successor: add 1
+--> pred : Num -> Num
 pred = sub 1, -- predecessor: subtract 1
+--> negate : Num -> Num
 negate = n -> sub n 0, -- arithmetic negation: negate n = 0 - n
 
 -- signum n: sign of n (-1, 0, or 1)
+--> signum : Num -> Num
 signum = n -> if (eq n 0) 0 (if (lt 0 n) (negate 1) 1),
 
 -- abs n: absolute value of n
+--> abs : Num -> Num
 abs = n -> if (lt 0 n) (negate n) n,
 
+--> max : Num -> Num -> Num
 max = a -> b -> if (lt a b) a b, -- larger of two numbers
+--> min : Num -> Num -> Num
 min = a -> b -> if (lt a b) b a, -- smaller of two numbers
+--> clamp : Num -> Num -> Num -> Num
 clamp = lo -> hi -> n -> max lo (min hi n), -- clamp n to the range [lo, hi]
 
 -- trunc n: round n towards zero (integer division by 1)
+--> trunc : Num -> Num
 trunc = div 1,
 
 -- isInteger n: checks if number is integer
+--> isInteger : Num -> Num
 isInteger = x -> eq x (trunc x),
 
 -- floor n: round n towards negative infinity
+--> floor : Num -> Num
 floor = n ->
 	let t = trunc n in
 	if (lt 0 n)           -- n < 0
@@ -34,6 +45,7 @@ floor = n ->
 		t,
 
 -- ceil n: round n towards positive infinity
+--> ceil : Num -> Num
 ceil = n ->
 	let t = trunc n in
 	if (lt 0 n)           -- n < 0
@@ -41,16 +53,21 @@ ceil = n ->
 		(if (eq t n) t (add 1 t)),
 
 -- round n: round n to the nearest integer, half toward positive infinity (round half up)
+--> round : Num -> Num
 round = n -> floor (add 0.5 n),
 
 -- floorMod a n: n mod a, always in [0, a) for positive a (mod truncates
 -- toward zero, so mod 100 (-50) = -50; this corrects it back into range)
+--> floorMod : Num -> Num -> Num
 floorMod = a -> n -> let r = mod a n in if (lt 0 r) (add a r) r,
 
+--> even : Num -> Num
 even = n -> eq 0 (mod 2 n), -- 1 if n is even
+--> odd : Num -> Num
 odd  = n -> eq 1 (mod 2 n), -- 1 if n is odd
 
 -- gcd a b: greatest common divisor of a and b
+--> gcd : Num -> Num -> Num
 gcd = a -> b ->
 	let
 		absA = abs a,
@@ -63,18 +80,21 @@ gcd = a -> b ->
 		go [absA, absB],
 
 -- lcm a b: least common multiple of a and b
+--> lcm : Num -> Num -> Num
 lcm = a -> b ->
 	if (or (eq a 0) (eq b 0))
 		0
 		(abs (mul (div (gcd a b) b) a)),
 
 -- digits n: list of the decimal digits of a non-negative integer n
+--> digits : Num -> List Num
 digits = {
 	0 -> [0;],
 	n -> (n > iterate (div 10) > takeWhile (gt 0) > map (mod 10) > reverse)
 },
 
 -- factorial n: n! for non-negative integer n
+--> factorial : Num -> Num
 factorial = {
 	0 -> 1,
 	n -> mul n (factorial (pred n))
