@@ -1,6 +1,7 @@
 package types
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/Castux/thunky/internal/source"
@@ -103,8 +104,11 @@ func Infer(program *syntax.Program, modules map[string]*syntax.Module, res *synt
 	// a shape is *called*, so sharing them costs nothing and keeps one name for
 	// one shape. (Checking a signature will need the module's own import scope.)
 	in.namer = NewNamer()
-	for _, file := range sourcesOf(program, modules) {
-		decls, warns := CollectDecls(file)
+	units := unitsOf(program, modules)
+	perModule := map[string][]Decl{}
+	for _, u := range units {
+		decls, warns := CollectDecls(u.file)
+		perModule[u.mod] = append(perModule[u.mod], decls...)
 		in.namer.Declare(decls)
 		in.warnings = append(in.warnings, warns...)
 	}
@@ -146,6 +150,13 @@ func Infer(program *syntax.Program, modules map[string]*syntax.Module, res *synt
 			Type: namer.String(t),
 		})
 	}
+	// Signatures are checked after the walk, against the finished types. Type
+	// names resolve in the unit's own scope — its declarations plus those of the
+	// modules it imports, qualified or not — which is the rule the language
+	// already uses for values.
+	in.checkSignatures(units, perModule)
+
+	analysis.Warnings = in.warnings
 	analysis.Equations = namer.Equations()
 	analysis.Warnings = append(analysis.Warnings, namer.Notes()...)
 
@@ -479,4 +490,74 @@ func sourcesOf(program *syntax.Program, modules map[string]*syntax.Module) []*so
 		add(mod.Start)
 	}
 	return out
+}
+
+// unitsOf describes each source file the analysis saw: which module it is (the
+// empty string for the program), the file itself, and what it imports.
+func unitsOf(program *syntax.Program, modules map[string]*syntax.Module) []unit {
+	var out []unit
+	seen := map[*source.Source]bool{}
+
+	names := func(ns []*syntax.Name) []string {
+		out := make([]string, len(ns))
+		for i, n := range ns {
+			out[i] = n.Value
+		}
+		return out
+	}
+
+	if program.Start.File != nil {
+		seen[program.Start.File] = true
+		out = append(out, unit{mod: "", file: program.Start.File, imports: names(program.Imports)})
+	}
+	for _, mod := range sortedModules(modules) {
+		if mod.Start.File == nil || seen[mod.Start.File] {
+			continue
+		}
+		seen[mod.Start.File] = true
+		out = append(out, unit{mod: mod.Name, file: mod.Start.File, imports: names(mod.Imports)})
+	}
+	return out
+}
+
+// checkSignatures resolves every `--> name : Type` annotation in its own unit's
+// scope, attaches it to the binding below it, and reports contradictions.
+func (in *inferrer) checkSignatures(units []unit, perModule map[string][]Decl) {
+	// Every binding the walk gave a type to, so a signature can be matched to one.
+	var bindings []*syntax.Binding
+	for node := range in.env {
+		if b, ok := node.(*syntax.Binding); ok {
+			bindings = append(bindings, b)
+		}
+	}
+
+	for _, u := range units {
+		scope := buildScope(u, perModule)
+		sigs, warns := CollectSignatures(u.file, scope)
+		in.warnings = append(in.warnings, warns...)
+
+		// Only the bindings in this file can be the target of its signatures.
+		var local []*syntax.Binding
+		for _, b := range bindings {
+			if b.Name.Pos.File == u.file {
+				local = append(local, b)
+			}
+		}
+		bound, warns := attach(sigs, local)
+		in.warnings = append(in.warnings, warns...)
+
+		for b, sig := range bound {
+			t, ok := in.env[b]
+			if !ok {
+				continue
+			}
+			if msg, bad := conflict(sig.Pat, t, in.namer, "", map[[2]any]bool{}); bad {
+				in.warnings = append(in.warnings, Warning{
+					Message: fmt.Sprintf("%s : %s does not hold — %s (inferred %s)",
+						sig.Name, sig.Text, msg, in.namer.String(t)),
+					Pos: sig.Pos,
+				})
+			}
+		}
+	}
 }

@@ -7,6 +7,8 @@ import list, maybe, core in
 
 module
 
+--> Hashmap a b = [] | [Num, a, b, Hashmap a b, Hashmap a b]
+
 empty = [],
 
 singleton = k -> v -> [hash k, k, v, [], []],

@@ -120,9 +120,17 @@ func TestAnnotErrors(t *testing.T) {
 		}
 	}
 
-	// A well-formed signature is recognised and does nothing, quietly: checking
-	// is a later stage, and warning on every correct annotation would be noise.
-	if _, _, warns := run(t, "--> length : List a -> Num\nadd 1 2"); len(warns) != 0 {
+	// A signature naming an undeclared type is reported, since it cannot be
+	// checked against anything.
+	_, _, warns := run(t, "--> length : List a -> Num\nlet length = x -> 1 in length")
+	if len(warns) != 1 || !strings.Contains(warns[0].Message, `unknown type "List"`) {
+		t.Errorf("expected an unknown-type complaint, got %v", warns)
+	}
+
+	// With the type declared, a true signature is silent.
+	if _, _, warns := run(t,
+		"--> List a = [] | [a, List a]\n--> length : List a -> Num\n"+
+			"let length = { [] -> 0, [h, t] -> add 1 (length t) } in length"); len(warns) != 0 {
 		t.Errorf("a valid signature should be silent, got %v", warns)
 	}
 }
@@ -171,5 +179,153 @@ func TestAnnotNotes(t *testing.T) {
 	// The same name declared identically twice is not worth mentioning.
 	if _, _, warns = run(t, "--> List a = [] | [a, List a]\n--> List a = [] | [a, List a]\nadd 1 2"); len(warns) != 0 {
 		t.Errorf("an identical redeclaration should be silent, got %v", warns)
+	}
+}
+
+// runWithModule analyses a program plus one module, so signatures can be tested
+// where they actually belong — inside a module, resolving names across an import.
+func runWithModule(t *testing.T, modName, modSrc, progSrc string) []types.Warning {
+	t.Helper()
+	modTokens := syntax.LexContent(modName+".th", modSrc)
+	if modTokens == nil {
+		t.Fatalf("lexing module failed:\n%s", modSrc)
+	}
+	mod := syntax.ParseModule(modTokens)
+	if mod == nil {
+		t.Fatalf("parsing module failed:\n%s", modSrc)
+	}
+	mod.Name = modName
+
+	tokens := syntax.LexContent("test.th", progSrc)
+	program := syntax.ParseProgram(tokens)
+	if program == nil {
+		t.Fatalf("parsing program failed:\n%s", progSrc)
+	}
+	modules := map[string]*syntax.Module{modName: mod}
+	res := syntax.Resolve(program, modules)
+	return types.Infer(program, modules, res).Warnings
+}
+
+func messages(ws []types.Warning) string {
+	out := make([]string, len(ws))
+	for i, w := range ws {
+		out[i] = w.Message
+	}
+	return strings.Join(out, " | ")
+}
+
+// TestSignatureHolds checks that a true claim is silent, including one that is
+// deliberately narrower than what inference found.
+func TestSignatureHolds(t *testing.T) {
+	srcs := []string{
+		"--> List a = [] | [a, List a]\n" +
+			"let\n  --> n : List a -> Num\n  n = { [] -> 0, [h, t] -> add 1 (n t) }\nin n",
+		// Narrower than the finding, and true: specialisation is not an error.
+		"--> List a = [] | [a, List a]\n" +
+			"let\n  --> n : List Num -> Num\n  n = { [] -> 0, [h, t] -> add 1 (n t) }\nin n",
+		// A variable claims nothing concrete, so it never contradicts.
+		"let\n  --> f : a -> b\n  f = x -> add x 1\nin f",
+	}
+	for _, src := range srcs {
+		if _, _, warns := run(t, src); len(warns) != 0 {
+			t.Errorf("expected no warnings for\n%s\n  got %s", src, messages(warns))
+		}
+	}
+}
+
+// TestSignatureContradiction checks the claims that are actually wrong.
+func TestSignatureContradiction(t *testing.T) {
+	cases := []struct{ src, want string }{
+		{
+			"--> List a = [] | [a, List a]\n" +
+				"let\n  --> n : Num -> Num\n  n = { [] -> 0, [h, t] -> add 1 (n t) }\nin n",
+			"claimed a number",
+		},
+		{
+			// One arrow too many.
+			"--> List a = [] | [a, List a]\n" +
+				"let\n  --> n : List a -> Num -> Num\n  n = { [] -> 0, [h, t] -> add 1 (n t) }\nin n",
+			"claimed a function",
+		},
+		{
+			// The tuple arity is wrong.
+			"let\n  --> f : [Num, Num, Num] -> Num\n  f = { [a, b] -> add a b }\nin f",
+			"claimed a 3-tuple",
+		},
+	}
+	for _, c := range cases {
+		_, _, warns := run(t, c.src)
+		if len(warns) != 1 || !strings.Contains(warns[0].Message, c.want) {
+			t.Errorf("%s\n  got  %s\n  want one warning containing %q", c.src, messages(warns), c.want)
+		}
+	}
+}
+
+// TestSignatureAttachment checks the adjacency rule and what happens when it
+// cannot be satisfied.
+func TestSignatureAttachment(t *testing.T) {
+	cases := []struct{ src, want string }{
+		{"let\n  --> wrong : Num\n  other = 1\nin other", `signature names "wrong"`},
+		{"let x = 1 in x\n--> late : Num", "has no binding after it"},
+		{"let\n  --> f : Num\n  --> f : Num -> Num\n  f = x -> x\nin f", "already has a signature"},
+	}
+	for _, c := range cases {
+		_, _, warns := run(t, c.src)
+		if len(warns) == 0 || !strings.Contains(messages(warns), c.want) {
+			t.Errorf("%s\n  got  %s\n  want a warning containing %q", c.src, messages(warns), c.want)
+		}
+	}
+}
+
+// TestSignatureScope checks that type names resolve with the module rules the
+// language already uses for values: a module's own declarations, those of the
+// modules it imports, and qualified module.Name.
+func TestSignatureScope(t *testing.T) {
+	modSrc := "module\n\n--> Box a = [a]\n\n--> wrap : a -> Box a\nwrap = x -> [x]\n"
+
+	// A module's signature may use its own declaration.
+	if ws := runWithModule(t, "boxes", modSrc, "import boxes in boxes.wrap 1"); len(ws) != 0 {
+		t.Errorf("a module's own type should be in scope, got %s", messages(ws))
+	}
+
+	// The program may use the imported module's type, qualified or not.
+	for _, prog := range []string{
+		"import boxes in\nlet\n  --> u : Box Num\n  u = boxes.wrap 1\nin u",
+		"import boxes in\nlet\n  --> u : boxes.Box Num\n  u = boxes.wrap 1\nin u",
+	} {
+		if ws := runWithModule(t, "boxes", modSrc, prog); len(ws) != 0 {
+			t.Errorf("imported type should be in scope for\n%s\n  got %s", prog, messages(ws))
+		}
+	}
+
+	// A module that is not imported is not in scope, qualified or not.
+	bare := "let\n  --> u : Box Num\n  u = 1\nin u"
+	ws := runWithModule(t, "boxes", modSrc, bare)
+	if len(ws) != 1 || !strings.Contains(ws[0].Message, `unknown type "Box"`) {
+		t.Errorf("expected Box to be out of scope, got %s", messages(ws))
+	}
+
+	qual := "let\n  --> u : boxes.Box Num\n  u = 1\nin u"
+	ws = runWithModule(t, "boxes", modSrc, qual)
+	if len(ws) != 1 || !strings.Contains(ws[0].Message, "not imported here") {
+		t.Errorf("expected boxes to be unimported, got %s", messages(ws))
+	}
+}
+
+// TestSignatureArity checks that a declared type must be given its parameters.
+func TestSignatureArity(t *testing.T) {
+	src := "--> Pair a b = [a, b]\nlet\n  --> f : Pair Num -> Num\n  f = { [a, b] -> a }\nin f"
+	_, _, warns := run(t, src)
+	if len(warns) != 1 || !strings.Contains(warns[0].Message, "takes 2 parameter(s), given 1") {
+		t.Errorf("expected an arity complaint, got %s", messages(warns))
+	}
+}
+
+// TestSignatureRejectsTop checks that `?` cannot be claimed: it says nothing, so
+// checking it would always succeed and hide a mistake.
+func TestSignatureRejectsTop(t *testing.T) {
+	_, _, warns := run(t, "let\n  --> f : ? -> Num\n  f = x -> 1\nin f")
+	if len(warns) != 1 || !strings.Contains(warns[0].Message, "claims nothing") {
+		t.Errorf("expected `?` to be rejected, got %s", messages(warns))
 	}
 }

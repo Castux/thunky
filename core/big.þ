@@ -37,6 +37,8 @@ import core, math, list, text, bit in
 
 module
 
+-- BigInt = [Num, List Num]
+
 base      = 4294967296,     -- 2^32
 halfBase  = 65536,          -- 2^16
 limbBits  = 32,
@@ -413,6 +415,8 @@ intDigits = n -> intToString n > filter isDigit > map digitToInt,
 --
 -- [mantissa, exponent, precision] means mantissa * 2^exponent, with the
 -- mantissa held to `precision` significand bits.
+
+-- BigFloat = [BigInt, Num, Num]
 
 floatMantissa  = [m, e, p] -> m,
 floatExponent  = [m, e, p] -> e,
