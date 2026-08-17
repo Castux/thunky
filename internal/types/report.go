@@ -7,10 +7,32 @@ import (
 	"github.com/Castux/thunky/internal/source"
 )
 
+// definitions renders the recursive-type equations the rest of the report refers
+// to. They are printed first because every signature below may mention them.
+func definitions(a *Analysis) string {
+	if len(a.Equations) == 0 {
+		return ""
+	}
+	var out strings.Builder
+	out.WriteString("-- recursive types\n")
+	width := 0
+	for _, e := range a.Equations {
+		if n := len(e.Header()); n > width {
+			width = n
+		}
+	}
+	for _, e := range a.Equations {
+		fmt.Fprintf(&out, "  %-*s : %s\n", width, e.Header(), e.Body)
+	}
+	out.WriteString("\n")
+	return out.String()
+}
+
 // Report renders the inferred types: one line per module binding, then the
 // program's own type, then anything the analysis could not make sense of.
 func Report(a *Analysis, programPath string) string {
 	var out strings.Builder
+	out.WriteString(definitions(a))
 
 	for _, mod := range a.Modules {
 		if len(mod.Entries) == 0 {
@@ -46,6 +68,7 @@ func Report(a *Analysis, programPath string) string {
 // kind of node it is, and what it was inferred to be.
 func ReportAll(a *Analysis) string {
 	var out strings.Builder
+	out.WriteString(definitions(a))
 	file := ""
 	for _, e := range a.Exprs {
 		if f := fileName(e.Pos); f != file {

@@ -51,6 +51,9 @@ type ExprType struct {
 }
 
 type Analysis struct {
+	// Equations are the named recursive types the rendered types refer to.
+	Equations []Equation
+
 	Program  string
 	Modules  []ModuleEntry
 	Exprs    []ExprType
@@ -100,7 +103,10 @@ func Infer(program *syntax.Program, modules map[string]*syntax.Module, res *synt
 	}
 	in.expr(program.Body)
 
-	analysis := &Analysis{Program: String(bodyType), Warnings: in.warnings}
+	// One namer for the whole report: a recursive shape earns its equation once,
+	// however many signatures mention it.
+	namer := NewNamer()
+	analysis := &Analysis{Program: namer.String(bodyType), Warnings: in.warnings}
 	for _, mod := range sortedModules(modules) {
 		entry := ModuleEntry{Name: mod.Name}
 		for _, b := range mod.PublicBindings {
@@ -111,7 +117,7 @@ func Infer(program *syntax.Program, modules map[string]*syntax.Module, res *synt
 			entry.Entries = append(entry.Entries, Entry{
 				Name: b.Name.Value,
 				Pos:  b.Name.Pos,
-				Type: String(t),
+				Type: namer.String(t),
 			})
 		}
 		analysis.Modules = append(analysis.Modules, entry)
@@ -121,9 +127,11 @@ func Infer(program *syntax.Program, modules map[string]*syntax.Module, res *synt
 		analysis.Exprs = append(analysis.Exprs, ExprType{
 			Kind: syntax.NodeType(node),
 			Pos:  syntax.NodePos(node),
-			Type: String(t),
+			Type: namer.String(t),
 		})
 	}
+	analysis.Equations = namer.Equations()
+
 	sort.Slice(analysis.Exprs, func(i, j int) bool {
 		a, b := analysis.Exprs[i].Pos, analysis.Exprs[j].Pos
 		if a.File != b.File {
