@@ -147,7 +147,8 @@ Source must be UTF-8. Whitespace separates tokens but is otherwise insignificant
 - **Comments** start with `--` and run to the end of the line. A comment
   beginning `-->` is an annotation read by the type analysis
   ([7.Type Analysis](implementation/7.Type%20Analysis.md)); it has no effect on
-  running the program.
+  running the program. A signature may be written above any binding, a module's
+  or a `let`'s, and `--types` reports every named value either way.
 - **Identifiers** match `[a-zA-Z_][a-zA-Z0-9_]*`.
 - **Keywords** are reserved and may not be used as identifiers: `let`, `in`,
   `module`, `import`.

@@ -41,30 +41,30 @@ func Report(a *Analysis, programPath string) string {
 	out.WriteString(definitions(a))
 
 	for _, mod := range a.Modules {
-		if len(mod.Entries) == 0 {
+		if len(mod.Entries) == 0 && len(mod.Locals) == 0 {
 			continue
 		}
 		fmt.Fprintf(&out, "-- %s\n", mod.Name)
-		width := 0
-		for _, e := range mod.Entries {
-			if len(e.Name) > width {
-				width = len(e.Name)
+		entries(&out, mod.Entries)
+		// Locals are listed apart from the interface, and named by the path that
+		// reaches them, so that reading a module's own bindings is still reading
+		// its interface.
+		if len(mod.Locals) > 0 {
+			if len(mod.Entries) > 0 {
+				out.WriteString("\n")
 			}
-		}
-		for _, e := range mod.Entries {
-			fmt.Fprintf(&out, "  %-*s : %s\n", width, e.Name, e.Type)
-			// A contradicted signature is still shown as written — it is what the
-			// author claims — with the finding underneath, where the disagreement is
-			// impossible to miss.
-			if e.Inferred != "" {
-				fmt.Fprintf(&out, "  %-*s   ^ does not hold; inferred %s\n", width, "", e.Inferred)
-			}
+			out.WriteString("  -- let bindings\n")
+			entries(&out, mod.Locals)
 		}
 		out.WriteString("\n")
 	}
 
 	fmt.Fprintf(&out, "-- %s\n", programPath)
 	fmt.Fprintf(&out, "  %s : %s\n", "<program>", a.Program)
+	if len(a.Locals) > 0 {
+		out.WriteString("\n  -- let bindings\n")
+		entries(&out, a.Locals)
+	}
 
 	// Provenance once, rather than a marker on every line: after a library is
 	// annotated most types are the author's, and saying so per line is noise.
@@ -104,6 +104,25 @@ func ReportAll(a *Analysis) string {
 		fmt.Fprintf(&out, "  %4d:%-3d %-14s %s\n", line, column, e.Kind, e.Type)
 	}
 	return out.String()
+}
+
+// entries renders one aligned block of bindings.
+func entries(out *strings.Builder, es []Entry) {
+	width := 0
+	for _, e := range es {
+		if len(e.Name) > width {
+			width = len(e.Name)
+		}
+	}
+	for _, e := range es {
+		fmt.Fprintf(out, "  %-*s : %s\n", width, e.Name, e.Type)
+		// A contradicted signature is still shown as written — it is what the
+		// author claims — with the finding underneath, where the disagreement is
+		// impossible to miss.
+		if e.Inferred != "" {
+			fmt.Fprintf(out, "  %-*s   ^ does not hold; inferred %s\n", width, "", e.Inferred)
+		}
+	}
 }
 
 func where(pos source.SourcePos) string {

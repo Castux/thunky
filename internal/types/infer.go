@@ -67,11 +67,19 @@ type Analysis struct {
 	Modules  []ModuleEntry
 	Exprs    []ExprType
 	Warnings []Warning
+
+	// Locals are the program's own `let` bindings. A program is usually one `let`
+	// with everything in it, so this is most of what it defines.
+	Locals []Entry
 }
 
 type ModuleEntry struct {
 	Name    string
 	Entries []Entry
+
+	// Locals are the `let` bindings inside this module's public bindings, named
+	// by the path that reaches them. They are where most of the code is.
+	Locals []Entry
 }
 
 type inferrer struct {
@@ -159,22 +167,29 @@ func Infer(program *syntax.Program, modules map[string]*syntax.Module, res *synt
 			if !ok {
 				continue
 			}
-			e := Entry{Name: b.Name.Value, Pos: b.Name.Pos, Type: namer.StringIn(mod.Name, t)}
-			if g, ok := given[b]; ok {
-				// The author's words win. Any declared type the signature names has
-				// to reach the preamble, which rendering the inferred shape would
-				// otherwise have been what did it.
-				e.Given = true
-				e.Asserted = g.asserted
-				if g.conflicted {
-					e.Inferred = e.Type
-				}
-				e.Type = g.text
-				namer.UseNamed(g.names)
-			}
-			entry.Entries = append(entry.Entries, e)
+			entry.Entries = append(entry.Entries, in.entry(b.Name.Value, b, t, mod.Name, given))
 		}
 		analysis.Modules = append(analysis.Modules, entry)
+	}
+
+	// The `let` bindings, attached to the module they are written in. A binding
+	// nothing referred to still has a type: the walk forces every binding of every
+	// `let` it enters, so there is nothing further to infer here.
+	byMod := map[string]int{}
+	for i, m := range analysis.Modules {
+		byMod[m.Name] = i
+	}
+	for _, l := range collectLocals(program, modules) {
+		t, ok := in.env[l.b]
+		if !ok {
+			continue
+		}
+		e := in.entry(l.path, l.b, t, l.mod, given)
+		if i, ok := byMod[l.mod]; ok && l.mod != "" {
+			analysis.Modules[i].Locals = append(analysis.Modules[i].Locals, e)
+			continue
+		}
+		analysis.Locals = append(analysis.Locals, e)
 	}
 
 	modOfFile := map[*source.Source]string{}
@@ -209,6 +224,26 @@ func Infer(program *syntax.Program, modules map[string]*syntax.Module, res *synt
 	})
 
 	return analysis
+}
+
+// entry describes one binding: its name, where it is, and what it is. A given
+// signature wins over the inferred shape — the author's words are what the report
+// is for — and any declared type it names has to reach the preamble, which
+// rendering the inferred shape would otherwise have been what did.
+func (in *inferrer) entry(name string, b *syntax.Binding, t *Type, mod string,
+	given map[*syntax.Binding]givenSig) Entry {
+
+	e := Entry{Name: name, Pos: b.Name.Pos, Type: in.namer.StringIn(mod, t)}
+	if g, ok := given[b]; ok {
+		e.Given = true
+		e.Asserted = g.asserted
+		if g.conflicted {
+			e.Inferred = e.Type
+		}
+		e.Type = g.text
+		in.namer.UseNamed(g.names)
+	}
+	return e
 }
 
 func fileName(p source.SourcePos) string {
