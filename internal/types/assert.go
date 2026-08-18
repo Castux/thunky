@@ -41,6 +41,13 @@ import (
 // to `last` joins the two, so the argument node carries last's `List a` — empty
 // case and all. The narrower fact exists only at the syntax.
 //
+// A name whose binding carries a *signature* discharges too. A signature is the
+// author's claim rather than a join, so it survives where the inferred type does
+// not: `tail fibonacci` is safe when `fibonacci : Stream Num`, because a stream
+// is a pair and has no empty alternative for tail to miss. This is the one place
+// annotating pays for itself twice — the claim is checked against the code, and
+// then believed at call sites.
+//
 // The callee's *patterns* are what license this, not its signature: they are the
 // evidence for what it really handles. A binding that is an alias inherits them,
 // so `char = head` discharges exactly as head does.
@@ -185,7 +192,7 @@ func (c *assertChecker) callSite(fn syntax.Expression, argIndex int, arg syntax.
 		if a.position != position+1 {
 			continue
 		}
-		if discharged(a, arg) {
+		if c.discharged(a, arg) {
 			continue
 		}
 		c.demand(a, pos)
@@ -284,15 +291,53 @@ func (c *assertChecker) matchedAt(b *syntax.Binding, position int) (map[int]bool
 	}
 }
 
-// discharged reports whether the argument is written in a shape the callee is
-// known to match. Anything but a literal or a constructed cell is unknown, and
-// unknown does not discharge.
-func discharged(a assertion, arg syntax.Expression) bool {
+// discharged reports whether the argument is known to be a shape the callee
+// matches. Anything else is unknown, and unknown does not discharge.
+func (c *assertChecker) discharged(a assertion, arg syntax.Expression) bool {
 	if !a.hasPats || arg == nil {
 		return false
 	}
-	arity, ok := writtenArity(arg)
-	return ok && a.matched[arity]
+	if arity, ok := writtenArity(arg); ok {
+		return a.matched[arity]
+	}
+	// A name whose binding carries a signature says what it is. That claim is the
+	// author's rather than a join, so unlike an inferred type it still means
+	// something here: `tail fibonacci` is safe when `fibonacci : Stream Num`,
+	// because a stream has no empty alternative for tail to miss.
+	name, ok := arg.(*syntax.Name)
+	if !ok {
+		return false
+	}
+	fact, ok := c.in.res.Uses[name]
+	if !ok {
+		return false
+	}
+	b, ok := fact.Def.(*syntax.Binding)
+	if !ok {
+		return false
+	}
+	sig, ok := c.given[b]
+	if !ok {
+		return false
+	}
+	return coveredBy(sig.sig.Pat, a.matched)
+}
+
+// coveredBy reports whether every alternative a claimed type admits is one the
+// callee matches. A type variable admits anything, so it covers nothing.
+func coveredBy(p *pattern, matched map[int]bool) bool {
+	if p == nil || p.hole >= 0 || p.top || p.num || p.fun != nil || p.asserted {
+		return false
+	}
+	if len(p.tuples) == 0 {
+		return false
+	}
+	for arity := range p.tuples {
+		if !matched[arity] {
+			return false
+		}
+	}
+	return true
 }
 
 // writtenArity reads the arity an expression is written as. `[a, b]` is a pair;

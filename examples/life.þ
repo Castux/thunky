@@ -35,11 +35,17 @@
 import core, list, math, maybe, text in
 
 let
+	--> width : Num
 	width      = 40,          -- cells; each is drawn two columns wide
+	--> height : Num
 	height     = 24,
+	--> frames : Num
 	frames     = 300,
+	--> frameDelay : Num
 	frameDelay = 30000,       -- ~20 ms on an i7-6700K, on top of ~60 ms of work
+	--> density : Num
 	density    = 32,          -- percentage of cells alive in the initial soup
+	--> seed : List Num
 	seed       = "thunky",
 
 	-- ANSI control ----------------------------------------------------------
@@ -52,13 +58,20 @@ let
 	-- off: Ctrl-C during the animation would leave the terminal with an
 	-- invisible cursor. Only escapes that are harmless to abandon are used here.
 
+	--> csi : List Num
 	csi        = flatten [[esc;]; "["],
+	--> sgr : Num -> List Num
 	sgr        = n -> flatten [csi; string n; "m"],
+	--> home : List Num
 	home       = flatten [csi; "H"],
+	--> clear : List Num
 	clear      = flatten [csi; "2J"],
 
+	--> born : List Num
 	born       = sgr 96,      -- bright cyan: alive now, dead in the previous frame
+	--> survivor : List Num
 	survivor   = sgr 32,      -- green: alive in both
+	--> plain : List Num
 	plain      = sgr 0,
 
 	-- The initial soup ------------------------------------------------------
@@ -66,6 +79,7 @@ let
 	-- `hash` iterated on itself is the same cheap pseudorandom stream that
 	-- examples/random-chisquare.þ tests; here it only has to look disordered.
 
+	--> soup : List (List Num)
 	soup = iterate hash (hash seed)
 		> map (n -> if (lt density (mod 100 n)) 1 0)
 		> take (mul width height)
@@ -73,22 +87,33 @@ let
 
 	-- One generation --------------------------------------------------------
 
-	rotateLeft  = l -> append [head l;] (tail l),      -- [a; b; c] -> [b; c; a]
-	rotateRight = l -> prepend [last l;] (init l),     -- [a; b; c] -> [c; a; b]
+	-- Both are total: taking and dropping handle the empty list, where head/tail
+	-- and last/init would each have needed an assumption the grid's size makes
+	-- true but the type cannot state.
+	--> rotateLeft : List a -> List a
+	rotateLeft  = l -> append (take 1 l) (drop 1 l),   -- [a; b; c] -> [b; c; a]
+	--> rotateRight : List a -> List a
+	rotateRight = l -> splitAt (pred (length l)) l
+		> ([front, back] -> prepend back front),       -- [a; b; c] -> [c; a; b]
 
+	--> sum3 : Num -> Num -> Num -> Num
 	sum3 = a -> b -> c -> add a (add b c),
 
 	-- Sum of each cell and its left/right neighbours, then of each row and the
 	-- rows above and below: the full 3x3 sum, including the cell itself.
+	--> horizontal : List Num -> List Num
 	horizontal    = row  -> zipWith3 sum3 (rotateLeft row) row (rotateRight row),
+	--> neighbourhood : List (List Num) -> List (List Num)
 	neighbourhood = rows -> let sums = map horizontal rows in
 		zipWith3 (zipWith3 sum3) (rotateLeft sums) sums (rotateRight sums),
 
+	--> rule : Num -> Num -> Num
 	rule = alive -> total ->
 		when       (eq total 3)             1  -- three neighbours: birth or survival
 		> elseWhen (and (eq total 4) alive) 1  -- two neighbours and already alive
 		> default                           0,
 
+	--> step : List (List Num) -> List (List Num)
 	step = rows -> zipWith (zipWith rule) rows (neighbourhood rows),
 
 	-- Rendering -------------------------------------------------------------
@@ -96,13 +121,16 @@ let
 	-- A cell is coloured by comparing the frame with the one before it, which is
 	-- possible only because the previous generation is still an ordinary value.
 
+	--> cell : Num -> Num -> List Num
 	cell = previous -> current ->
 		when       (and current (not previous)) (prepend born     "██")
 		> elseWhen (and current previous)       (prepend survivor "██")
 		> default                               "  ",
 
+	--> rowText : List Num -> List Num -> List Num
 	rowText = previousRow -> currentRow -> zipWith cell previousRow currentRow > flatten,
 
+	--> header : Num -> List (List Num) -> List Num
 	header = generation -> grid -> flatten [
 		plain; "Life  ";
 		string width; "x"; string height; " torus  ";
@@ -112,14 +140,17 @@ let
 
 	-- `home` puts the cursor back at the top left instead of clearing, so the
 	-- new frame overwrites the old one in place and the screen does not flash.
+	--> draw : Num -> List (List Num) -> List (List Num) -> List (List Num)
 	draw = generation -> previous -> current ->
 		seq (bwrite home)
 			(prepend [header generation current;] (zipWith rowText previous current)
 				> writeList),
 
 	-- The frame delay: a loop that computes nothing, forced by `seq`.
+	--> spin : Num -> Num
 	spin = { 0 -> 0, n -> spin (sub 1 n) },
 
+	--> play : Num -> List (List Num) -> Stream (List (List Num)) -> List Num
 	play = remaining -> previous -> { [current, rest] ->
 		if (eq remaining 0)
 			(seq (bwrite plain) (write "done"))

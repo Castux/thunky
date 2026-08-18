@@ -39,15 +39,15 @@ removeMin = {
 get = k ->
 	let
 		h = hash k,
-		go = {
+		rec = {
 			[] -> maybe.none,
 			[nh, nk, nv, left, right] ->
-				when       (lt nh h)    (go left)
-				> elseWhen (gt nh h)    (go right)
+				when       (lt nh h)    (rec left)
+				> elseWhen (gt nh h)    (rec right)
 				> elseWhen (equal nk k) (maybe.some nv)
-				> default               (go right)
+				> default               (rec right)
 		}
-	in go,
+	in rec,
 
 -- getOr def k m: value for key k, or def if absent
 --> getOr : v -> k -> Hashmap k v -> v
@@ -58,15 +58,15 @@ getOr = def -> k -> m -> maybe.default def (get k m),
 set = k -> v ->
 	let
 		h = hash k,
-		go = {
+		rec = {
 			[] -> [h, k, v, [], []],
 			[nh, nk, nv, left, right] ->
-				when       (lt nh h)    [nh, nk, nv, go left, right]
-				> elseWhen (gt nh h)    [nh, nk, nv, left, go right]
+				when       (lt nh h)    [nh, nk, nv, rec left, right]
+				> elseWhen (gt nh h)    [nh, nk, nv, left, rec right]
 				> elseWhen (equal nk k) [nh, k, v, left, right]
-				> default               [nh, nk, nv, left, go right]
+				> default               [nh, nk, nv, left, rec right]
 		}
-	in go,
+	in rec,
 
 -- remove k m: remove the entry for key k (no-op if absent)
 --> remove : k -> Hashmap k v -> Hashmap k v
@@ -78,47 +78,47 @@ remove = k ->
 		removeNode = left -> right -> minNode right
 			> maybe.mapDefault left ([mh, mk, mv] -> [mh, mk, mv, left, removeMin right]),
 
-		go = {
+		rec = {
 			[] -> [],
 			[nh, nk, nv, left, right] ->
-				when       (lt nh h)    [nh, nk, nv, go left, right]
-				> elseWhen (gt nh h)    [nh, nk, nv, left, go right]
+				when       (lt nh h)    [nh, nk, nv, rec left, right]
+				> elseWhen (gt nh h)    [nh, nk, nv, left, rec right]
 				> elseWhen (equal nk k) (removeNode left right)
-				> default               [nh, nk, nv, left, go right]
+				> default               [nh, nk, nv, left, rec right]
 		}
-	in go,
+	in rec,
 
 -- update k f m: apply f to the value at key k
 --> update : k -> (v -> v) -> Hashmap k v -> Hashmap k v
 update = k -> f ->
 	let
 		h = hash k,
-		go = {
+		rec = {
 			[] -> [],
 			[nh, nk, nv, left, right] ->
-				when       (lt nh h)    [nh, nk, nv, go left, right]
-				> elseWhen (gt nh h)    [nh, nk, nv, left, go right]
+				when       (lt nh h)    [nh, nk, nv, rec left, right]
+				> elseWhen (gt nh h)    [nh, nk, nv, left, rec right]
 				> elseWhen (equal nk k) [nh, k, f nv, left, right]
-				> default               [nh, nk, nv, left, go right]
+				> default               [nh, nk, nv, left, rec right]
 		}
 	in
-		go,
+		rec,
 
 -- updateOr k f def m: apply f to the value at key k, or insert def if not found
 --> updateOr : k -> (v -> v) -> v -> Hashmap k v -> Hashmap k v
 updateOr = k -> f -> def ->
 	let
 		h = hash k,
-		go = {
+		rec = {
 			[] -> [h, k, def, [], []],
 			[nh, nk, nv, left, right] ->
-				when       (lt nh h)    [nh, nk, nv, go left, right]
-				> elseWhen (gt nh h)    [nh, nk, nv, left, go right]
+				when       (lt nh h)    [nh, nk, nv, rec left, right]
+				> elseWhen (gt nh h)    [nh, nk, nv, left, rec right]
 				> elseWhen (equal nk k) [nh, k, f nv, left, right]
-				> default               [nh, nk, nv, left, go right]
+				> default               [nh, nk, nv, left, rec right]
 		}
 	in
-		go,
+		rec,
 
 -- keys m: list of all keys in hash order
 --> keys : Hashmap k v -> List k

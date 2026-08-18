@@ -22,20 +22,20 @@ let
 
 	encode = text ->
 		let
-			go = dict -> nextCode -> current -> input -> input > {
+			rec = dict -> nextCode -> current -> input -> input > {
 				[] -> if (isEmpty current) [] [hashmap.getOr 0 current dict;],
 				[c, rest] ->
 					let candidate = append [c;] current in
 						hashmap.get candidate dict > {
-							[known] -> go dict nextCode candidate rest,
+							[known] -> rec dict nextCode candidate rest,
 							[] -> [
 								hashmap.getOr 0 current dict,
-								go (hashmap.set candidate nextCode dict) (succ nextCode) [c;] rest
+								rec (hashmap.set candidate nextCode dict) (succ nextCode) [c;] rest
 							]
 						}
 			}
 		in
-			go encodeDictionary firstCode [] text,
+			rec encodeDictionary firstCode [] text,
 
 	decodeDictionary = rangeIncl 0 255
 		> foldl (dict -> c -> hashmap.set c [c;] dict) hashmap.empty,
@@ -46,7 +46,7 @@ let
 			let
 				start = hashmap.getOr [] firstOne decodeDictionary,
 
-				go = dict -> nextCode -> previous -> input -> input > {
+				rec = dict -> nextCode -> previous -> input -> input > {
 					[] -> [],
 					[code, more] ->
 						let
@@ -56,10 +56,10 @@ let
 								> maybe.default (append [head previous;] previous),
 							grown = hashmap.set nextCode (append [head entry;] previous) dict
 						in
-							[entry, go grown (succ nextCode) entry more]
+							[entry, rec grown (succ nextCode) entry more]
 				}
 			in
-				prepend start (flatten (go decodeDictionary firstCode start rest))
+				prepend start (flatten (rec decodeDictionary firstCode start rest))
 	},
 
 	sample   = "TOBEORNOTTOBEORTOBEORNOT",

@@ -49,13 +49,13 @@ bitAt = k -> div (powerOfTwo k) *> mod 2,
 -- of the larger operand rather than a fixed 32 steps.
 --> combine : (Num -> Num -> Num) -> Num -> Num -> Num
 combine = f -> a -> b ->
-	let go = weight -> x -> y -> if (and (eq x 0) (eq y 0))
+	let rec = weight -> x -> y -> if (and (eq x 0) (eq y 0))
 		0
 		(add
 			(mul weight (f (mod 2 x) (mod 2 y)))
-			(go (mul 2 weight) (div 2 x) (div 2 y)))
+			(rec (mul 2 weight) (div 2 x) (div 2 y)))
 	in
-		go 1 a b,
+		rec 1 a b,
 
 -- bAnd a b, bOr a b, bXor a b: the binary logical operations.
 -- bNot n: the one's complement within 32 bits.

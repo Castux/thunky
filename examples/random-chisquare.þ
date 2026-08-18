@@ -1,8 +1,11 @@
 import core, list, hashmap, math, text in
 
 let
-	N = 1000000,
+	--> samples : Num
+	samples = 1000000,
+	--> bins : Num
 	bins = 20,
+	--> seed : List Num
 	seed = "the super seed",
 
 	-- Tally bin counts with a STRICT left fold. A lazy fold (foldl/foldr) builds an
@@ -13,19 +16,26 @@ let
 	-- would otherwise dominate memory. The random stream is folded inline (not bound to
 	-- a name) so its cells are collected as they are consumed rather than retained.
 	-- The result: this runs in constant space and scales to N in the millions.
+	--> incrCount : Hashmap a Num -> a -> Hashmap a Num
 	incrCount = counts -> val -> eval (updateOr val succ 1 counts),
-	counts = hash seed > iterate hash > map (mod bins) > take N
+	--> counts : Hashmap Num Num
+	counts = hash seed > iterate hash > map (mod bins) > take samples
 		> foldlStrict incrCount hashmap.empty,
 
-	expected = N > fdiv bins,
+	--> expected : Num
+	expected = samples > fdiv bins,
+	--> chiSquare : Num
 	chiSquare = counts > values > map (sub expected *> pow 2 *> fdiv expected) > sum,
 
+	--> dfs : Num
 	dfs = pred bins,
+	--> approxThreshold : Num
 	approxThreshold = let
 		tmp = 2 > fdiv 9 > fdiv dfs
 	in
 		1 > sub tmp > add (mul 1.645 (sqrt tmp)) > pow 3 > mul dfs,
 
+	--> report : List (List Num)
 	report = [
 		counts > keyValues > sortWith (on lt first) > string;
 		prepend "chi^2: " (string chiSquare);

@@ -29,14 +29,28 @@
 
 import list, core, text, comb, maybe in
 
+-- An expression tree: the value it evaluates to, the operator that built it,
+-- and its two operands. A leaf carries the symbol 'given' and empty operands.
+--> Node = [] | [Num, List Num, Node, Node]
+-- One subset of the numbers, with every value reachable from it and the tree
+-- that reaches each.
+--> Memo = List [List Num, List Node]
+
 let
+	--> target : Num
 	target  = 364,
+	--> numbers : List Num
 	numbers = [100; 25; 1; 9; 4; 7],
 
 	-- Node accessors -------------------------------------------------------
 
+	--> leaf : Num -> Node
 	leaf  = n -> [n, 'given', [], []],
-	value = [v, sym, left, right] -> v,
+	-- Total, so that nothing downstream has to assume a node is non-empty. The
+	-- empty case cannot arise: only a leaf's operand slots are empty, and a leaf
+	-- is never asked for its value.
+	--> value : Node -> Num
+	value = { [] -> 0, [v, sym, left, right] -> v },
 
 	-- Combine one left result with one right result into the nodes for each
 	-- legal operation. Both orderings of every partition are generated, so a
@@ -45,6 +59,7 @@ let
 	-- positive, and / only when it divides evenly and is not a trivial ÷1.
 	-- (Recall the builtins lte/gt compare their second argument to the first.)
 
+	--> combineNodes : Node -> Node -> List Node
 	combineNodes = left -> right ->
 		let lv = value left, rv = value right in
 			flatten [
@@ -56,6 +71,7 @@ let
 
 	-- Every left result against every right result.
 
+	--> combine : List Node -> List Node -> List Node
 	combine = lefts -> rights ->
 		lefts
 			> map (left -> rights > map (combineNodes left) > flatten)
@@ -69,6 +85,7 @@ let
 	-- above pick the legal orientation for - and / and the canonical one for
 	-- + and *.
 
+	--> assignments : List a -> List [List a, List a]
 	assignments = {
 		[] -> [ [[], []]; ],
 		[h, t] -> assignments t
@@ -76,6 +93,7 @@ let
 			> flatten
 	},
 
+	--> partitionsOf : List a -> List [List a, List a]
 	partitionsOf = assignments *> filter ([l, r] -> and (not (isEmpty l)) (not (isEmpty r))),
 
 	-- Memoised results -----------------------------------------------------
@@ -90,6 +108,7 @@ let
 	lookup = subset ->
 		find (first *> equal subset) *> maybe.andThen second,
 
+	--> resultsFor : Memo -> List Num -> List Node
 	resultsFor = memo -> {
 		[x;] -> [ leaf x; ],
 		subset -> partitionsOf subset
@@ -99,12 +118,14 @@ let
 
 	-- Fold the size-ordered subsets into a memo of [subset, results] pairs
 
+	--> addSubset : Memo -> List Num -> [[List Num, List Node], Memo]
 	addSubset = memo -> subset ->
 		let
 			results = resultsFor memo subset
 		in
 			[[subset, results], memo],
 
+	--> memo : Memo
 	memo = subsets numbers
 		> filter (not <* isEmpty)
 		> sortWith (on lt length)
@@ -114,6 +135,7 @@ let
 	--
 	-- Every result of every subset that lands on the target.
 
+	--> solutionNodes : List Node
 	solutionNodes = memo
 		> map ([subset, res] -> res)
 		> flatten
@@ -121,7 +143,9 @@ let
 
 	-- Flatten a solution tree into its internal (operation) nodes, post-order.
 
+	--> collect : Node -> List Node
 	collect = {
+		[] -> [],
 		[v, 'given', [], []] -> [],
 		[v, sym, left, right] ->
 			flatten [ collect left; collect right; [ [v, sym, left, right]; ] ]
@@ -129,6 +153,7 @@ let
 
 	-- Render a solution tree as "a op b = c, …".
 
+	--> solutionToString : Node -> List Num
 	solutionToString = collect
 		*> map ([v, sym, left, right] ->
 			format '%v%s%v=%v' [ value left; sym; value right; v ])
@@ -139,14 +164,18 @@ let
 	-- source number (e.g. 25*4 and 100), so a light final pass still helps;
 	-- by now the list is the real solutions, not a sea of duplicates.
 
+	--> solutions : List (List Num)
 	solutions = solutionNodes
 		> map solutionToString
 		> nub
 		> sortWith (on lt length),
 
+	--> header : List Num
 	header = format 'reaching %v from %v' [ target; numbers ],
+	--> footer : List Num
 	footer = format '%v solution(s)' [ length solutions; ],
 
+	--> report : List (List Num)
 	report = prepend [ header; ] < prepend solutions < [ footer; ]
 in
 	report > writeList

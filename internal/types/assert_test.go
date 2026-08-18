@@ -132,3 +132,37 @@ func TestAssertionPositionCounted(t *testing.T) {
 		t.Errorf("supplying only the unasserted argument should be silent, got %s", messages(warns))
 	}
 }
+
+// TestAssertionDischargedBySignature checks that a name whose binding carries a
+// signature discharges an assumption its claimed type rules out. A signature is
+// the author's claim rather than a join, so it still means something at a call
+// site where the inferred type would not.
+func TestAssertionDischargedBySignature(t *testing.T) {
+	mod := "module\n\n" + assertPrelude +
+		"--> Stream a = [a, Stream a]\n\n" +
+		"--> head : List a! -> a\n" +
+		"head = [h, t] -> h,\n\n" +
+		"--> ones : Stream Num\n" +
+		"ones = [1, ones],\n\n" +
+		"--> first : Num\n" +
+		"first = head ones\n"
+	a := analyzeWithModule(t, "m", mod, "import m in 0")
+	for _, w := range a.Warnings {
+		if strings.Contains(w.Message, "asserted with") {
+			t.Errorf("a stream should discharge head's assumption, got %s", w.Message)
+		}
+	}
+
+	// And a claim that does *not* rule the empty case out still inherits.
+	mod = strings.Replace(mod, "--> ones : Stream Num", "--> ones : List Num", 1)
+	a = analyzeWithModule(t, "m", mod, "import m in 0")
+	var found bool
+	for _, w := range a.Warnings {
+		if strings.Contains(w.Message, "first inherits it") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("a List claim should not discharge, got %s", messages(a.Warnings))
+	}
+}

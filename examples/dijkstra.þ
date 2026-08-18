@@ -29,6 +29,7 @@ let
 	-- The graph: [node, [[neighbour, weight]; …]] entries. Undirected, so every
 	-- edge appears in both adjacency lists.
 
+	--> graph : Table (List Num) (List [List Num, Num])
 	graph = [
 		["A", [["B", 7]; ["C", 9]; ["F", 14]]];
 		["B", [["A", 7]; ["C", 10]; ["D", 15]]];
@@ -40,18 +41,23 @@ let
 		["H", []]
 	],
 
+	--> source : List Num
 	source = "A",
 
+	--> neighbours : List Num -> List [List Num, Num]
 	neighbours = node -> table.getOr [] node graph,
 
 	-- Min-heap on the distance field of the [dist, node, path] triple.
 	-- (core.first only reads 2-tuples, hence the explicit accessor.)
+	--> distanceOf : [Num, a, b] -> Num
 	distanceOf = [dist, node, path] -> dist,
+	--> byDistance : [Num, a, b] -> [Num, a, b] -> Num
 	byDistance = on gt distanceOf,
 
 	-- One settled node per step. The heap may hold several entries for the same
 	-- node; the first to surface is the shortest, so later ones are dropped.
 
+	--> search : Table (List Num) Num -> Heap [Num, List Num, List (List Num)] -> List [List Num, Num, List (List Num)]
 	search = visited -> frontier -> frontier > {
 		[] -> [],
 		h -> heap.top h > ([dist, node, path] ->
@@ -69,10 +75,12 @@ let
 	},
 
 	-- The result is a lazy list, so it is built only as far as it is consumed.
+	--> settled : List [List Num, Num, List (List Num)]
 	settled = search table.empty (heap.singleton [0, source, [source;]]),
 
 	-- Reporting -------------------------------------------------------------
 
+	--> row : [List Num, Num, List (List Num)] -> List Num
 	row = [node, dist, path] -> flatten [
 		text.padRight 6 text.space node;
 		text.padLeft 5 text.space (string dist);
@@ -80,6 +88,7 @@ let
 		text.join " -> " path
 	],
 
+	--> pathTo : List Num -> List Num
 	pathTo = target -> settled
 		> find ([node, dist, path] -> equal node target)
 		> maybe.mapDefault
@@ -89,6 +98,7 @@ let
 				" via "; text.join " -> " path
 			]),
 
+	--> report : List (List Num)
 	report = flatten [
 		[text.format "shortest paths from %s:" [source;]; "node    dist   path"];
 		map row settled;

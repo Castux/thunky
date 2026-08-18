@@ -24,14 +24,18 @@
 import core, list, math, maybe, text, hashmap in
 
 let
+	--> topN : Num
 	topN     = 20,
+	--> barWidth : Num
 	barWidth = 36,
 
+	--> input : List Num
 	input = stdin,
 
 	-- Tokenising: lowercase, cut on every run of non-alphanumeric characters,
 	-- drop the empty sections `splitWith` leaves at the boundaries.
 
+	--> words : List (List Num)
 	words = input
 		> map toLower
 		> splitWith (isAlphaNum *> not)
@@ -39,34 +43,48 @@ let
 
 	-- Counting: one hashmap update per word, with that word's count forced.
 
+	--> bump : Hashmap a Num -> a -> Hashmap a Num
 	bump = counts -> word ->
 		let updated = hashmap.updateOr word succ 1 counts in
 			seq (hashmap.getOr 0 word updated) updated,
 
+	--> counts : Hashmap (List Num) Num
 	counts = foldlStrict bump hashmap.empty words,
 
 	-- Ranking: by count descending, ties broken by the word ascending.
 	-- `sortWith f` calls `f pivot element`, and `f` answers "does element come
 	-- before pivot?", so the comparison reads pivot-first.
 
+	--> byCount : [List Num, Num] -> [List Num, Num] -> Num
 	byCount = [word1, count1] -> [word2, count2] ->
 		if (neq count1 count2) (gt count1 count2) (ltString word1 word2),
 
+	--> ranked : List [List Num, Num]
 	ranked = counts > hashmap.keyValues > sortWith byCount,
+	--> top : List [List Num, Num]
 	top    = take topN ranked,
 
 	-- Reporting -------------------------------------------------------------
 
+	--> maxCount : Num
 	maxCount = top > { [] -> 1, [[word, count], rest] -> count },
 
+	--> bar : Num -> List Num
 	bar = count -> replicate (mul barWidth count > div maxCount > max 1) (char '#'),
 
+	-- A table row is heterogeneous on purpose: tableLines renders a number cell
+	-- with `string` and a string cell as it is.
+	--> row : Num -> [List Num, Num] -> [List Num; List Num; Num; List Num]
 	row = index -> [word, count] -> [format "%v." [succ index;]; word; count; bar count],
 
+	--> charCount : Num
 	charCount = length input,
+	--> lineCount : Num
 	lineCount = input > count (eq lf),
+	--> wordCount : Num
 	wordCount = length words,
 
+	--> report : List (List Num)
 	report = if (eq wordCount 0)
 		["(no words on standard input)";]
 		(flatten [

@@ -20,7 +20,7 @@ let
 					value  = nth middle items
 				in
 					when       (eq value target) (maybe.some middle)
-					> elseWhen (lt target value) (probe (succ middle) high)  -- lt t v: v < t, go right
+					> elseWhen (lt target value) (probe (succ middle) high)  -- lt t v: v < t, rec right
 					> default                    (probe low (pred middle)))
 		in
 			probe 0 (pred (length items)),

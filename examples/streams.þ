@@ -30,7 +30,9 @@ let
 	-- how many primes to produce, which is the point; a few hundred of them is
 	-- where the cost starts to show (the 300th below is ~0.3 s, the 1000th ~2 s).
 
+	--> sieve : Stream Num -> Stream Num
 	sieve = { [p, rest] -> [p, sieve (filter (x -> neq 0 (mod p x)) rest)] },
+	--> primes : Stream Num
 	primes = sieve (upFrom 2),
 
 	-- Fibonacci by self-reference -------------------------------------------
@@ -38,6 +40,7 @@ let
 	-- The definition mentions the list it is defining. Sharing is what makes it
 	-- linear: `fibonacci` and `tail fibonacci` are the same cells, read twice.
 
+	--> fibonacci : Stream Num
 	fibonacci = prepend [1; 1] (zipWith add fibonacci (tail fibonacci)),
 
 	-- Hamming numbers -------------------------------------------------------
@@ -45,12 +48,14 @@ let
 	-- The numbers whose only prime factors are 2, 3 and 5, in order. Same trick,
 	-- one level up: the stream is the ordered merge of its own multiples.
 
+	--> mergeUniq : Stream Num -> Stream Num -> Stream Num
 	mergeUniq = xs -> ys -> xs > { [a, as] -> ys > { [b, bs] ->
 		when       (lt b a) [a, mergeUniq as ys]  -- a < b : a comes first
 		> elseWhen (lt a b) [b, mergeUniq xs bs]  -- b < a : b comes first
 		> default           [a, mergeUniq as bs]  -- equal : emit once, drop both
 	} },
 
+	--> hamming : Stream Num
 	hamming = [1, mergeUniq
 		(map (mul 2) hamming)
 		(mergeUniq (map (mul 3) hamming) (map (mul 5) hamming))],
@@ -60,6 +65,7 @@ let
 	-- Each row from the previous one: shift left, shift right, add. `iterate`
 	-- makes the infinite triangle out of that single step.
 
+	--> pascal : Stream (List Num)
 	pascal = iterate (fork (zipWith add) (prepend [0;]) (append [0;])) [1;],
 
 	-- Look-and-say ----------------------------------------------------------
@@ -67,7 +73,9 @@ let
 	-- "one 1" -> "two 1s" -> "one 2, one 1" … Grouping equal neighbours and
 	-- replacing each run by its length and its digit is the whole rule.
 
-	lookAndSay = iterate (groupBy equal *> flatMap (run -> [length run; head run])) [1;],
+	--> lookAndSay : Stream (List Num)
+	lookAndSay = iterate (groupBy equal *> flatMap (run -> [length run; headOr 0 run])) [1;],
+	--> digitsToString : List Num -> List Num
 	digitsToString = map intToDigit,
 
 	-- Newton's method as a stream -------------------------------------------
@@ -76,7 +84,9 @@ let
 	-- infinite sequence of ever-better guesses, `within` decides when to stop.
 	-- Neither knows about the other, and no iteration count is ever chosen.
 
+	--> newtonSqrt : Num -> Stream Num
 	newtonSqrt = a -> iterate (x -> fdiv 2 (add x (fdiv x a))) a,
+	--> within : Num -> Stream Num -> Num
 	within = eps -> { [a, [b, rest]] ->
 		if (lt eps (abs (sub a b))) b (within eps [b, rest]) },
 
@@ -86,33 +96,39 @@ let
 	-- records are an infinite filter over an infinite map, with the best value
 	-- so far carried in the recursion.
 
+	--> collatz : Num -> List Num
 	collatz = n -> iterate (x -> if (even x) (div 2 x) (add 1 (mul 3 x))) n
 		> takeWhile (neq 1)
 		> append [1;],
 
+	--> records : Num -> Stream [a, Num] -> Stream [a, Num]
 	records = best -> { [[n, len], rest] ->
 		if (gt best len)
 			[[n, len], records len rest]
 			(records best rest) },
 
+	--> collatzRecords : Stream [Num, Num]
 	collatzRecords = upFrom 1 > map (n -> [n, length (collatz n)]) > records 0,
 
 	-- Reporting -------------------------------------------------------------
 
+	--> row : List Num -> List Num -> List Num
 	row = name -> value -> flatten [text.padRight 18 text.space name; value],
+	--> line : List Num -> a -> List Num
 	line = name -> value -> row name (string value),
 
+	--> report : [List Num, List (List Num)]
 	report = [
 		"-- primes";
 		line "first 12"        (take 12 primes);
 		line "below 60"        (takeWhile (lt 60) primes);
-		line "300th"           (nth 299 primes);
+		line "300th"           (nthOr 0 299 primes);
 
 		"";
 		"-- self-referential";
 		line "fibonacci 15"    (take 15 fibonacci);
 		line "hamming 20"      (take 20 hamming);
-		line "hamming 500th"   (nth 499 hamming);
+		line "hamming 500th"   (nthOr 0 499 hamming);
 
 		"";
 		"-- iterate";

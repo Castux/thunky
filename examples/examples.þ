@@ -26,15 +26,20 @@ let
 	-- representation instead of printing it, which is what makes a report like
 	-- this one composable.
 
+	--> row : List Num -> List Num -> List Num
 	row  = name -> text  -> flatten [padRight 22 space name; text],
+	--> line : List Num -> a -> List Num
 	line = name -> value -> row name (string value),
 	-- `write` ends each line for us, so a leading line feed gives a blank line
 	-- before a section title. String literals have no escapes; `text.lf` is 10.
+	--> head_ : List Num -> List Num
 	head_ = title -> prepend [lf;] title,
 
 	-- 1. Application and partial application --------------------------------
 
+	--> add3 : Num -> Num -> Num -> Num
 	add3 = x -> y -> z -> add x (add y z),
+	--> addFive : Num -> Num
 	addFive = add 5,                       -- a builtin, partially applied
 
 	-- 2. Pattern matching ---------------------------------------------------
@@ -43,6 +48,7 @@ let
 	-- why "hello" must come before [a, b]: a string is a list, a list is nested
 	-- 2-tuples, so the tuple pattern would swallow it.
 
+	--> classify : a -> List Num
 	classify = {
 		0        -> "zero",
 		"hello"  -> "the greeting",
@@ -52,6 +58,7 @@ let
 	},
 
 	-- Patterns nest to any depth and mix matching with binding at each level.
+	--> corners : [[Num, Num], [Num, Num]] -> Num
 	corners = [[a, b], [c, d]] -> add (mul a d) (mul b c),
 
 	-- 3. Recursion and mutual recursion -------------------------------------
@@ -59,15 +66,21 @@ let
 	-- Bindings in one `let` are mutually visible, so recursion needs no keyword
 	-- and mutual recursion needs no forward declaration.
 
+	--> factorial : Num -> Num
 	factorial = { 0 -> 1, n -> mul n (factorial (pred n)) },
 
+	--> isEven : Num -> Num
 	isEven = { 0 -> 1, n -> isOdd  (pred n) },
+	--> isOdd : Num -> Num
 	isOdd  = { 0 -> 0, n -> isEven (pred n) },
 
 	-- 4. Laziness -----------------------------------------------------------
 
+	--> fibonacci : Stream Num
 	fibonacci = prepend [1; 1] (zipWith add fibonacci (tail fibonacci)),
+	--> sieve : Stream Num -> Stream Num
 	sieve = { [p, rest] -> [p, sieve (filter (x -> neq 0 (mod p x)) rest)] },
+	--> primes : Stream Num
 	primes = sieve (upFrom 2),
 
 	-- 5. Higher-order style -------------------------------------------------
@@ -75,17 +88,22 @@ let
 	-- Composition builds the function first and applies it later; the pipe
 	-- threads a value through the same steps. Both read left to right.
 
+	--> sumOfEvenSquares : List Num -> Num
 	sumOfEvenSquares = filter even *> map (pow 2) *> sum,
 
 	-- 6. A worked example ---------------------------------------------------
 	--
 	-- Run-length encoding: group equal neighbours, describe each run.
 
-	encodeRuns = groupBy equal *> map (run -> [head run, length run]),
+	--> encodeRuns : List a -> Table a Num
+	encodeRuns = groupBy equal *> mapFilter (run -> headSafe run > maybe.fmap (h -> [h, length run])),
+	--> decodeRuns : Table a Num -> List a
 	decodeRuns = flatMap ([value, n] -> replicate n value),
 
+	--> sample : List Num
 	sample = "aaabccddddbbb",
 
+	--> inventory : Table (List Num) Num
 	inventory = table.empty
 		> table.set "apples" 12
 		> table.set "pears" 3
@@ -93,7 +111,9 @@ let
 
 in
 
-let report = [
+let
+--> report : List (List Num)
+ report = [
 	head_ "-- 1. application";
 	line "add3 10 20 30"      (add3 10 20 30);
 	line "addFive 10"         (addFive 10);
@@ -120,7 +140,7 @@ let report = [
 
 	head_ "-- 5. laziness";
 	line "take 10 fibonacci"  (take 10 fibonacci);
-	line "30th fibonacci"     (nth 29 fibonacci);
+	line "30th fibonacci"     (nthOr 0 29 fibonacci);
 	line "primes below 40"    (takeWhile (lt 40) primes);
 	line "take 5 (upFrom 1)"  (take 5 (upFrom 1));
 

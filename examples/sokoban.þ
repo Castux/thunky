@@ -30,10 +30,16 @@
 
 import core, list, math, maybe, text in
 
+-- A position on the board, column then row, and the state the game moves
+-- through: where the player stands and where the boxes are.
+--> Pos = [Num, Num]
+--> State = [Pos, List Pos]
+
 let
 	-- The level. '#' wall, '.' target, '$' box, '*' box on a target,
 	-- '@' player, '+' player on a target, space floor.
 
+	--> level : List (List Num)
 	level = [
 		"##########";
 		"#        #";
@@ -50,31 +56,42 @@ let
 	-- resulting [[x, y], character] table. Positions are 2-tuples throughout and
 	-- compare with `equal`, so `contains` is all the membership testing needed.
 
+	--> charAt : List [Pos, Num]
 	charAt = level
 		> mapIndex (y -> row -> mapIndex (x -> c -> [[x, y], c]) row)
 		> flatten,
 
+	--> isAnyOf : List a -> a -> Num
 	isAnyOf = chars -> c -> contains c chars,
 
+	--> positionsOf : List Num -> List Pos
 	positionsOf = chars -> charAt > filter (second *> isAnyOf chars) > map first,
 
+	--> walls : List Pos
 	walls   = positionsOf "#",
+	--> targets : List Pos
 	targets = positionsOf ".*+",
+	--> boxes0 : List Pos
 	boxes0  = positionsOf "$*",
-	player0 = positionsOf "@+" > head,
+	--> player0 : Pos
+	player0 = positionsOf "@+" > headOr [0, 0],
 
+	--> initial : State
 	initial = [player0, boxes0],
 
 	-- Rules -----------------------------------------------------------------
 
+	--> shift : Pos -> Pos -> Pos
 	shift = [dx, dy] -> [x, y] -> [add x dx, add y dy],
 
+	--> isWall : Pos -> Num
 	isWall = position -> contains position walls,
 
 	-- A move walks into the next cell. If a box is there, it moves one further,
 	-- but only if that cell is free. Anything blocked leaves the state alone,
 	-- which is why every branch returns a state rather than mutating one.
 
+	--> move : Pos -> State -> State
 	move = direction -> [player, boxes] ->
 		let
 			ahead  = shift direction player,
@@ -86,8 +103,10 @@ let
 										[ahead, replace ahead beyond boxes])
 			> default                         [ahead, boxes],
 
+	--> solved : State -> Num
 	solved = [player, boxes] -> boxes > allMatch (box -> contains box targets),
 
+	--> directionOf : List Num -> Maybe Pos
 	directionOf = {
 		"w" -> some [0, negate 1],  "up"    -> some [0, negate 1],
 		"s" -> some [0, 1],         "down"  -> some [0, 1],
@@ -98,14 +117,28 @@ let
 
 	-- Rendering -------------------------------------------------------------
 
+	--> csi : List Num
 	csi   = flatten [[esc;]; "["],
+	--> sgr : Num -> List Num
 	sgr   = n -> flatten [csi; string n; "m"],
+	--> clear : List Num
 	clear = flatten [csi; "2J"; csi; "H"],
 
-	grey = sgr 90, red = sgr 31, yellow = sgr 33,
-	green = sgr 32, white = sgr 97, plain = sgr 0,
+	--> grey : List Num
+	grey   = sgr 90,
+	--> red : List Num
+	red    = sgr 31,
+	--> yellow : List Num
+	yellow = sgr 33,
+	--> green : List Num
+	green  = sgr 32,
+	--> white : List Num
+	white  = sgr 97,
+	--> plain : List Num
+	plain  = sgr 0,
 
 	-- Every cell is two columns wide so the board is roughly square on screen.
+	--> cellAt : State -> Pos -> List Num
 	cellAt = [player, boxes] -> position ->
 		when       (isWall position)             (prepend grey   "██")
 		> elseWhen (equal position player)       (prepend white  " @")
@@ -114,20 +147,26 @@ let
 		> elseWhen (contains position targets)   (prepend red    " ·")
 		> default                                "  ",
 
-	width  = level > map length > maximum,
+	--> width : Num
+	width  = level > map length > maximumOr 0,
+	--> height : Num
 	height = length level,
 
+	--> boardText : State -> List (List Num)
 	boardText = state -> range 0 height
 		> map (y -> range 0 width > map (x -> cellAt state [x, y]) > flatten),
 
+	--> status : Num -> State -> List Num
 	status = moves -> state -> flatten [
 		plain; "moves "; string moves; "   boxes on target ";
 		string (state > second > count (box -> contains box targets));
 		"/"; string (length boxes0)
 	],
 
+	--> help : List Num
 	help = flatten [grey; "w a s d move   u undo   r reset   q quit"; plain],
 
+	--> draw : Num -> State -> List Num -> List (List Num)
 	draw = moves -> state -> note -> seq (bwrite clear)
 		(flatten [
 			boardText state;
@@ -141,13 +180,16 @@ let
 	-- recursive, which needs no forward declaration: bindings in one `let` are
 	-- mutually visible.
 
+	--> prompt : List Num
 	prompt = flatten [white; "> "; plain],
 
+	--> readLine : List Num -> [List Num, List Num]
 	readLine = input -> span (neq lf) input > ([line, rest] -> [line, rest > {
 		[] -> [],                 -- end of input with no final newline
 		[nl, more] -> more
 	}]),
 
+	--> turn : Num -> List State -> State -> List Num -> List Num -> List Num
 	turn = moves -> history -> state -> note -> input ->
 		seq (draw moves state note)
 			(if (solved state)
@@ -159,8 +201,10 @@ let
 							dispatch moves history state (trim (map toLower line)) rest)
 					}))),
 
+	--> isOneOf : List (List Num) -> List Num -> Num
 	isOneOf = words -> command -> contains command words,
 
+	--> dispatch : Num -> List State -> State -> List Num -> List Num -> List Num
 	dispatch = moves -> history -> state -> command -> input ->
 		when       (isOneOf ["q"; "quit"; "exit"] command) (write (flatten [plain; "bye"]))
 		> elseWhen (isOneOf ["r"; "reset"] command)        (turn 0 [] initial "" input)

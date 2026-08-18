@@ -20,7 +20,13 @@
 
 import core, list, math, maybe, text, heap, table in
 
+-- A Huffman tree: a leaf holding one code point, or a node holding two
+-- subtrees. The two are told apart by arity, so a pattern match distinguishes
+-- them without a tag.
+--> Tree = [Num] | [Tree, Tree]
+
 let
+	--> sample : List Num
 	sample = "the quick brown fox jumps over the lazy dog, and the dog barks back",
 
 	-- Frequencies -----------------------------------------------------------
@@ -29,14 +35,19 @@ let
 	-- them into sublists, and each run's length is its count. O(n log n) and
 	-- three combinators — no mutable counter anywhere.
 
-	counts = sample > sort > groupBy equal > map (run -> [head run, length run]),
+	--> counts : Table Num Num
+	counts = sample > sort > groupBy equal
+		> mapFilter (run -> headSafe run > maybe.fmap (c -> [c, length run])),
 
+	--> byWeight : [Num, a] -> [Num, a] -> Num
 	byWeight = on gt first,           -- min-heap on the weight of a [weight, tree] pair
 
 	-- Construction ----------------------------------------------------------
 
+	--> initial : Heap [Num, Tree]
 	initial = counts > map ([c, n] -> [n, [c]]) > heap.fromList byWeight,
 
+	--> build : Heap [Num, Tree]! -> Tree
 	build = h ->
 		let rest = heap.pop byWeight h in rest > {
 			[] -> heap.top h > second,             -- one subtree left: it is the tree
@@ -49,6 +60,9 @@ let
 					build (heap.insert byWeight node rest2)
 		},
 
+	-- Marked: build assumes a non-empty heap, and a non-empty sample is what makes
+	-- that true — which is an assumption about the input, not a fact about the type.
+	--> tree : Tree!
 	tree = build initial,
 
 	-- Codes -----------------------------------------------------------------
@@ -57,21 +71,25 @@ let
 	-- going right '1'. Bits are accumulated in reverse (a cons is cheap, an
 	-- append is not) and reversed once at each leaf.
 
+	--> codesFrom : List Num -> Tree -> Table Num (List Num)
 	codesFrom = prefix -> {
 		[c]    -> [[c, reverse prefix];],
 		[l, r] -> prepend (codesFrom [char '0', prefix] l) (codesFrom [char '1', prefix] r)
 	},
 
+	--> codes : Table Num (List Num)
 	codes = codesFrom [] tree,
 
 	-- Encoding and decoding -------------------------------------------------
 
+	--> encoded : List Num
 	encoded = sample > flatMap (c -> table.getOr "" c codes),
 
 	-- Decoding walks the tree bit by bit; reaching a leaf emits its character
 	-- and restarts from the root. The result is lazy: `take 10 (decode bits)`
 	-- consumes only the bits those ten characters needed.
 
+	--> decode : List Num -> List Num
 	decode = bits ->
 		let walk = node -> bs -> node > {
 				[c]    -> [c, bs > { [] -> [], more -> walk tree more }],
@@ -89,9 +107,11 @@ let
 	-- Bits needed to reach a whole number of bytes. (`sub a b` is b - a, so the
 	-- 8-minus-remainder is `sub remainder 8` — the wrong order here silently
 	-- yields a negative count, and `replicate` of a negative count never ends.)
+	--> padding : Num
 	padding = let remainder = mod 8 (length encoded) in
 		if (eq remainder 0) 0 (sub remainder 8),
 
+	--> packed : List Num
 	packed  = encoded
 		> append (replicate padding (char '0'))
 		> map digitToInt
@@ -100,12 +120,15 @@ let
 
 	-- Reporting -------------------------------------------------------------
 
+	--> charLabel : Num -> List Num
 	charLabel = c -> if (eq c text.space) "' '" [c;],
 
+	--> byLengthThenChar : [Num, List Num] -> [Num, List Num] -> Num
 	byLengthThenChar = [c1, code1] -> [c2, code2] ->
 		let n1 = length code1, n2 = length code2 in
 			if (neq n1 n2) (lt n1 n2) (lt c1 c2),
 
+	--> codeRow : [Num, List Num] -> List Num
 	codeRow = [c, code] -> flatten [
 		text.padRight 5 text.space (charLabel c);
 		text.padLeft 4 text.space (string (table.getOr 0 c counts));
@@ -113,11 +136,16 @@ let
 		code
 	],
 
+	--> round2 : Num -> Num
 	round2      = x -> mul 100 x > round > fdiv 100,
+	--> plainBits : Num
 	plainBits   = mul 8 (length sample),
+	--> codedBits : Num
 	codedBits   = length encoded,
+	--> bitsPerChar : Num
 	bitsPerChar = fdiv (length sample) codedBits > round2,
 
+	--> report : List (List Num)
 	report = flatten [
 		["sample:"; sample];
 		[text.format "%v characters, %v distinct" [length sample; length counts];];
