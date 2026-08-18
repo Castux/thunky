@@ -1,7 +1,5 @@
 -- maybe.þ: optional values, represented as a 1-tuple [x] or the empty tuple [].
--- Depends only on core, which depends on nothing, so any module may import it.
-
-import core in
+-- Depends on nothing, so any module may import it.
 
 module
 
@@ -54,10 +52,10 @@ default = def -> {
 	[x] -> x
 },
 
--- when cond x: some x if cond holds, none otherwise. Behaves exactly as `if`
--- does, including on a condition that is neither 0 nor 1.
+-- when cond x: some x if cond holds, none otherwise. Matching the condition
+-- directly is what `core.if` does anyway, and it keeps this module dependency-free.
 --> when : Num -> a -> Maybe a
-when = cond -> x -> if cond [x] [],
+when = cond -> x -> cond > { 1 -> [x], 0 -> [] },
 
 -- elseWhen cond x m: m if it is some, otherwise some x when cond holds. With
 -- `when` to open a chain and `default` to close it, this is a multiway
