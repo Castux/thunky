@@ -282,7 +282,12 @@ func (p *exprParser) parseAtom() *pattern {
 	case isVarName(tok):
 		p.pos++
 		if p.o.params == nil {
-			return wildcard() // a signature's free type variable
+			// A signature's free type variable. It claims nothing on its own, so
+			// it stays a hole; the name is kept so that every occurrence of `a`
+			// becomes one node when the signature is instantiated at a call site.
+			t := wildcard()
+			t.varName = tok
+			return t
 		}
 		i, ok := p.o.params[tok]
 		if !ok {

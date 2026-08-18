@@ -249,30 +249,59 @@ func TestSignatureHolds(t *testing.T) {
 	}
 }
 
-// TestSignatureContradiction checks the claims that are actually wrong.
+// TestSignatureContradiction checks the claims that are actually wrong. Since a
+// signature now drives the walk, a claim can only be contradicted on the way
+// *out*: the domain is pushed into the patterns, so over-claiming it is
+// exhaustiveness's business (TestSignatureDomainOverclaim) and what is left here
+// is a body that produces something its own signature forbids.
 func TestSignatureContradiction(t *testing.T) {
 	cases := []struct{ src, want string }{
 		{
-			"--> List a = [] | [a, List a]\n" +
-				"let\n  --> n : Num -> Num\n  n = { [] -> 0, [h, t] -> add 1 (n t) }\nin n",
-			"claimed a number",
+			// The result is a 1-tuple, not a number.
+			"let\n  --> f : Num -> Num\n  f = x -> [x]\nin f 1",
+			"the result: a 1-tuple is not admitted",
 		},
 		{
-			// One arrow too many.
+			// One arrow too many: the result is a number, not a function.
 			"--> List a = [] | [a, List a]\n" +
 				"let\n  --> n : List a -> Num -> Num\n  n = { [] -> 0, [h, t] -> add 1 (n t) }\nin n",
-			"claimed a function",
+			"the result: a number is not admitted",
 		},
 		{
-			// The tuple arity is wrong.
-			"let\n  --> f : [Num, Num, Num] -> Num\n  f = { [a, b] -> add a b }\nin f",
-			"claimed a 3-tuple",
+			// Nested: the claim is wrong two levels down.
+			"let\n  --> f : Num -> [Num, [Num, Num]]\n  f = x -> [x, [x, [x]]]\nin f 1",
+			"field 2 of the pair of field 2 of the pair",
 		},
 	}
 	for _, c := range cases {
 		_, _, warns := run(t, c.src)
-		if len(warns) != 1 || !strings.Contains(warns[0].Message, c.want) {
-			t.Errorf("%s\n  got  %s\n  want one warning containing %q", c.src, messages(warns), c.want)
+		if len(warns) == 0 || !strings.Contains(messages(warns), c.want) {
+			t.Errorf("%s\n  got  %s\n  want a warning containing %q", c.src, messages(warns), c.want)
+		}
+	}
+}
+
+// TestSignatureDomainOverclaim checks the other half of the same relation. A
+// signature that claims to accept more than the patterns match is contravariant
+// — the claim is wider than the finding, which subtyping allows — so it is
+// caught by demanding that the patterns cover the declared domain, not by
+// comparing types.
+func TestSignatureDomainOverclaim(t *testing.T) {
+	cases := []struct{ src, want string }{
+		{
+			"--> List a = [] | [a, List a]\n" +
+				"let\n  --> n : Num -> Num\n  n = { [] -> 0, [h, t] -> add 1 (n t) }\nin n",
+			"does not cover Num",
+		},
+		{
+			"let\n  --> f : [Num, Num, Num] -> Num\n  f = { [a, b] -> add a b }\nin f",
+			"does not cover a 3-tuple",
+		},
+	}
+	for _, c := range cases {
+		_, _, warns := run(t, c.src)
+		if len(warns) == 0 || !strings.Contains(messages(warns), c.want) {
+			t.Errorf("%s\n  got  %s\n  want a warning containing %q", c.src, messages(warns), c.want)
 		}
 	}
 }

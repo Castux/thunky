@@ -38,6 +38,31 @@ type Type struct {
 	tuples map[int][]*Type
 	fun    *arrow
 
+	// fromVar marks a node that a *signature* wrote as a type variable. Such a
+	// position claims nothing, and it goes on claiming nothing after unification
+	// has pinned it down: `core.if : Num -> a -> a -> a` gets `a` from its first
+	// branch, and checking the second branch against that would be checking it
+	// against the first branch rather than against anything the author wrote.
+	// Checking is against the declaration, so it stops wherever the declaration
+	// stopped.
+	fromVar bool
+
+	// weak marks a signature variable the callee *consumes* — one it hands back
+	// to the caller's own callback before returning, so two arguments meeting
+	// there really do have to agree. Its value is still assembled by joining,
+	// though, so it is held to disjointness rather than containment: enough to
+	// catch a number where a list arrives, not enough to complain that a
+	// callback matches a narrower shape than the element type admits.
+	weak bool
+
+	// asserted marks a position a signature wrote with `!`. On an argument that
+	// is exhaustiveness's business and assert.go's; on a result it says the
+	// author claims something narrower than the analysis can confirm — `cycle`
+	// returns a Stream, never the empty list, and no amount of joining will show
+	// it. Either way the mark means "checked by the author, not by me", and the
+	// report totals them.
+	asserted bool
+
 	// level is the depth of the binding this node was created inside. A node
 	// belonging to an enclosing binding must not be copied when a use of a
 	// let-bound name is instantiated — it is shared with the outer scope, and
@@ -185,6 +210,11 @@ func (bld *builder) join(a, b *Type) *Type {
 	}
 
 	a.num = a.num || b.num
+	// fromVar is deliberately *not* unioned here. It records what a signature
+	// wrote, not what unification later discovered, and a value that has passed
+	// through a polymorphic position has not thereby become unknown. `a` stays
+	// the root when a call site joins an argument into it, which is the direction
+	// that has to keep the mark.
 
 	for arity, bFields := range b.tuples {
 		aFields, ok := a.tuples[arity]
@@ -265,7 +295,8 @@ func (bld *builder) instantiate(t *Type, memo map[*Type]*Type) *Type {
 
 	fresh := bld.fresh()
 	memo[t] = fresh
-	fresh.top, fresh.num = t.top, t.num
+	fresh.top, fresh.num, fresh.asserted = t.top, t.num, t.asserted
+	fresh.fromVar, fresh.weak = t.fromVar, t.weak
 	if t.tuples != nil {
 		fresh.tuples = make(map[int][]*Type, len(t.tuples))
 		for arity, fields := range t.tuples {

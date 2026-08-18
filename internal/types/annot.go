@@ -50,6 +50,15 @@ type pattern struct {
 	hole int  // >= 0: this whole position is parameter #hole
 	self bool // the declared type, recursively
 
+	// varName is the name a *signature*'s free type variable was written with.
+	// A declaration's parameters are positional and use hole instead; a
+	// signature has no parameter list, so the name is all there is to tie two
+	// positions together. `List a -> List a` has to mean one `a`, or a call site
+	// could check the argument and then hand back an element type it has already
+	// forgotten. Empty for a declaration, and for a position that was never
+	// written as a variable.
+	varName string
+
 	// asserted is set by a `!` suffix: the author claims this position beyond what
 	// the analysis can confirm, so exhaustiveness is not required of it. It marks
 	// an assumption rather than a fact, and the report counts them.
