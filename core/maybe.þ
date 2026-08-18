@@ -1,5 +1,7 @@
 -- maybe.þ: optional values, represented as a 1-tuple [x] or the empty tuple [].
--- Depends on nothing, so any module may import it.
+-- Depends on nothing: the representation is plain tuples and every name here is
+-- defined below. Importing it is unconditional either way, since Thunky permits
+-- circular imports.
 
 module
 

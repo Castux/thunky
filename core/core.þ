@@ -1,5 +1,7 @@
 -- core.þ: foundational combinators, tuple accessors, and boolean logic.
--- Depends on nothing: every other module may import it freely.
+-- Depends on nothing: every name here is a builtin or defined below. That is a
+-- property of this file, not a condition on importing it — circular imports are
+-- permitted, so any module may import any other regardless.
 
 module
 -- Combinators
