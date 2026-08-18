@@ -68,7 +68,7 @@ the compiler — that last one is a bug in Thunky and asks to be reported.
 `thunky --help` lists the flags, of which the interesting ones are the stage
 dumps (`--dump-ast`, `--dump-core`, `--dump-bytecode`), the type reports
 (`--types`, `--types-all` — the language is dynamic, but the shapes are
-recoverable; see
+recoverable, and where a `-->` comment writes one down it is checked; see
 [7.Type Analysis](implementation/7.Type%20Analysis.md)), and `--to-file` to
 write any of them beside the program. `thunky --version` reports the build.
 
@@ -145,10 +145,11 @@ embedded in the binary; see [§14](#14-standard-library) for the full catalogue.
 Source must be UTF-8. Whitespace separates tokens but is otherwise insignificant.
 
 - **Comments** start with `--` and run to the end of the line. A comment
-  beginning `-->` is an annotation read by the type analysis
-  ([7.Type Analysis](implementation/7.Type%20Analysis.md)); it has no effect on
-  running the program. A signature may be written above any binding, a module's
-  or a `let`'s, and `--types` reports every named value either way.
+  beginning `-->` is an annotation read by the type analysis — a type
+  declaration, or a signature for the binding below it
+  ([7.Type Analysis](implementation/7.Type%20Analysis.md)). Neither has any
+  effect on running the program. A signature may be written above any binding, a
+  module's or a `let`'s, and `--types` reports every named value either way.
 - **Identifiers** match `[a-zA-Z_][a-zA-Z0-9_]*`.
 - **Keywords** are reserved and may not be used as identifiers: `let`, `in`,
   `module`, `import`.

@@ -105,8 +105,11 @@ let
 	-- results to a name and store that name. eval forces the list to normal
 	-- form on first use, so later uses read it back rather than rebuilding it.
 
+	-- mapDefault, not andThen: `second` hands back the results themselves rather
+	-- than a maybe of them, and an absent subset means no results.
+	--> lookup : List Num -> Memo -> List Node
 	lookup = subset ->
-		find (first *> equal subset) *> maybe.andThen second,
+		find (first *> equal subset) *> maybe.mapDefault [] second,
 
 	--> resultsFor : Memo -> List Num -> List Node
 	resultsFor = memo -> {

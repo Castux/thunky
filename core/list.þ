@@ -584,5 +584,5 @@ downFrom = iterate pred, -- lazy infinite list: [n; n-1; n-2; ...]
 upFrom   = iterate succ, -- lazy infinite list: [n; n+1; n+2; ...]
 --> repeat : a -> Stream a
 repeat   = iterate id,   -- lazy infinite list of x
---> cycle : List a -> Stream a
+--> cycle : List a -> Stream a!
 cycle    = l -> prepend l (cycle l) -- lazy infinite cycle of list l

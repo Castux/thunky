@@ -30,9 +30,12 @@ let
 	-- how many primes to produce, which is the point; a few hundred of them is
 	-- where the cost starts to show (the 300th below is ~0.3 s, the 1000th ~2 s).
 
-	--> sieve : Stream Num -> Stream Num
+	-- `List Num!`, not `Stream Num`: filter returns a list, so the recursive call
+	-- cannot be shown to hand on a stream. The mark is the real assumption —
+	-- sieve has no case for a list that runs out.
+	--> sieve : List Num! -> Stream Num
 	sieve = { [p, rest] -> [p, sieve (filter (x -> neq 0 (mod p x)) rest)] },
-	--> primes : Stream Num
+	--> primes : Stream Num!
 	primes = sieve (upFrom 2),
 
 	-- Fibonacci by self-reference -------------------------------------------
@@ -40,7 +43,9 @@ let
 	-- The definition mentions the list it is defining. Sharing is what makes it
 	-- linear: `fibonacci` and `tail fibonacci` are the same cells, read twice.
 
-	--> fibonacci : Stream Num
+	-- Marked because it takes its own tail: the definition is infinite, which no
+	-- type here can state, since zipWith returns a list.
+	--> fibonacci : List Num!
 	fibonacci = prepend [1; 1] (zipWith add fibonacci (tail fibonacci)),
 
 	-- Hamming numbers -------------------------------------------------------
@@ -48,14 +53,14 @@ let
 	-- The numbers whose only prime factors are 2, 3 and 5, in order. Same trick,
 	-- one level up: the stream is the ordered merge of its own multiples.
 
-	--> mergeUniq : Stream Num -> Stream Num -> Stream Num
+	--> mergeUniq : List Num! -> List Num! -> Stream Num
 	mergeUniq = xs -> ys -> xs > { [a, as] -> ys > { [b, bs] ->
 		when       (lt b a) [a, mergeUniq as ys]  -- a < b : a comes first
 		> elseWhen (lt a b) [b, mergeUniq xs bs]  -- b < a : b comes first
 		> default           [a, mergeUniq as bs]  -- equal : emit once, drop both
 	} },
 
-	--> hamming : Stream Num
+	--> hamming : Stream Num!
 	hamming = [1, mergeUniq
 		(map (mul 2) hamming)
 		(mergeUniq (map (mul 3) hamming) (map (mul 5) hamming))],
@@ -101,13 +106,13 @@ let
 		> takeWhile (neq 1)
 		> append [1;],
 
-	--> records : Num -> Stream [a, Num] -> Stream [a, Num]
+	--> records : Num -> List [a, Num]! -> Stream [a, Num]
 	records = best -> { [[n, len], rest] ->
 		if (gt best len)
 			[[n, len], records len rest]
 			(records best rest) },
 
-	--> collatzRecords : Stream [Num, Num]
+	--> collatzRecords : Stream [Num, Num]!
 	collatzRecords = upFrom 1 > map (n -> [n, length (collatz n)]) > records 0,
 
 	-- Reporting -------------------------------------------------------------

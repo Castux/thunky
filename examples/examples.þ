@@ -76,11 +76,11 @@ let
 
 	-- 4. Laziness -----------------------------------------------------------
 
-	--> fibonacci : Stream Num
+	--> fibonacci : List Num!
 	fibonacci = prepend [1; 1] (zipWith add fibonacci (tail fibonacci)),
-	--> sieve : Stream Num -> Stream Num
+	--> sieve : List Num! -> Stream Num
 	sieve = { [p, rest] -> [p, sieve (filter (x -> neq 0 (mod p x)) rest)] },
-	--> primes : Stream Num
+	--> primes : Stream Num!
 	primes = sieve (upFrom 2),
 
 	-- 5. Higher-order style -------------------------------------------------

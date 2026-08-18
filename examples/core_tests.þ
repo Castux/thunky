@@ -436,7 +436,9 @@ runTests [
 	assert "maybe.andThen-some-some" (maybe.andThen maybe.some (maybe.some 5)) [5];
 	assert "maybe.andThen-some-none" (maybe.andThen (x -> maybe.none) (maybe.some 5)) [];
 	assert "maybe.andThen-none" (maybe.andThen maybe.some maybe.none) [];
-	assert "maybe.andThen-extract" (maybe.andThen (add 1) (maybe.some 5)) 6;
+	-- andThen chains: f returns a maybe, so the result is one too. Mapping a plain
+	-- function over a maybe is fmap, above.
+	assert "maybe.andThen-chain" (maybe.andThen (x -> maybe.some (add 1 x)) (maybe.some 5)) [6];
 	assert "maybe.orElse-some" (maybe.orElse (maybe.some 0) (maybe.some 5)) [5];
 	assert "maybe.orElse-none" (maybe.orElse (maybe.some 0) maybe.none) [0];
 	assert "maybe.mapDefault-some" (maybe.mapDefault 0 (add 1) (maybe.some 5)) 6;

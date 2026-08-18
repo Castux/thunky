@@ -91,8 +91,19 @@ type inferrer struct {
 	state map[*syntax.Binding]bindState
 	types map[syntax.Node]*Type
 
+	// The declared type of every binding that has a signature, built once and
+	// instantiated per use. Its presence is also what makes a callee trusted:
+	// its parameter types are the author's, not a join of whatever reached them.
+	sigTypes map[*syntax.Binding]*Type
+
 	warnings []Warning
 	seenWarn map[string]bool
+
+	// settled is set for the refinement pass over the program body. Types are
+	// wider by then — every use of a name has been joined into the node the
+	// report will print — so a second look would describe the same call site
+	// with a different, vaguer type. Checking belongs to the first walk.
+	settled bool
 
 	// namer renders types for diagnostics, so a warning and the report agree.
 	namer *Namer
@@ -108,6 +119,7 @@ func Infer(program *syntax.Program, modules map[string]*syntax.Module, res *synt
 		env:      map[syntax.Node]*Type{},
 		state:    map[*syntax.Binding]bindState{},
 		types:    map[syntax.Node]*Type{},
+		sigTypes: map[*syntax.Binding]*Type{},
 		seenWarn: map[string]bool{},
 	}
 
@@ -136,6 +148,13 @@ func Infer(program *syntax.Program, modules map[string]*syntax.Module, res *synt
 		in.namer.Declare(perModule[u.mod])
 	}
 
+	// Signatures are resolved *before* the walk, because a declared type is now
+	// what the analysis uses: a use of an annotated binding gets a fresh copy of
+	// its signature rather than of whatever its body inferred to. That is the one
+	// place this differs from a report — a claim participates, so it has to be
+	// checked, which is what checkGiven and exhaustiveness are for.
+	given := in.collectSignatures(units, perModule, program, modules)
+
 	// The program body pulls in whatever it needs; a second pass over every
 	// module binding then reaches the ones nothing referred to, and refines the
 	// ones whose recursive group was entered at an awkward point. Joining is
@@ -146,14 +165,15 @@ func Infer(program *syntax.Program, modules map[string]*syntax.Module, res *synt
 			in.bindingType(b)
 		}
 	}
+	in.settled = true
 	in.expr(program.Body)
 
 	namer := in.namer
-	// Signatures are resolved and checked before the report is assembled, because
-	// an annotated binding is *displayed* as its signature: the report is then the
-	// documented interface, verified, rather than a restatement of what inference
-	// happened to find.
-	given := in.checkSignatures(units, perModule)
+	// Now that every body has been walked, each claim is compared with what its
+	// own definition inferred to. An annotated binding is *displayed* as its
+	// signature, so the report is the documented interface, verified, rather than
+	// a restatement of what inference happened to find.
+	in.checkGiven(given)
 
 	// Assertions propagate once every signature is known: a call site that does
 	// not rule out a callee's assumption passes it to the caller.
@@ -365,6 +385,16 @@ func (in *inferrer) name(node *syntax.Name) *Type {
 // first time it is asked for. A request that arrives while the binding is still
 // being inferred is a recursive reference and gets the binding's own node.
 func (in *inferrer) bindingType(b *syntax.Binding) *Type {
+	// A signature is authoritative. Every use — including a recursive one — gets
+	// a fresh copy of the declared type, so nothing has to be known about the
+	// body first. That is what removes the knot-tying: a recursive call no longer
+	// has to share the node it is still building, and an annotated module can be
+	// checked in any order.
+	if declared, signed := in.sigTypes[b]; signed {
+		in.inferBody(b, declared)
+		return in.b.instantiate(declared, map[*Type]*Type{})
+	}
+
 	switch in.state[b] {
 	case inProgress:
 		return in.env[b]
@@ -387,6 +417,63 @@ func (in *inferrer) bindingType(b *syntax.Binding) *Type {
 	in.record(b.Name, node)
 
 	return in.b.instantiate(node, map[*Type]*Type{})
+}
+
+// inferBody walks an annotated binding's definition once, so that the claim can
+// be compared with it afterwards. The body is inferred *against* the signature:
+// the declared argument types are pushed into the patterns, which is what gives
+// a binder in `[h, t]` the field types the declaration promises instead of a
+// fresh variable.
+func (in *inferrer) inferBody(b *syntax.Binding, declared *Type) {
+	if in.state[b] != unvisited {
+		return
+	}
+	in.state[b] = inProgress
+
+	in.b.level++
+	node := in.b.fresh()
+	in.env[b] = node
+	// A copy, so that seeding the patterns cannot write anything back into the
+	// declared type every other use is served from.
+	in.b.join(node, in.exprAgainst(b.Expression, in.b.instantiate(declared, map[*Type]*Type{})))
+	in.b.level--
+
+	in.state[b] = finished
+	in.b.generalize(node)
+	in.record(b.Name, node)
+}
+
+// exprAgainst infers an expression with an expected type in hand. Only a lambda
+// can use it — everything else is inferred bottom-up and compared afterwards —
+// but that is the case that matters, since a lambda is where names get bound.
+func (in *inferrer) exprAgainst(e syntax.Expression, want *Type) *Type {
+	if lam, ok := e.(*syntax.Lambda); ok {
+		return in.record(lam, in.lambdaAgainst(lam, want))
+	}
+	return in.expr(e)
+}
+
+// lambdaAgainst is the checking half of the walk: the domain is seeded from the
+// declaration before the patterns are read, so each case's binders come out at
+// the declared field types. `[h, t]` against `List a` gives `h : a` and
+// `t : List a` — refinement by the shape of the pattern, which needs no flow
+// analysis and no knowledge of what the other cases matched.
+//
+// The codomain is deliberately *not* seeded: joining it with the declared result
+// would merge the claim into the finding and leave nothing to check.
+func (in *inferrer) lambdaAgainst(l *syntax.Lambda, want *Type) *Type {
+	w := find(want)
+	if w.fun == nil {
+		return in.lambda(l)
+	}
+	dom := in.b.fresh()
+	cod := in.b.fresh()
+	in.b.join(dom, w.fun.arg)
+	for _, c := range l.Cases {
+		in.b.join(dom, in.pattern(c.Pattern))
+		in.b.join(cod, in.exprAgainst(c.Expression, w.fun.res))
+	}
+	return in.b.fn(dom, cod)
 }
 
 func (in *inferrer) lambda(l *syntax.Lambda) *Type {
@@ -432,7 +519,15 @@ func (in *inferrer) pattern(p syntax.Pattern) *Type {
 // apply is where most of the information comes from: the argument's shape flows
 // into the function's parameter, and the function's result becomes the type of
 // the application.
-func (in *inferrer) apply(fn, arg *Type, pos source.SourcePos, what string) *Type {
+//
+// It is also where the argument is checked, and how strictly depends on where
+// the parameter's type came from. A *trusted* callee — one with a signature, or
+// a builtin — has a parameter that is exact and freshly instantiated for this
+// call, so the argument can be required to be contained in it. Anything else has
+// a parameter inference arrived at by joining whatever reached it, which is both
+// narrower than intended (`isEmpty` only ever matches `[]`) and polluted by other
+// call sites, so only outright disjointness is reported there.
+func (in *inferrer) apply(fn, arg *Type, pos source.SourcePos, what string, trusted bool) *Type {
 	f := find(fn)
 	if f.top {
 		return in.b.any()
@@ -446,11 +541,53 @@ func (in *inferrer) apply(fn, arg *Type, pos source.SourcePos, what string) *Typ
 		in.b.join(f, in.b.fn(arg, res))
 		return res
 	}
-	if conflicts(f.fun.arg, arg) {
+
+	if in.settled {
+		// The refinement pass: nothing here is news.
+	} else if trusted {
+		if v, ok := admits(f.fun.arg, arg, map[containKey]bool{}); !ok {
+			in.warn("passed "+in.namer.String(find(arg))+" to "+what+
+				", which takes "+in.namer.String(find(f.fun.arg))+v.describe(), pos)
+		}
+	} else if conflicts(f.fun.arg, arg) {
 		in.warn("passed "+in.namer.String(find(arg))+" to "+what+", which takes "+in.namer.String(find(f.fun.arg)), pos)
 	}
+
+	// The join is what instantiates the signature's variables: passing `List Num`
+	// to `reverse : List a -> List a` puts Num into `a`, and the result node,
+	// which is the same `a`, carries it back out.
 	in.b.join(f.fun.arg, arg)
 	return f.fun.res
+}
+
+// trusted reports whether a callee's parameter types are the author's rather
+// than inference's: a builtin, or a binding with a signature. A partial
+// application is still the same instantiated signature, so it stays trusted.
+func (in *inferrer) trusted(e syntax.Expression) bool {
+	switch node := e.(type) {
+	case *syntax.Name:
+		fact, ok := in.res.Uses[node]
+		if !ok {
+			return false
+		}
+		if fact.Kind == syntax.ResolveBuiltin {
+			return true
+		}
+		if b, ok := fact.Def.(*syntax.Binding); ok {
+			_, signed := in.sigTypes[b]
+			return signed
+		}
+	case *syntax.QualifiedName:
+		if b, ok := in.res.Quals[node]; ok {
+			_, signed := in.sigTypes[b]
+			return signed
+		}
+	case *syntax.Operation:
+		if node.Operator == "" && len(node.Operands) > 0 {
+			return in.trusted(node.Operands[0])
+		}
+	}
+	return false
 }
 
 // conflicts reports whether two types have no shape in common at all — a number
@@ -488,15 +625,16 @@ func (in *inferrer) operation(op *syntax.Operation) *Type {
 	switch op.Operator {
 	case "": // application: f a b c
 		t := in.expr(op.Operands[0])
+		trusted := in.trusted(op.Operands[0])
 		for _, arg := range op.Operands[1:] {
-			t = in.apply(t, in.expr(arg), pos, describe(op.Operands[0]))
+			t = in.apply(t, in.expr(arg), pos, describe(op.Operands[0]), trusted)
 		}
 		return t
 
 	case ">": // a > f > g  =  g (f a)
 		t := in.expr(op.Operands[0])
 		for _, fn := range op.Operands[1:] {
-			t = in.apply(in.expr(fn), t, pos, describe(fn))
+			t = in.apply(in.expr(fn), t, pos, describe(fn), in.trusted(fn))
 		}
 		return t
 
@@ -504,7 +642,7 @@ func (in *inferrer) operation(op *syntax.Operation) *Type {
 		last := len(op.Operands) - 1
 		t := in.expr(op.Operands[last])
 		for i := last - 1; i >= 0; i-- {
-			t = in.apply(in.expr(op.Operands[i]), t, pos, describe(op.Operands[i]))
+			t = in.apply(in.expr(op.Operands[i]), t, pos, describe(op.Operands[i]), in.trusted(op.Operands[i]))
 		}
 		return t
 
@@ -512,7 +650,7 @@ func (in *inferrer) operation(op *syntax.Operation) *Type {
 		in0 := in.b.fresh()
 		t := in0
 		for _, fn := range op.Operands {
-			t = in.apply(in.expr(fn), t, pos, describe(fn))
+			t = in.apply(in.expr(fn), t, pos, describe(fn), in.trusted(fn))
 		}
 		return in.b.fn(in0, t)
 
@@ -520,7 +658,7 @@ func (in *inferrer) operation(op *syntax.Operation) *Type {
 		in0 := in.b.fresh()
 		t := in0
 		for i := len(op.Operands) - 1; i >= 0; i-- {
-			t = in.apply(in.expr(op.Operands[i]), t, pos, describe(op.Operands[i]))
+			t = in.apply(in.expr(op.Operands[i]), t, pos, describe(op.Operands[i]), in.trusted(op.Operands[i]))
 		}
 		return in.b.fn(in0, t)
 	}
@@ -597,19 +735,18 @@ type givenSig struct {
 	sig Signature
 }
 
-// checkSignatures resolves every `--> name : Type` annotation in its own unit's
-// scope, attaches it to the binding below it, reports contradictions, and returns
-// the signatures that found a binding so the report can display them.
-func (in *inferrer) checkSignatures(units []unit, perModule map[string][]Decl) map[*syntax.Binding]givenSig {
-	out := map[*syntax.Binding]givenSig{}
+// collectSignatures resolves every `--> name : Type` annotation in its own unit's
+// scope, attaches it to the binding below it, and builds the type each one
+// describes. It runs before the walk, because those types are what the walk uses.
+//
+// The bindings come from the AST rather than from the environment: nothing has
+// been inferred yet, and a signature has to be in hand before the binding it
+// names is first referred to.
+func (in *inferrer) collectSignatures(units []unit, perModule map[string][]Decl,
+	program *syntax.Program, modules map[string]*syntax.Module) map[*syntax.Binding]givenSig {
 
-	// Every binding the walk gave a type to, so a signature can be matched to one.
-	var bindings []*syntax.Binding
-	for node := range in.env {
-		if b, ok := node.(*syntax.Binding); ok {
-			bindings = append(bindings, b)
-		}
-	}
+	out := map[*syntax.Binding]givenSig{}
+	bindings := allBindings(program, modules)
 
 	for _, u := range units {
 		scope := buildScope(u, perModule)
@@ -627,28 +764,84 @@ func (in *inferrer) checkSignatures(units []unit, perModule map[string][]Decl) m
 		in.warnings = append(in.warnings, warns...)
 
 		for b, sig := range bound {
-			t, ok := in.env[b]
-			if !ok {
-				continue
-			}
-			g := givenSig{text: sig.Text, names: namedIn(sig.Text, scope), sig: sig,
+			out[b] = givenSig{text: sig.Text, names: namedIn(sig.Text, scope), sig: sig,
 				asserted: countAsserted(sig.Pat, map[*pattern]bool{})}
-			if msg, bad := conflict(sig.Pat, t, in.namer, "", map[[2]any]bool{}); bad {
-				g.conflicted = true
-				in.warnings = append(in.warnings, Warning{
-					Message: fmt.Sprintf("%s : %s does not hold — %s (inferred %s)",
-						sig.Name, sig.Text, msg, in.namer.String(t)),
-					Pos: sig.Pos,
-				})
-			} else {
-				// Only when the claim is not simply wrong: the patterns cannot cover a
-				// domain the code does not accept, and suggesting `!` for a plainly
-				// wrong type is how the mark would become a rubber stamp.
-				in.checkExhaustive(b, sig)
-			}
-			out[b] = g
+			in.sigTypes[b] = in.b.sigType(sig.Pat)
 		}
 	}
+	return out
+}
+
+// checkGiven compares each claim with what its own definition inferred to. This
+// is the half of the contract that keeps a declared type honest on the way *out*
+// — the result a body actually produces has to be one the signature allows —
+// while exhaustiveness keeps it honest on the way *in*, by demanding that the
+// patterns cover the domain it claims. Neither means much without the other:
+// call sites are checked against the declaration, so a declaration wider than
+// the code behind it is a lie every caller inherits.
+func (in *inferrer) checkGiven(given map[*syntax.Binding]givenSig) {
+	for b, g := range given {
+		found, ok := in.env[b]
+		if !ok {
+			continue // nothing referred to it, so there is nothing to compare
+		}
+		if v, ok := admits(in.sigTypes[b], found, map[containKey]bool{}); !ok {
+			g.conflicted = true
+			given[b] = g
+			in.warnings = append(in.warnings, Warning{
+				Message: fmt.Sprintf("%s : %s does not hold — %s (inferred %s)",
+					g.sig.Name, g.text, v.explain(), in.namer.String(found)),
+				Pos: g.sig.Pos,
+			})
+			continue
+		}
+		// Only when the claim is not simply wrong: the patterns cannot cover a
+		// domain the code does not accept, and suggesting `!` for a plainly wrong
+		// type is how the mark would become a rubber stamp.
+		in.checkExhaustive(b, g.sig)
+	}
+}
+
+// allBindings lists every binding in the program and its modules, nested lets
+// included, in a deterministic order.
+func allBindings(program *syntax.Program, modules map[string]*syntax.Module) []*syntax.Binding {
+	var out []*syntax.Binding
+	var walk func(syntax.Expression)
+	add := func(b *syntax.Binding) {
+		out = append(out, b)
+		walk(b.Expression)
+	}
+	walk = func(e syntax.Expression) {
+		switch node := e.(type) {
+		case *syntax.Let:
+			for _, b := range node.Bindings {
+				add(b)
+			}
+			walk(node.Expression)
+		case *syntax.Lambda:
+			for _, c := range node.Cases {
+				walk(c.Expression)
+			}
+		case *syntax.TupleExpr:
+			for _, x := range node.SubExpressions {
+				walk(x)
+			}
+		case *syntax.List:
+			for _, x := range node.SubExpressions {
+				walk(x)
+			}
+		case *syntax.Operation:
+			for _, x := range node.Operands {
+				walk(x)
+			}
+		}
+	}
+	for _, mod := range sortedModules(modules) {
+		for _, b := range mod.PublicBindings {
+			add(b)
+		}
+	}
+	walk(program.Body)
 	return out
 }
 

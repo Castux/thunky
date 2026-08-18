@@ -80,9 +80,8 @@ func TestGivenSignatureNamesReachThePreamble(t *testing.T) {
 // the disagreement invisible.
 func TestGivenSignatureContradictedShowsBoth(t *testing.T) {
 	modSrc := "module\n\n" +
-		"--> List a = [] | [a, List a]\n\n" +
 		"--> n : Num -> Num\n" +
-		"n = { [] -> 0, [h, t] -> add 1 (n t) }\n"
+		"n = x -> [x]\n"
 	a := analyzeWithModule(t, "m", modSrc, "import m in 0")
 
 	e, ok := entryFor(a, "n")
@@ -92,7 +91,7 @@ func TestGivenSignatureContradictedShowsBoth(t *testing.T) {
 	if e.Type != "Num -> Num" {
 		t.Errorf("the claim should be shown as written, got %q", e.Type)
 	}
-	if !strings.Contains(e.Inferred, "List") {
+	if !strings.Contains(e.Inferred, "[Num]") {
 		t.Errorf("the finding should be recorded beside it, got %q", e.Inferred)
 	}
 	var reported bool

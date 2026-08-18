@@ -129,17 +129,16 @@ func TestLocalSignature(t *testing.T) {
 // TestLocalSignatureContradicted checks that a wrong claim on a local is caught
 // and shown beside the finding, as it is for a module binding.
 func TestLocalSignatureContradicted(t *testing.T) {
-	a := analyzeProgram(t, "--> List a = [] | [a, List a]\n"+
-		"let\n"+
-		"--> n : Num -> Num\n"+
-		"  n = { [] -> 0, [h, t] -> add 1 (n t) }\n"+
-		"in n")
+	a := analyzeProgram(t, "let\n"+
+		"--> f : Num -> Num\n"+
+		"  f = x -> [x, x]\n"+
+		"in f")
 
-	e, ok := localNamed(a.Locals, "n")
+	e, ok := localNamed(a.Locals, "f")
 	if !ok {
-		t.Fatalf("n not reported: %v", localNames(a.Locals))
+		t.Fatalf("f not reported: %v", localNames(a.Locals))
 	}
-	if !strings.Contains(e.Inferred, "List") {
+	if !strings.Contains(e.Inferred, "[Num, Num]") {
 		t.Errorf("expected the finding beside the claim, got %q", e.Inferred)
 	}
 	var reported bool

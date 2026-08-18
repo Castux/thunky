@@ -333,7 +333,7 @@ numericColumn = allMatch (c -> let digits = c > dropWhile (eq (char '-')) in
 -- two strings would be the same value as a two-element list and split wrongly.
 -- Short rows are padded with empty cells; columns of numbers are right-aligned;
 -- no line carries trailing spaces.
---> tableLines : List (List (List Num)) -> List (List Num)
+--> tableLines : List (List a) -> List (List Num)
 tableLines = {
 	[]   -> [],
 	rows -> let
