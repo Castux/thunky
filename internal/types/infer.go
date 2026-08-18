@@ -428,14 +428,6 @@ func conflicts(want, got *Type) bool {
 	if w.top || g.top || isVar(w) || isVar(g) {
 		return false
 	}
-	// A parameter whose type is a function that contains itself is a chain like
-	// `core.case`, which takes a value one moment and another (condition, value)
-	// pair the next. The analysis folds the two into one node, so everything
-	// passed to it looks wrong. Nothing said about such a parameter is worth
-	// saying. (A list is cyclic too, but has no function in the cycle.)
-	if isRecursiveFunction(w) {
-		return false
-	}
 	if w.num && g.num {
 		return false
 	}

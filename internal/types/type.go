@@ -290,36 +290,3 @@ func (bld *builder) instantiate(t *Type, memo map[*Type]*Type) *Type {
 // String renders a type. Cyclic nodes get a mu binder, and the list shape —
 // the empty tuple joined with a pair whose tail is the same type — is printed
 // as [element] rather than spelled out.
-// isRecursiveFunction reports whether t is a function type that can reach
-// itself: a chain that returns another of its own kind, like the one core.case
-// folds into.
-func isRecursiveFunction(t *Type) bool {
-	t = find(t)
-	if t.fun == nil {
-		return false
-	}
-	seen := map[*Type]bool{}
-	var reaches func(*Type) bool
-	reaches = func(n *Type) bool {
-		n = find(n)
-		if n == t {
-			return true
-		}
-		if seen[n] {
-			return false
-		}
-		seen[n] = true
-		for _, fields := range n.tuples {
-			for _, f := range fields {
-				if reaches(f) {
-					return true
-				}
-			}
-		}
-		if n.fun != nil {
-			return reaches(n.fun.arg) || reaches(n.fun.res)
-		}
-		return false
-	}
-	return reaches(t.fun.arg) || reaches(t.fun.res)
-}

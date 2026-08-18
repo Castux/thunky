@@ -79,12 +79,12 @@ let
 		let
 			ahead  = shift direction player,
 			beyond = shift direction ahead
-		in case
-			(isWall ahead)          [player, boxes]
-			(contains ahead boxes)  (if (or (isWall beyond) (contains beyond boxes))
+		in
+			when       (isWall ahead)         [player, boxes]
+			> elseWhen (contains ahead boxes) (if (or (isWall beyond) (contains beyond boxes))
 										[player, boxes]
 										[ahead, replace ahead beyond boxes])
-			else                    [ahead, boxes],
+			> default                         [ahead, boxes],
 
 	solved = [player, boxes] -> boxes > allMatch (box -> contains box targets),
 
@@ -106,13 +106,13 @@ let
 	green = sgr 32, white = sgr 97, plain = sgr 0,
 
 	-- Every cell is two columns wide so the board is roughly square on screen.
-	cellAt = [player, boxes] -> position -> case
-		(isWall position)                                    (prepend grey   "██")
-		(equal position player)                              (prepend white  " @")
-		(and (contains position boxes) (contains position targets)) (prepend green  "▓▓")
-		(contains position boxes)                            (prepend yellow "▓▓")
-		(contains position targets)                          (prepend red    " ·")
-		else                                                 "  ",
+	cellAt = [player, boxes] -> position ->
+		when       (isWall position)             (prepend grey   "██")
+		> elseWhen (equal position player)       (prepend white  " @")
+		> elseWhen (and (contains position boxes) (contains position targets)) (prepend green  "▓▓")
+		> elseWhen (contains position boxes)     (prepend yellow "▓▓")
+		> elseWhen (contains position targets)   (prepend red    " ·")
+		> default                                "  ",
 
 	width  = level > map length > maximum,
 	height = length level,
@@ -161,15 +161,15 @@ let
 
 	isOneOf = words -> command -> contains command words,
 
-	dispatch = moves -> history -> state -> command -> input -> case
-		(isOneOf ["q"; "quit"; "exit"] command) (write (flatten [plain; "bye"]))
-		(isOneOf ["r"; "reset"] command)        (turn 0 [] initial "" input)
-		(isOneOf ["u"; "undo"] command)         (history > {
+	dispatch = moves -> history -> state -> command -> input ->
+		when       (isOneOf ["q"; "quit"; "exit"] command) (write (flatten [plain; "bye"]))
+		> elseWhen (isOneOf ["r"; "reset"] command)        (turn 0 [] initial "" input)
+		> elseWhen (isOneOf ["u"; "undo"] command)         (history > {
 			[] -> turn moves [] state "nothing to undo" input,
 			[previous, older] -> turn (pred moves) older previous "" input
 		})
-		(equal command "")                      (turn moves history state "" input)
-		else (directionOf command > maybe.mapDefault
+		> elseWhen (equal command "")                      (turn moves history state "" input)
+		> default (directionOf command > maybe.mapDefault
 			(turn moves history state (prepend "not a command: " command) input)
 			(direction -> let next = move direction state in
 				if (equal next state)

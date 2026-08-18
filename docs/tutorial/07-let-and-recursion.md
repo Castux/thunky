@@ -285,13 +285,13 @@ Part 2. State does not have to live in an argument — it can live in *which fun
 <summary>Solution</summary>
 
 ```
-import core, text in
+import core, maybe, text in
 let scan = depth -> {
   [] -> eq 0 depth,
-  [c, t] -> core.case
-    (eq (text.char "(") c) (scan (add 1 depth) t)
-    (eq (text.char ")") c) (core.if (eq 0 depth) 0 (scan (sub 1 depth) t))
-    core.else                (scan depth t)
+  [c, t] ->
+    maybe.when       (eq (text.char "(") c) (scan (add 1 depth) t)
+    > maybe.elseWhen (eq (text.char ")") c) (core.if (eq 0 depth) 0 (scan (sub 1 depth) t))
+    > maybe.default                         (scan depth t)
 } in
   show [scan 0 "(a(b)c)", scan 0 "(()", scan 0 ")(", scan 0 "abc"]
 ```

@@ -45,10 +45,10 @@ let
 	-- The numbers whose only prime factors are 2, 3 and 5, in order. Same trick,
 	-- one level up: the stream is the ordered merge of its own multiples.
 
-	mergeUniq = xs -> ys -> xs > { [a, as] -> ys > { [b, bs] -> case
-		(lt b a) [a, mergeUniq as ys]         -- a < b : a comes first
-		(lt a b) [b, mergeUniq xs bs]         -- b < a : b comes first
-		else     [a, mergeUniq as bs]         -- equal : emit once, drop both
+	mergeUniq = xs -> ys -> xs > { [a, as] -> ys > { [b, bs] ->
+		when       (lt b a) [a, mergeUniq as ys]  -- a < b : a comes first
+		> elseWhen (lt a b) [b, mergeUniq xs bs]  -- b < a : b comes first
+		> default           [a, mergeUniq as bs]  -- equal : emit once, drop both
 	} },
 
 	hamming = [1, mergeUniq

@@ -42,10 +42,10 @@ get = k ->
 		go = {
 			[] -> maybe.none,
 			[nh, nk, nv, left, right] ->
-				case (lt nh h) (go left)
-					(gt nh h) (go right)
-					(equal nk k) (maybe.some nv)
-					else (go right)
+				when       (lt nh h)    (go left)
+				> elseWhen (gt nh h)    (go right)
+				> elseWhen (equal nk k) (maybe.some nv)
+				> default               (go right)
 		}
 	in go,
 
@@ -61,10 +61,10 @@ set = k -> v ->
 		go = {
 			[] -> [h, k, v, [], []],
 			[nh, nk, nv, left, right] ->
-				case (lt nh h) [nh, nk, nv, go left, right]
-					(gt nh h) [nh, nk, nv, left, go right]
-					(equal nk k) [nh, k, v, left, right]
-					else [nh, nk, nv, left, go right]
+				when       (lt nh h)    [nh, nk, nv, go left, right]
+				> elseWhen (gt nh h)    [nh, nk, nv, left, go right]
+				> elseWhen (equal nk k) [nh, k, v, left, right]
+				> default               [nh, nk, nv, left, go right]
 		}
 	in go,
 
@@ -81,10 +81,10 @@ remove = k ->
 		go = {
 			[] -> [],
 			[nh, nk, nv, left, right] ->
-				case (lt nh h) [nh, nk, nv, go left, right]
-					(gt nh h) [nh, nk, nv, left, go right]
-					(equal nk k) (removeNode left right)
-					else [nh, nk, nv, left, go right]
+				when       (lt nh h)    [nh, nk, nv, go left, right]
+				> elseWhen (gt nh h)    [nh, nk, nv, left, go right]
+				> elseWhen (equal nk k) (removeNode left right)
+				> default               [nh, nk, nv, left, go right]
 		}
 	in go,
 
@@ -96,10 +96,10 @@ update = k -> f ->
 		go = {
 			[] -> [],
 			[nh, nk, nv, left, right] ->
-				case (lt nh h) [nh, nk, nv, go left, right]
-					(gt nh h) [nh, nk, nv, left, go right]
-					(equal nk k) [nh, k, f nv, left, right]
-					else [nh, nk, nv, left, go right]
+				when       (lt nh h)    [nh, nk, nv, go left, right]
+				> elseWhen (gt nh h)    [nh, nk, nv, left, go right]
+				> elseWhen (equal nk k) [nh, k, f nv, left, right]
+				> default               [nh, nk, nv, left, go right]
 		}
 	in
 		go,
@@ -112,10 +112,10 @@ updateOr = k -> f -> def ->
 		go = {
 			[] -> [h, k, def, [], []],
 			[nh, nk, nv, left, right] ->
-				case (lt nh h) [nh, nk, nv, go left, right]
-					(gt nh h) [nh, nk, nv, left, go right]
-					(equal nk k) [nh, k, f nv, left, right]
-					else [nh, nk, nv, left, go right]
+				when       (lt nh h)    [nh, nk, nv, go left, right]
+				> elseWhen (gt nh h)    [nh, nk, nv, left, go right]
+				> elseWhen (equal nk k) [nh, k, f nv, left, right]
+				> default               [nh, nk, nv, left, go right]
 		}
 	in
 		go,

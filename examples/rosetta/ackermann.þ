@@ -2,13 +2,13 @@
 -- A(m,n) = n+1 if m=0; A(m-1,1) if n=0; A(m-1, A(m,n-1)) otherwise.
 -- The definition transcribes directly into a two-argument pattern match.
 
-import core, list, math, text in
+import core, list, math, text, maybe in
 
 let
-	ackermann = m -> n -> case
-		(eq m 0) (succ n)
-		(eq n 0) (ackermann (pred m) 1)
-		else     (ackermann (pred m) (ackermann m (pred n)))
+	ackermann = m -> n ->
+		when       (eq m 0) (succ n)
+		> elseWhen (eq n 0) (ackermann (pred m) 1)
+		> default           (ackermann (pred m) (ackermann m (pred n)))
 in
 	rangeIncl 0 3
 	> map (m -> rangeIncl 0 4

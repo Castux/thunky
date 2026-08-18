@@ -33,7 +33,7 @@
 -- operations are `intAdd`, `intMul`, … and the float ones `floatAdd`,
 -- `floatMul`, …, and both read well qualified: `big.intAdd`, `big.floatDiv`.
 
-import core, math, list, text, bit in
+import core, math, list, maybe, text, bit in
 
 module
 
@@ -67,18 +67,19 @@ magFromNumber = n -> if (lt 1 n) [] (prepend [mod base n;] (magFromNumber (div b
 
 --> magCompare : List Num -> List Num -> Num
 magCompare = a -> b ->
-	let la = length a, lb = length b in case
-		(neq la lb) (if (lt lb la) (negate 1) 1)
-		else (magCompareSameLength (reverse a) (reverse b)),
+	let la = length a, lb = length b in
+		if (neq la lb)
+			(if (lt lb la) (negate 1) 1)
+			(magCompareSameLength (reverse a) (reverse b)),
 
 -- Both lists most significant first and of equal length.
 --> magCompareSameLength : List Num -> List Num -> Num
 magCompareSameLength = xs -> ys -> xs > {
 	[] -> 0,
-	[x, xrest] -> ys > { [y, yrest] -> case
-		(lt y x) (negate 1)
-		(lt x y) 1
-		else     (magCompareSameLength xrest yrest)
+	[x, xrest] -> ys > { [y, yrest] ->
+		when       (lt y x) (negate 1)
+		> elseWhen (lt x y) 1
+		> default  (magCompareSameLength xrest yrest)
 	}
 },
 
@@ -197,13 +198,13 @@ divTwoByOne = high -> low -> d ->
 -- This replaced binary long division, which needed a pass per *bit* of the
 -- dividend rather than per limb: a factor of 32 on the same operands.
 --> magDivMod : List Num -> List Num -> [List Num, List Num]
-magDivMod = a -> b -> case
-	(magIsZero b)              [[], []]                      -- caller's error; no crash
-	(eq (negate 1) (magCompare a b)) [[], a]                  -- a < b
+magDivMod = a -> b ->
 	-- magDivModSmall reports its remainder as a plain number, not a magnitude.
-	(eq 1 (length b))          (magDivModSmall (headOr 0 b) a
-		> ([quotient, remainder] -> [quotient, magFromNumber remainder]))
-	else                       (magDivModLarge a b),
+	let bySmallDivisor = magDivModSmall (headOr 0 b) a > ([quotient, remainder] -> [quotient, magFromNumber remainder]) in
+		when       (magIsZero b)                    [[], []]        -- caller's error; no crash
+		> elseWhen (eq (negate 1) (magCompare a b)) [[], a]         -- a < b
+		> elseWhen (eq 1 (length b))                bySmallDivisor
+		> default  (magDivModLarge a b),
 
 --> magDivModLarge : List Num -> List Num -> [List Num, List Num]
 magDivModLarge = a -> b ->
@@ -309,19 +310,19 @@ intAbs    = [sign, mag] -> [1, mag],
 -- intCompare a b: -1, 0 or 1 as a is less than, equal to, or greater than b.
 --> intCompare : BigInt -> BigInt -> Num
 intCompare = a -> b ->
-	let sa = intSign a, sb = intSign b in case
-		(neq sa sb) (if (lt sb sa) (negate 1) 1)
-		(eq sa 0)   0
-		else        (mul sa (magCompare (intMagnitude a) (intMagnitude b))),
+	let sa = intSign a, sb = intSign b in
+		when       (neq sa sb) (if (lt sb sa) (negate 1) 1)
+		> elseWhen (eq sa 0)   0
+		> default  (mul sa (magCompare (intMagnitude a) (intMagnitude b))),
 
 --> intAdd : BigInt -> BigInt -> BigInt
 intAdd = a -> b -> a > ([sa, ma] -> b > ([sb, mb] ->
 	if (eq sa sb)
 		[sa, magAdd ma mb]
-		(let c = magCompare ma mb in case
-			(eq c 0)  intZero
-			(eq c 1)  [sa, magSub ma mb]                -- |a| > |b|
-			else      [sb, magSub mb ma]))),
+		(let c = magCompare ma mb in
+			when       (eq c 0) intZero
+			> elseWhen (eq c 1) [sa, magSub ma mb]      -- |a| > |b|
+			> default           [sb, magSub mb ma]))),
 
 -- intSub k n: n - k. The operand comes first and the value it applies to last,
 -- exactly as the `sub` builtin does, so `n > intSub k` reads as "subtract k"
@@ -364,20 +365,20 @@ intMulSmall = k -> [sign, mag] -> if (lt 0 k)
 -- intPow e b: b^e for a non-negative e, by squaring — the argument order of the
 -- `pow` builtin, where `pow 2 x` is x squared.
 --> intPow : Num -> BigInt -> BigInt
-intPow = e -> b -> case
-	(eq e 0)  intOne
-	(even e)  (let half = intPow (div 2 e) b in intMul half half)
-	else      (intMul b (intPow (pred e) b)),
+intPow = e -> b ->
+	when       (eq e 0) intOne
+	> elseWhen (even e) (let half = intPow (div 2 e) b in intMul half half)
+	> default           (intMul b (intPow (pred e) b)),
 
 -- intPowMod m e b: b^e mod m, for a non-negative exponent. Square-and-multiply
 -- with a reduction at every step, so the operands stay the size of m instead of
 -- growing to the size of b^e. Computing the power first and reducing afterwards
 -- is the same answer and a different order of cost: 1000^1000 has 3001 digits.
 --> intPowMod : BigInt -> Num -> BigInt -> BigInt
-intPowMod = m -> e -> b -> case
-	(eq e 0)  (intMod m intOne)
-	(even e)  (let half = intPowMod m (div 2 e) b in intMod m (intMul half half))
-	else      (intMod m (intMul b (intPowMod m (pred e) b))),
+intPowMod = m -> e -> b ->
+	when       (eq e 0) (intMod m intOne)
+	> elseWhen (even e) (let half = intPowMod m (div 2 e) b in intMod m (intMul half half))
+	> default           (intMod m (intMul b (intPowMod m (pred e) b))),
 
 -- intPowModBig m e b: b^e mod m with the exponent itself an arbitrary-precision
 -- integer. `intPowMod` takes a plain number, which caps the exponent at 2^53 —

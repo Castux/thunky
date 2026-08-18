@@ -1,5 +1,7 @@
 -- maybe.þ: optional values, represented as a 1-tuple [x] or the empty tuple [].
--- Depends on nothing, so any module may import it.
+-- Depends only on core, which depends on nothing, so any module may import it.
+
+import core in
 
 module
 
@@ -51,6 +53,26 @@ default = def -> {
 	[] -> def,
 	[x] -> x
 },
+
+-- when cond x: some x if cond holds, none otherwise. Behaves exactly as `if`
+-- does, including on a condition that is neither 0 nor 1.
+--> when : Num -> a -> Maybe a
+when = cond -> x -> if cond [x] [],
+
+-- elseWhen cond x m: m if it is some, otherwise some x when cond holds. With
+-- `when` to open a chain and `default` to close it, this is a multiway
+-- conditional built out of ordinary functions:
+--
+--     when     (magIsZero b) [[], []]
+--     > elseWhen (lt a b)      [[], a]
+--     > default  (divide a b)
+--
+-- Each branch is a separate application, so every part of it has a type — which
+-- the variadic `case … else …` it replaces could not have. Laziness is unchanged:
+-- orElse matches on its second argument and never touches the first when that is
+-- some, so no branch after the first true one is forced.
+--> elseWhen : Num -> a -> Maybe a -> Maybe a
+elseWhen = cond -> x -> orElse (when cond x),
 
 -- orElse other m: return m if it is some, otherwise other. Both are maybes and
 -- so is the result, which is what distinguishes it from `default`: orElse picks

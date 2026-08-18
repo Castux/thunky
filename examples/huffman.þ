@@ -100,14 +100,11 @@ let
 
 	-- Reporting -------------------------------------------------------------
 
-	charLabel = c -> case
-		(eq c text.space) "' '"
-		else [c;],
+	charLabel = c -> if (eq c text.space) "' '" [c;],
 
 	byLengthThenChar = [c1, code1] -> [c2, code2] ->
-		let n1 = length code1, n2 = length code2 in case
-			(neq n1 n2) (lt n1 n2)
-			else (lt c1 c2),
+		let n1 = length code1, n2 = length code2 in
+			if (neq n1 n2) (lt n1 n2) (lt c1 c2),
 
 	codeRow = [c, code] -> flatten [
 		text.padRight 5 text.space (charLabel c);
@@ -131,7 +128,7 @@ let
 		[text.format "%v bits at 8 per character -> %v bits, %v per character"
 			[plainBits; codedBits; bitsPerChar];];
 		[text.format "encoded / original = %v" [fdiv plainBits codedBits > round2;];];
-		[text.format "round trip: %s" [case (equal (decode encoded) sample) "ok" else "FAILED";];]
+		[text.format "round trip: %s" [if (equal (decode encoded) sample) "ok" "FAILED";];]
 	]
 
 in

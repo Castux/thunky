@@ -32,7 +32,7 @@
 -- animation crawls, raise it if it blurs. Computing and drawing a frame already
 -- costs around 60 ms, so the delay is a top-up rather than the whole budget.
 
-import core, list, math, text in
+import core, list, math, maybe, text in
 
 let
 	width      = 40,          -- cells; each is drawn two columns wide
@@ -84,10 +84,10 @@ let
 	neighbourhood = rows -> let sums = map horizontal rows in
 		zipWith3 (zipWith3 sum3) (rotateLeft sums) sums (rotateRight sums),
 
-	rule = alive -> total -> case
-		(eq total 3)              1        -- three neighbours: birth or survival
-		(and (eq total 4) alive)  1        -- two neighbours and already alive
-		else                      0,
+	rule = alive -> total ->
+		when       (eq total 3)             1  -- three neighbours: birth or survival
+		> elseWhen (and (eq total 4) alive) 1  -- two neighbours and already alive
+		> default                           0,
 
 	step = rows -> zipWith (zipWith rule) rows (neighbourhood rows),
 
@@ -96,10 +96,10 @@ let
 	-- A cell is coloured by comparing the frame with the one before it, which is
 	-- possible only because the previous generation is still an ordinary value.
 
-	cell = previous -> current -> case
-		(and current (not previous)) (prepend born     "██")
-		(and current previous)       (prepend survivor "██")
-		else                         "  ",
+	cell = previous -> current ->
+		when       (and current (not previous)) (prepend born     "██")
+		> elseWhen (and current previous)       (prepend survivor "██")
+		> default                               "  ",
 
 	rowText = previousRow -> currentRow -> zipWith cell previousRow currentRow > flatten,
 

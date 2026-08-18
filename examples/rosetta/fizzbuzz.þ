@@ -2,12 +2,12 @@
 -- Numbers 1 to 100, with multiples of 3 as Fizz, of 5 as Buzz, of both as
 -- FizzBuzz.
 
-import core, list, math, text in
+import core, list, math, text, maybe in
 
 	rangeIncl 1 100
-	> map (n -> case
-		(eq 0 (mod 15 n)) "FizzBuzz"
-		(eq 0 (mod 3 n))  "Fizz"
-		(eq 0 (mod 5 n))  "Buzz"
-		else              (string n))
+	> map (n ->
+		when       (eq 0 (mod 15 n)) "FizzBuzz"
+		> elseWhen (eq 0 (mod 3 n))  "Fizz"
+		> elseWhen (eq 0 (mod 5 n))  "Buzz"
+		> default                    (string n))
 	> writeList

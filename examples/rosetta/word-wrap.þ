@@ -7,18 +7,18 @@
 -- which is what wrapping means. The fold carries the finished lines and the
 -- line being built.
 
-import core, list, math, text in
+import core, list, math, text, maybe in
 
 let
 	wrap = width -> content ->
 		let
-			place = [done, current] -> word -> case
-				(isEmpty current)                              [done, word]
+			place = [done, current] -> word ->
+				when (isEmpty current) [done, word]
 				-- `lte width n` is "n fits in width"; `gte` here reads the same
 				-- in English and means the opposite.
-				(lte width (add (length current) (succ (length word))))
+				> elseWhen (lte width (add (length current) (succ (length word))))
 					[done, flatten [current; " "; word]]
-				else                                           [append [current;] done, word]
+				> default [append [current;] done, word]
 		in
 			words content
 			> foldl place [[], ""]

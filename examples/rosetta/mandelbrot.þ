@@ -6,7 +6,7 @@
 -- language needs for it. Escape is tested against |z|^2 > 4 rather than |z| > 2
 -- so that no square root is taken per iteration.
 
-import core, list, math, text in
+import core, list, math, text, maybe in
 
 let
 	width = 78, height = 30, maxIterations = 60,
@@ -15,10 +15,10 @@ let
 
 	-- Iterations before escape, or maxIterations if it never does.
 	escapeTime = cx -> cy ->
-		let go = n -> zx -> zy -> case
-			(gte maxIterations n)                n     -- n >= maxIterations
-			(gt 4 (add (mul zx zx) (mul zy zy))) n     -- |z|^2 > 4
-			else (go (succ n)
+		let go = n -> zx -> zy ->
+			when       (gte maxIterations n)                n  -- n >= maxIterations
+			> elseWhen (gt 4 (add (mul zx zx) (mul zy zy))) n  -- |z|^2 > 4
+			> default (go (succ n)
 				(add cx (sub (mul zy zy) (mul zx zx)))
 				(add cy (mul 2 (mul zx zy))))
 		in
