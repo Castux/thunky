@@ -428,9 +428,9 @@ chunkBase   = 1000000000,      -- 10^9, the largest power of ten below 2^32
 --> intToString : BigInt -> List Num
 intToString = [sign, mag] -> if (magIsZero mag) "0"
 	(let
-		-- Matching the chunks says what `head`/`tail` said, without assuming the
-		-- list is non-empty. The empty case cannot arise — magIsZero ruled it out
-		-- above — but saying so costs one line and asserts nothing.
+		-- The chunks are matched rather than taken apart with head and tail, so
+		-- nothing here assumes the list is non-empty. The empty case cannot arise —
+		-- magIsZero rules it out above — but handling it costs one line.
 		body = magToChunks mag > {
 			[] -> "",
 			[hd, rest] -> flatten [

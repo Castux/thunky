@@ -52,8 +52,8 @@ default = def -> {
 	[x] -> x
 },
 
--- when cond x: some x if cond holds, none otherwise. Matching the condition
--- directly is what `core.if` does anyway, and it keeps this module dependency-free.
+-- when cond x: some x if cond holds, none otherwise. The condition is matched
+-- here rather than passed to `core.if`, so this module depends on nothing.
 --> when : Num -> a -> Maybe a
 when = cond -> x -> cond > { 1 -> [x], 0 -> [] },
 
@@ -65,10 +65,10 @@ when = cond -> x -> cond > { 1 -> [x], 0 -> [] },
 --     > elseWhen (lt a b)      [[], a]
 --     > default  (divide a b)
 --
--- Each branch is a separate application, so every part of it has a type — which
--- the variadic `case … else …` it replaces could not have. Laziness is unchanged:
--- orElse matches on its second argument and never touches the first when that is
--- some, so no branch after the first true one is forced.
+-- Each branch is a separate application, so every part of the chain has a type.
+-- Only the branches that must be are forced: orElse matches on its second
+-- argument and never touches the first when that is some, so nothing after the
+-- first true condition is evaluated.
 --> elseWhen : Num -> a -> Maybe a -> Maybe a
 elseWhen = cond -> x -> orElse (when cond x),
 

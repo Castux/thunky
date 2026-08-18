@@ -284,8 +284,8 @@ func attach(sigs []Signature, bindings []*syntax.Binding) (map[*syntax.Binding]S
 	}
 	// Ties on a line are broken by column, because a one-line definition puts more
 	// than one binding there: `floorMod = a -> n -> let r = mod a n in ...` is both
-	// floorMod and r, and a signature above it means the leftmost of them. Sorting
-	// by line alone left the choice to sort.Slice, which does not promise an order.
+	// floorMod and r, and a signature above it means the leftmost of them. Line
+	// alone would leave the choice to sort.Slice, which promises no order.
 	sort.Slice(byLine, func(i, j int) bool {
 		if byLine[i].line != byLine[j].line {
 			return byLine[i].line < byLine[j].line

@@ -37,9 +37,9 @@ import (
 // is a pair and never the empty list.
 //
 // The shape is read off the *source*, not off the argument's inferred type,
-// because by the end of the walk that type no longer says anything. Passing
-// `[h, t]` to `last` joins the two, so the argument node ends up carrying last's
-// `List a` — empty case and all. The narrower fact exists only at the syntax.
+// because by the end of the walk that type says nothing useful: passing `[h, t]`
+// to `last` joins the two, so the argument node carries last's `List a` — empty
+// case and all. The narrower fact exists only at the syntax.
 //
 // The callee's *patterns* are what license this, not its signature: they are the
 // evidence for what it really handles. A binding that is an alias inherits them,

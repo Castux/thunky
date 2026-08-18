@@ -62,9 +62,9 @@ last = {
 
 -- The safe wrappers rebuild the cell they just matched — `last [h, t]` rather
 -- than `last l` — so that the argument's type is a pair and cannot be empty.
--- That is the same reason the reader has for believing the call is safe, and it
--- is the reason the analysis accepts it, which is the point: a `!` here would be
--- an assumption, and there is no assumption to make.
+-- That is the same reason the reader has for believing the call is safe, and the
+-- reason the analysis accepts it. A `!` here would mark an assumption, and there
+-- is no assumption being made.
 --> lastSafe : List a -> Maybe a
 lastSafe = {
 	[] -> maybe.none,
@@ -219,9 +219,9 @@ filterIndex = f ->
 	zip (upFrom 0) *> filter (uncurry f) *> map second,
 
 -- allOrNone l: some list of every value, or none if any element is none. The
--- all-or-nothing counterpart to mapFilter, which drops the nones instead. Use it
--- to check a whole list before committing to it, rather than testing with
--- anyMatch isNone and then unwrapping with value.
+-- all-or-nothing counterpart to mapFilter, which drops the nones instead. It
+-- states the requirement once, where testing with anyMatch isNone and then
+-- unwrapping with value states it twice and leaves only the test checkable.
 --> allOrNone : List (Maybe a) -> Maybe (List a)
 allOrNone = {
 	[] -> maybe.some [],
@@ -302,9 +302,8 @@ scanl = f -> acc -> {
 -- scanr f acc l: list of successive right-fold results, ending with acc.
 -- scanr f z [a;b;c] = [f a r0; f b r1; f c z; z] where each r is the next scan value
 --> scanr : (a -> b -> b) -> b -> List a -> List b
--- `headOr acc rest` rather than `head rest`: rest is never empty, and acc is
--- exactly what its head would be if it were, so the default costs nothing and
--- there is no assumption left to assert.
+-- rest is never empty, and acc is exactly what its head would be if it were, so
+-- the default costs nothing and nothing here need be asserted.
 scanr = f -> acc -> {
 	[] -> [acc;],
 	[h, t] -> let rest = scanr f acc t in [f h (headOr acc rest), rest]
@@ -538,10 +537,9 @@ unzip = {
 },
 
 -- transpose rows: turn a list of rows into a list of columns; stops at the
--- shortest row. It used to test only the *first* row for emptiness, which is what
--- the comment already claimed it did not do: `transpose [[1;]; []]` reached
--- `head []` and crashed. Unconsing every row at once is both total and the
--- documented behaviour.
+-- shortest row, whichever row that is. Every row is unconsed at once, so a short
+-- row anywhere ends the column — testing only the first row would miss it, and
+-- would reach `head []` on `transpose [[1;]; []]`.
 --> transpose : List (List a) -> List (List a)
 transpose = {
 	[] -> [],
@@ -574,11 +572,10 @@ sort = sortWith lt, -- sort in ascending order using lt
 
 --> iterate : (a -> a) -> a -> Stream a
 iterate  = f -> x -> [x, iterate f (f x)], -- lazy infinite list: [x; f x; f (f x); ...]
--- times n f x: apply f to x n times. Direct recursion rather than
--- `iterate f *> nth n`: that built a stream only to index into it, and borrowed
--- nth's assumption to do it — sound, since a stream is never empty, but it read
--- as an assumption all the same. This also returns x for n <= 0 where indexing
--- with a negative n did not terminate.
+-- times n f x: apply f to x n times, and x itself for n <= 0. Direct recursion
+-- rather than `iterate f *> nth n`, which would build a stream only to index into
+-- it and would borrow nth's assumption to do so — sound, since a stream is never
+-- empty, but it reads as an assumption all the same.
 --> times : Num -> (a -> a) -> a -> a
 times    = n -> f -> x -> if (lt 1 n) x (times (pred n) f (f x)),
 --> downFrom : Num -> Stream Num

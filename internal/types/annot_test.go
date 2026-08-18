@@ -33,8 +33,8 @@ func run(t *testing.T, src string) (string, string, []types.Warning) {
 // TestDeclMatchesUnrolling checks that a finite unrolling of a recursive type is
 // recognised as that type, since it is the same regular tree. Inference produces
 // such nodes routinely — `tails` builds its element as one step of a list over
-// the tied one — and matching by pointer identity alone rendered the element as
-// `[] | [a, List a]`, spelled out beside the very name that means it.
+// the tied one — and matching by pointer identity alone would render that element
+// as `[] | [a, List a]`, spelled out beside the very name that means it.
 func TestDeclMatchesUnrolling(t *testing.T) {
 	got, _, warns := run(t, "--> List a = [] | [a, List a]\n"+
 		"let tails = { [] -> [[];], [h, t] -> [[h, t], tails t] } in tails")

@@ -78,10 +78,10 @@ popSafe = cmp -> {
 --> fromList : (a -> a -> Num) -> List a -> Heap a
 fromList = cmp -> foldl (h -> x -> insert cmp x h) [], -- build a heap from a list
 
+-- The node is matched here rather than reached through top and pop, which are
+-- the partial pair: the empty case is already handled, so one destructuring
+-- serves both fields and assumes nothing.
 --> toList : (a -> a -> Num) -> Heap a -> List a
--- Matching the node rather than calling top and pop on it: those are the partial
--- pair, and the empty case is already handled here, so destructuring once says
--- the same thing without the assumption — and without destructuring twice.
 toList = cmp -> {
 	[] -> [],
 	[rank, value, left, right] -> [value, toList cmp (merge cmp left right)]

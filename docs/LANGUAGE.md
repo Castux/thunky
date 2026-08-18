@@ -746,11 +746,10 @@ show [ap add (mul 2) 5, mean [1; 2; 3; 4]]    -- [15, 2.5]
 | `not b` | logical not |
 
 For more than two branches, chain `maybe.when` / `maybe.elseWhen` /
-`maybe.default` ([below](#maybe)) rather than nesting `if`. `core` used to carry
-a variadic `case cond1 val1 … else defval` for this; it was removed because a
-chain whose next argument's *shape* depended on the last argument's *value* could
-not be given a type, and the untypeable fragment leaked into the inferred result
-of everything that used it.
+`maybe.default` ([below](#maybe)) rather than nesting `if`. They are ordinary
+functions, which is what lets every part of such a chain have a type: a variadic
+form, where the *shape* of one argument depends on the *value* of the last, could
+not.
 
 ---
 
