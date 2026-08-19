@@ -81,7 +81,7 @@ let
 	--
 	-- Run-length encoding: group equal neighbours, describe each run.
 
-	encodeRuns = groupBy equal *> map (run -> [head run, length run]),
+	encodeRuns = groupBy equal *> mapFilter (run -> headSafe run > maybe.fmap (h -> [h, length run])),
 	decodeRuns = flatMap ([value, n] -> replicate n value),
 
 	sample = "aaabccddddbbb",
@@ -120,7 +120,7 @@ let report = [
 
 	head_ "-- 5. laziness";
 	line "take 10 fibonacci"  (take 10 fibonacci);
-	line "30th fibonacci"     (nth 29 fibonacci);
+	line "30th fibonacci"     (nthOr 0 29 fibonacci);
 	line "primes below 40"    (takeWhile (lt 40) primes);
 	line "take 5 (upFrom 1)"  (take 5 (upFrom 1));
 

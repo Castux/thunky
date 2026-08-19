@@ -67,7 +67,7 @@ let
 	-- "one 1" -> "two 1s" -> "one 2, one 1" … Grouping equal neighbours and
 	-- replacing each run by its length and its digit is the whole rule.
 
-	lookAndSay = iterate (groupBy equal *> flatMap (run -> [length run; head run])) [1;],
+	lookAndSay = iterate (groupBy equal *> flatMap (run -> [length run; headOr 0 run])) [1;],
 	digitsToString = map intToDigit,
 
 	-- Newton's method as a stream -------------------------------------------
@@ -106,13 +106,13 @@ let
 		"-- primes";
 		line "first 12"        (take 12 primes);
 		line "below 60"        (takeWhile (lt 60) primes);
-		line "300th"           (nth 299 primes);
+		line "300th"           (nthOr 0 299 primes);
 
 		"";
 		"-- self-referential";
 		line "fibonacci 15"    (take 15 fibonacci);
 		line "hamming 20"      (take 20 hamming);
-		line "hamming 500th"   (nth 499 hamming);
+		line "hamming 500th"   (nthOr 0 499 hamming);
 
 		"";
 		"-- iterate";

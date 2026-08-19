@@ -55,12 +55,12 @@ gcd = a -> b ->
 	let
 		absA = abs a,
 		absB = abs b,
-		go = {
+		rec = {
 			[x, 0] -> x,
-			[x, y] -> go [y, mod y x]  -- mod y x = x mod y (builtin: mod a b = b mod a)
+			[x, y] -> rec [y, mod y x]  -- mod y x = x mod y (builtin: mod a b = b mod a)
 		}
 	in
-		go [absA, absB],
+		rec [absA, absB],
 
 -- lcm a b: least common multiple of a and b
 lcm = a -> b ->

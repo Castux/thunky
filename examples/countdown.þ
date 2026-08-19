@@ -29,6 +29,11 @@
 
 import list, core, text, comb, maybe in
 
+-- An expression tree: the value it evaluates to, the operator that built it,
+-- and its two operands. A leaf carries the symbol 'given' and empty operands.
+-- One subset of the numbers, with every value reachable from it and the tree
+-- that reaches each.
+
 let
 	target  = 364,
 	numbers = [100; 25; 1; 9; 4; 7],
@@ -36,7 +41,10 @@ let
 	-- Node accessors -------------------------------------------------------
 
 	leaf  = n -> [n, 'given', [], []],
-	value = [v, sym, left, right] -> v,
+	-- Total, so that nothing downstream has to assume a node is non-empty. The
+	-- empty case cannot arise: only a leaf's operand slots are empty, and a leaf
+	-- is never asked for its value.
+	value = { [] -> 0, [v, sym, left, right] -> v },
 
 	-- Combine one left result with one right result into the nodes for each
 	-- legal operation. Both orderings of every partition are generated, so a
@@ -122,6 +130,7 @@ let
 	-- Flatten a solution tree into its internal (operation) nodes, post-order.
 
 	collect = {
+		[] -> [],
 		[v, 'given', [], []] -> [],
 		[v, sym, left, right] ->
 			flatten [ collect left; collect right; [ [v, sym, left, right]; ] ]

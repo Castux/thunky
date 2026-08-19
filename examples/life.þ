@@ -73,8 +73,12 @@ let
 
 	-- One generation --------------------------------------------------------
 
-	rotateLeft  = l -> append [head l;] (tail l),      -- [a; b; c] -> [b; c; a]
-	rotateRight = l -> prepend [last l;] (init l),     -- [a; b; c] -> [c; a; b]
+	-- Both are total: taking and dropping handle the empty list, where head/tail
+	-- and last/init would each have needed an assumption the grid's size makes
+	-- true but the type cannot state.
+	rotateLeft  = l -> append (take 1 l) (drop 1 l),   -- [a; b; c] -> [b; c; a]
+	rotateRight = l -> splitAt (pred (length l)) l
+		> ([front, back] -> prepend back front),       -- [a; b; c] -> [c; a; b]
 
 	sum3 = a -> b -> c -> add a (add b c),
 

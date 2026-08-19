@@ -20,6 +20,10 @@
 
 import core, list, math, maybe, text, heap, table in
 
+-- A Huffman tree: a leaf holding one code point, or a node holding two
+-- subtrees. The two are told apart by arity, so a pattern match distinguishes
+-- them without a tag.
+
 let
 	sample = "the quick brown fox jumps over the lazy dog, and the dog barks back",
 
@@ -29,7 +33,8 @@ let
 	-- them into sublists, and each run's length is its count. O(n log n) and
 	-- three combinators — no mutable counter anywhere.
 
-	counts = sample > sort > groupBy equal > map (run -> [head run, length run]),
+	counts = sample > sort > groupBy equal
+		> mapFilter (run -> headSafe run > maybe.fmap (c -> [c, length run])),
 
 	byWeight = on gt first,           -- min-heap on the weight of a [weight, tree] pair
 
@@ -49,6 +54,8 @@ let
 					build (heap.insert byWeight node rest2)
 		},
 
+	-- Marked: build assumes a non-empty heap, and a non-empty sample is what makes
+	-- that true — which is an assumption about the input, not a fact about the type.
 	tree = build initial,
 
 	-- Codes -----------------------------------------------------------------

@@ -13,6 +13,8 @@ let
 	-- lands on the line below, after the FAIL lines have been printed.
 	someAssertionsFailed = { 1 -> 1 },
 
+	-- Marked: runTests reaches someAssertionsFailed, whose whole job is to have no
+	-- case for 0. The assumption is deliberate and this records it.
 	runTests = l -> let
 		total = length l,
 		passed = map second l > sum,
@@ -648,8 +650,8 @@ runTests [
 	assert "list.splitEqual" (list.splitEqual 2 [1; 2; 3; 4; 5]) [[1; 2]; [3; 4]; [5;]];
 	assert "list.splitEqual-exact" (list.splitEqual 2 [1; 2; 3; 4]) [[1; 2]; [3; 4]];
 	assert "list.spans-count" (length (list.spans [1; 2; 3])) 4;
-	assert "list.spans-first" (head (list.spans [1; 2])) [[], [1; 2]];
-	assert "list.spans-last" (last (list.spans [1; 2])) [[1; 2], []];
+	assert "list.spans-first" (headOr [] (list.spans [1; 2])) [[], [1; 2]];
+	assert "list.spans-last" (lastOr [] (list.spans [1; 2])) [[1; 2], []];
 	assert "list.zipWith3" (list.zipWith3 (a -> b -> c -> add a (add b c)) [1; 2] [10; 20] [100; 200]) [111; 222];
 	assert "list.zipWith3-ragged" (list.zipWith3 (a -> b -> c -> add a (add b c)) [1; 2] [10;] [100; 200]) [111;];
 	assert "list.iterate" (list.iterate (mul 2) 1 > take 4) [1; 2; 4; 8];
@@ -659,7 +661,7 @@ runTests [
 
 	-- comb ------------------------------------------------------------------
 	assert "comb.subsetsWithRest-count" (length (comb.subsetsWithRest 2 [1; 2; 3])) 3;
-	assert "comb.subsetsWithRest-shape" (head (comb.subsetsWithRest 1 [1; 2])) [[1;], [2;]];
+	assert "comb.subsetsWithRest-shape" (headOr [] (comb.subsetsWithRest 1 [1; 2])) [[1;], [2;]];
 
 	-- heap ------------------------------------------------------------------
 	assert "heap.popSafe-empty" (heap.popSafe lt heap.emptyHeap) maybe.none;

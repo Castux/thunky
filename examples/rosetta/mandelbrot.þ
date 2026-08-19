@@ -15,14 +15,14 @@ let
 
 	-- Iterations before escape, or maxIterations if it never does.
 	escapeTime = cx -> cy ->
-		let go = n -> zx -> zy ->
+		let rec = n -> zx -> zy ->
 			when       (gte maxIterations n)                n  -- n >= maxIterations
 			> elseWhen (gt 4 (add (mul zx zx) (mul zy zy))) n  -- |z|^2 > 4
-			> default (go (succ n)
+			> default (rec (succ n)
 				(add cx (sub (mul zy zy) (mul zx zx)))
 				(add cy (mul 2 (mul zx zy))))
 		in
-			go 0 0 0,
+			rec 0 0 0,
 
 	shades = " .:-=+*#%@",
 

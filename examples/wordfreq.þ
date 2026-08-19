@@ -61,6 +61,8 @@ let
 
 	bar = count -> replicate (mul barWidth count > div maxCount > max 1) (char '#'),
 
+	-- A table row is heterogeneous on purpose: tableLines renders a number cell
+	-- with `string` and a string cell as it is.
 	row = index -> [word, count] -> [format "%v." [succ index;]; word; count; bar count],
 
 	charCount = length input,

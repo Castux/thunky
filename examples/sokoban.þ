@@ -30,6 +30,9 @@
 
 import core, list, math, maybe, text in
 
+-- A position on the board, column then row, and the state the game moves
+-- through: where the player stands and where the boxes are.
+
 let
 	-- The level. '#' wall, '.' target, '$' box, '*' box on a target,
 	-- '@' player, '+' player on a target, space floor.
@@ -61,7 +64,7 @@ let
 	walls   = positionsOf "#",
 	targets = positionsOf ".*+",
 	boxes0  = positionsOf "$*",
-	player0 = positionsOf "@+" > head,
+	player0 = positionsOf "@+" > headOr [0, 0],
 
 	initial = [player0, boxes0],
 
@@ -114,7 +117,7 @@ let
 		> elseWhen (contains position targets)   (prepend red    " ·")
 		> default                                "  ",
 
-	width  = level > map length > maximum,
+	width  = level > map length > maximumOr 0,
 	height = length level,
 
 	boardText = state -> range 0 height

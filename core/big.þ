@@ -73,20 +73,20 @@ magCompareSameLength = xs -> ys -> xs > {
 },
 
 magAdd = a -> b ->
-	let go = carry -> x -> y -> if (and (isEmpty x) (isEmpty y))
+	let rec = carry -> x -> y -> if (and (isEmpty x) (isEmpty y))
 		(if (eq carry 0) [] [carry;])
 		(let
 			hx = headOr 0 x,
 			hy = headOr 0 y,
 			s  = add carry (add hx hy)
 		in
-			[mod base s, go (div base s) (drop 1 x) (drop 1 y)])
+			[mod base s, rec (div base s) (drop 1 x) (drop 1 y)])
 	in
-		go 0 a b,
+		rec 0 a b,
 
 -- magSub a b: a - b, requiring a >= b.
 magSub = a -> b ->
-	let go = borrow -> x -> y -> if (isEmpty x)
+	let rec = borrow -> x -> y -> if (isEmpty x)
 		[]
 		(let
 			hx = headOr 0 x,
@@ -94,10 +94,10 @@ magSub = a -> b ->
 			d  = sub (add borrow hy) hx        -- hx - (hy + borrow)
 		in
 			if (lt 0 d)
-				[add base d, go 1 (drop 1 x) (drop 1 y)]
-				[d, go 0 (drop 1 x) (drop 1 y)])
+				[add base d, rec 1 (drop 1 x) (drop 1 y)]
+				[d, rec 0 (drop 1 x) (drop 1 y)])
 	in
-		normalize (go 0 a b),
+		normalize (rec 0 a b),
 
 -- mulLimb a b: the product of two limbs as [low, high], via 16-bit halves so
 -- that no intermediate exceeds 2^53.
@@ -115,7 +115,7 @@ mulLimb = a -> b ->
 		[low, high],
 
 magMulSmall = k -> mag ->
-	let go = carry -> m -> if (isEmpty m)
+	let rec = carry -> m -> if (isEmpty m)
 		(if (eq carry 0) [] [carry;])
 		(let
 			product = mulLimb k (headOr 0 m),
@@ -123,9 +123,9 @@ magMulSmall = k -> mag ->
 			limb    = mod base low,
 			carry2  = add (second product) (div base low)
 		in
-			[limb, go carry2 (drop 1 m)])
+			[limb, rec carry2 (drop 1 m)])
 	in
-		normalize (go 0 mag),
+		normalize (rec 0 mag),
 
 -- Shift by whole limbs: little-endian, so this is prepending zeros.
 magShiftLimbs = n -> mag -> if (magIsZero mag) [] (prepend (replicate n 0) mag),
@@ -235,16 +235,16 @@ magDivModSmall = d -> mag ->
 	let
 		halves = mag > flatMap (limb -> [mod halfBase limb; div halfBase limb]),
 
-		go = remainder -> hs -> hs > {
+		rec = remainder -> hs -> hs > {
 			[] -> [[], remainder],
 			[h, rest] -> let
 				current = add (mul halfBase remainder) h,
-				rest2   = go (mod d current) rest
+				rest2   = rec (mod d current) rest
 			in
 				[[div d current, first rest2], second rest2]
 		},
 
-		divided        = go 0 (reverse halves),
+		divided        = rec 0 (reverse halves),
 		quotientHalves = reverse (first divided)
 	in
 		[
@@ -345,14 +345,14 @@ intPowMod = m -> e -> b ->
 intPowModBig = m -> e -> b ->
 	let
 		mag = intMagnitude e,
-		go = i -> acc -> if (lt 0 i)
+		rec = i -> acc -> if (lt 0 i)
 			acc
 			(let squared = intMod m (intMul acc acc) in
-				go (pred i) (if (eq 1 (magTestBit i mag))
+				rec (pred i) (if (eq 1 (magTestBit i mag))
 					(intMod m (intMul squared b))
 					squared))
 	in
-		if (intIsZero e) (intMod m intOne) (go (pred (magBitLength mag)) intOne),
+		if (intIsZero e) (intMod m intOne) (rec (pred (magBitLength mag)) intOne),
 
 -- Threshold-first predicates, matching the lt/lte/gt/gte builtins: the
 -- reference value comes first and the value under test last, so
@@ -440,11 +440,11 @@ floatFromInt = precision -> n -> floatRound [n, 0, precision],
 -- count of doublings is the exponent. A float64 carries at most 52 fractional
 -- bits, so this terminates well before the mantissa could overflow.
 floatFromNumber = precision -> n ->
-	let go = value -> exponent -> if (isInteger value)
+	let rec = value -> exponent -> if (isInteger value)
 		(floatRound [intFromNumber value, exponent, precision])
-		(go (mul 2 value) (pred exponent))
+		(rec (mul 2 value) (pred exponent))
 	in
-		go n 0,
+		rec n 0,
 
 -- floatWithPrecision: the same value carried at a different precision.
 floatWithPrecision = precision -> [m, e, p] -> floatRound [m, e, precision],
@@ -529,7 +529,7 @@ floatSqrt = value ->
 		two  = floatFromNumber p 2,
 		-- floatDiv is divisor-first: `floatDiv x value` is value / x.
 		step = x -> floatDiv two (floatAdd x (floatDiv x value)),
-		go   = x -> let next = step x in
-			if (eq 0 (floatCompare next x)) x (go next)
+		rec   = x -> let next = step x in
+			if (eq 0 (floatCompare next x)) x (rec next)
 	in
-		if (floatIsZero value) value (go (floatWithPrecision p value))
+		if (floatIsZero value) value (rec (floatWithPrecision p value))
