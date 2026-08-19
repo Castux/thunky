@@ -164,11 +164,13 @@ hexValue = c -> case
 	else                                 maybe.none,
 
 parseHex4 = text -> if (lt 4 (length text)) maybe.none
+	-- allOrNone rather than testing with anyMatch isNone and then unwrapping with
+	-- maybe.value: the test and the unwrap were two statements of the same fact,
+	-- and only the first of them was checkable.
 	(take 4 text
 		> map hexValue
-		> (values -> if (anyMatch maybe.isNone values)
-			maybe.none
-			(maybe.some (values > map maybe.value > foldl (acc -> d -> add d (mul 16 acc)) 0)))
+		> allOrNone
+		> maybe.fmap (foldl (acc -> d -> add d (mul 16 acc)) 0)
 		> maybe.andThen (code -> parseStringBody (drop 4 text)
 			> maybe.fmap ([chars, r] -> [[code, chars], r]))),
 
@@ -250,7 +252,8 @@ escapeOne = c -> case
 
 hexDigits = "0123456789abcdef",
 toHex4 = n -> if (eq n 0) "0" (toHexGo n),
-toHexGo = n -> if (eq n 0) [] (append [nth (mod 16 n) hexDigits;] (toHexGo (div 16 n))),
+-- `mod 16` is always in [0, 15], so nthOr's default is unreachable.
+toHexGo = n -> if (eq n 0) [] (append [nthOr 0 (mod 16 n) hexDigits;] (toHexGo (div 16 n))),
 
 -- stringifyPretty indent value: one member or element per line, indented by
 -- `indent` spaces per level. prettyAt indent depth value does the work.

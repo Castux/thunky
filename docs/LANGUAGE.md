@@ -851,15 +851,31 @@ This module adds the derived operations.
 | `minimum l` | smallest element; crashes on `[]` |
 | `lookup key l` | search an association list `[[k1, v1]; …]`; `some v` for the first matching key, or `none` |
 
-`head`, `tail`, `last`, and `init` crash on the empty list. Each has a safe
-counterpart returning a `maybe` instead:
+The accessors above crash on the empty list, or on an index past the end. Each
+has two total counterparts: a `…Safe` returning a `maybe`, and a `…Or` taking a
+default. Reach for one of these unless you have a reason of your own to believe
+the list is long enough.
 
 | Name | Description |
 |------|-------------|
+| `uncons l` | `some [h, t]`, or `none` if `l` is empty — the total destructor the others are built on |
 | `headSafe l` | `some h`, or `none` if `l` is empty |
 | `tailSafe l` | `some t`, or `none` if `l` is empty |
 | `lastSafe l` | `some x`, or `none` if `l` is empty |
 | `initSafe l` | `some l'`, or `none` if `l` is empty |
+| `nthSafe n l` | `some x`, or `none` if `l` has `n` elements or fewer |
+| `headOr def l` | first element, or `def` if `l` is empty |
+| `lastOr def l` | last element, or `def` if `l` is empty |
+| `nthOr def n l` | element at index `n`, or `def` if `l` is too short |
+| `maximumOr def l` | largest element, or `def` if `l` is empty |
+| `minimumOr def l` | smallest element, or `def` if `l` is empty |
+
+`maximumOr def` is not `foldlStrict max def`: the default stands in for the
+answer, it does not take part in the comparison, so `maximumOr 0 [-5; -3]` is
+`-3` rather than `0`.
+
+Prefer `headOr 0 x` to `if (isEmpty x) 0 (head x)`: it states the requirement
+once, in the accessor, rather than twice.
 
 **Modification**
 
@@ -888,6 +904,7 @@ counterpart returning a `maybe` instead:
 | `filter p l` | keep the elements for which `p` returns `1` |
 | `filterIndex p l` | keep the elements for which `p index element` returns `1` |
 | `mapFilter f l` | apply `f` (returning a `maybe`) to each element, dropping `none` and unwrapping `some` — a transformation and a filter in one pass |
+| `allOrNone l` | `some` list of every value, or `none` if any element is `none` — the all-or-nothing counterpart to `mapFilter` |
 | `flatMap f l` | map `f` over `l`, then flatten the resulting list of lists |
 | `find p l` | `some x` for the first element satisfying `p`, or `none` |
 | `findIndex p l` | `some i` for the zero-based index of the first element satisfying `p`, or `none` |
@@ -966,7 +983,7 @@ Each of these produces a lazy, unbounded list; consume it with `take`,
 | `downFrom n` | `[n; n-1; n-2; …]` |
 | `repeat x` | `[x; x; x; …]` |
 | `cycle l` | `l` repeated end to end, forever |
-| `times n f x` | *not* a list: apply `f` to `x` exactly `n` times (the `n`th element of `iterate f x`) |
+| `times n f x` | *not* a list: apply `f` to `x` exactly `n` times; `x` itself for `n <= 0` |
 
 ```
 import list in

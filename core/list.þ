@@ -46,9 +46,13 @@ last = {
 	[h, t] -> last t
 },
 
+-- The safe wrappers rebuild the cell they just matched — `last [h, t]` rather
+-- than `last l` — so the value handed to the partial accessor is visibly a pair
+-- and cannot be empty. That is the same reason the reader has for believing the
+-- call is safe.
 lastSafe = {
 	[] -> maybe.none,
-	l -> maybe.some (last l)
+	[h, t] -> maybe.some (last [h, t])
 },
 
 -- init l: everything but the last element of a non-empty list
@@ -59,8 +63,22 @@ init = {
 
 initSafe = {
 	[] -> maybe.none,
-	l -> maybe.some (init l)
+	[h, t] -> maybe.some (init [h, t])
 },
+
+-- uncons l: the head and tail together, or none if empty. The total destructor
+-- every partial accessor here can be written in terms of.
+uncons = {
+	[] -> maybe.none,
+	[h, t] -> maybe.some [h, t]
+},
+
+-- The `…Or` family: the accessor with a default, for when there is a sensible
+-- answer for the empty list. Prefer these to guarding a partial accessor by
+-- hand — `headOr 0 x` says what `if (isEmpty x) 0 (head x)` says, but states the
+-- requirement once instead of twice.
+headOr = def -> headSafe *> maybe.default def,
+lastOr = def -> lastSafe *> maybe.default def,
 
 -- tails l: all successive suffixes of a list
 tails = {
@@ -161,6 +179,18 @@ filter = f -> {
 filterIndex = f ->
 	zip (upFrom 0) *> filter (uncurry f) *> map second,
 
+-- allOrNone l: some list of every value, or none if any element is none. The
+-- all-or-nothing counterpart to mapFilter, which drops the nones instead. Use it
+-- to check a whole list before committing to it, rather than testing with
+-- anyMatch isNone and then unwrapping with value.
+allOrNone = {
+	[] -> maybe.some [],
+	[h, t] -> h > {
+		[] -> maybe.none,
+		[x] -> allOrNone t > maybe.fmap (cons x)
+	}
+},
+
 -- mapFilter f l: apply f (returning maybe) to each element; keep the some values unwrapped.
 -- Single-pass; more efficient than map *> filter *> map.
 mapFilter = f -> {
@@ -223,9 +253,12 @@ scanl = f -> acc -> {
 
 -- scanr f acc l: list of successive right-fold results, ending with acc.
 -- scanr f z [a;b;c] = [f a r0; f b r1; f c z; z] where each r is the next scan value
+-- `headOr acc rest` rather than `head rest`: rest is never empty, and acc is
+-- exactly what its head would be if it were, so the default costs nothing and
+-- the call is total either way.
 scanr = f -> acc -> {
 	[] -> [acc;],
-	[h, t] -> let rest = scanr f acc t in [f h (head rest), rest]
+	[h, t] -> let rest = scanr f acc t in [f h (headOr acc rest), rest]
 },
 
 -- Aggregations
@@ -359,11 +392,39 @@ contains = elem -> anyMatch (equal elem), -- 1 if list contains elem, else 0
 
 -- maximum l: largest element in list l (crashes on empty list)
 maximum = [h,t] -> foldlStrict max h t,
+
+-- maximumOr def l: largest element, or def for the empty list. Note this is not
+-- `foldlStrict max def`, which would fold the default in and report 0 as the
+-- maximum of a list of negatives.
+maximumOr = def -> {
+	[] -> def,
+	[h, t] -> foldlStrict max h t
+},
+
 -- minimum l: smallest element in list l (crashes on empty list)
 minimum = [h,t] -> foldlStrict min h t,
 
--- nth n l: zero-based index into list l
+-- minimumOr def l: smallest element, or def for the empty list
+minimumOr = def -> {
+	[] -> def,
+	[h, t] -> foldlStrict min h t
+},
+
+-- nth n l: zero-based index into list l.
+--
+-- Partial in a different way from head. head's requirement is about the shape of
+-- its argument, and matching a cell settles it; nth's is a relation between n and
+-- the length, which the argument alone cannot show — `nth 0 [1;]` works and
+-- `nth 5 [1;]` does not, for lists of the same shape. So every caller carries the
+-- requirement. Reach for nthSafe or nthOr instead unless the index is already
+-- known to be in range for a reason of your own.
 nth = n -> drop n *> head,
+
+-- nthSafe n l: the element at index n, or none if the list is shorter.
+nthSafe = n -> drop n *> headSafe,
+
+-- nthOr def n l: the element at index n, or def if the list is shorter.
+nthOr = def -> n -> nthSafe n *> maybe.default def,
 
 -- nub l: remove duplicates, keeping only the first occurrence of each value
 nub = {
@@ -389,10 +450,15 @@ unzip = {
 		unzip rest > { [as, bs] -> [[a, as], [b, bs]] }
 },
 
--- transpose rows: turn a list of rows into a list of columns; stops at the shortest row
+-- transpose rows: turn a list of rows into a list of columns; stops at the
+-- shortest row. It used to test only the *first* row for emptiness, which is what
+-- the comment already claimed it did not do: `transpose [[1;]; []]` reached
+-- `head []` and crashed. Unconsing every row at once is both total and the
+-- documented behaviour.
 transpose = {
 	[] -> [],
-	rows -> if (isEmpty (head rows)) [] [map head rows, transpose (map tail rows)]
+	rows -> rows > map uncons > allOrNone
+		> maybe.mapDefault [] (cells -> [map first cells, transpose (map second cells)])
 },
 
 -- Sorting
@@ -416,7 +482,10 @@ sort = sortWith lt, -- sort in ascending order using lt
 -- Infinite lists
 
 iterate  = f -> x -> [x, iterate f (f x)], -- lazy infinite list: [x; f x; f (f x); ...]
-times    = n -> f -> iterate f *> nth n,    -- apply function f n times
+-- times n f x: apply f to x n times, and x itself for n <= 0. Direct recursion
+-- rather than `iterate f *> nth n`, which built a stream only to index into it
+-- and did not terminate for a negative n.
+times    = n -> f -> x -> if (lt 1 n) x (times (pred n) f (f x)),
 downFrom = iterate pred, -- lazy infinite list: [n; n-1; n-2; ...]
 upFrom   = iterate succ, -- lazy infinite list: [n; n+1; n+2; ...]
 repeat   = iterate id,   -- lazy infinite list of x
