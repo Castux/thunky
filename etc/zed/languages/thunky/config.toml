@@ -1,4 +1,4 @@
-name = "microfun"
-grammar = "microfun"
+name = "Thunky"
+grammar = "thunky"
 path_suffixes = ["th", "þ"]
 line_comments = ["-- "]

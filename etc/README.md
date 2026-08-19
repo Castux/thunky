@@ -23,16 +23,27 @@ Syntax highlighting for three editors, all recognising `.th` and `.þ`:
 
 | Path | Editor | Install |
 |------|--------|---------|
-| [`nano/microfun.nanorc`](nano/microfun.nanorc) | GNU nano | copy to `/usr/share/nano/`, `include` it from your nanorc |
-| [`micro/microfun.yaml`](micro/microfun.yaml) | micro | copy to `~/.config/micro/syntax/` |
+| [`nano/thunky.nanorc`](nano/thunky.nanorc) | GNU nano | copy to `/usr/share/nano/`, `include` it from your nanorc |
+| [`micro/thunky.yaml`](micro/thunky.yaml) | micro | copy to `~/.config/micro/syntax/` |
 | [`zed/`](zed/) | Zed | install as a dev extension |
 
-The Zed extension carries a full tree-sitter grammar
-(`zed/grammars/microfun/grammar.js`) with highlight queries; the other two are
-regex-based and colour keywords, builtins, literals, comments and operators.
+The nano and micro files are regex-based and colour keywords, builtins, literals,
+comments and operators. The Zed extension is a real tree-sitter integration, and
+it is split across two repositories:
 
-All three still use the language's former name, `microfun`, in their
-identifiers — the Zed grammar's id is tied to an external `tree-sitter-microfun`
-repository, and renaming it means regenerating the grammar. The grammars
-themselves are current: same keywords, same operators, same builtin list as
-[`docs/LANGUAGE.md`](../docs/LANGUAGE.md).
+- [`zed/`](zed/) here holds the extension — `extension.toml` plus
+  `languages/thunky/{config.toml,highlights.scm}`.
+- The grammar itself lives in
+  [`Castux/tree-sitter-thunky`](https://github.com/Castux/tree-sitter-thunky),
+  because Zed only consumes a grammar it can clone at a pinned commit.
+
+Zed clones that repo at the `commit` in `[grammars.thunky]` and compiles
+`src/parser.c` to wasm itself, so **after every grammar change you must
+regenerate and commit `src/` there, push, and bump the hash here** — otherwise
+Zed keeps building the old parser. The highlight queries Zed applies are
+`zed/languages/thunky/highlights.scm` in this repo, not the grammar repo's
+`queries/highlights.scm`; the two are identical today and should be kept that
+way.
+
+All three grammars are current: same keywords, same operators, same builtin list
+as [`docs/LANGUAGE.md`](../docs/LANGUAGE.md).

@@ -1,13 +1,14 @@
-id = "microfun"
-name = "microfun"
+id = "thunky"
+name = "Thunky"
 version = "0.0.1"
 schema_version = 1
 authors = ["Noé Falzon"]
 description = "Thunky language support for Zed (.th / .þ files)"
-repository = "https://github.com/noefalzon/tree-sitter-microfun"
+repository = "https://github.com/Castux/thunky"
 
-# grammars/microfun is a local git repo with remote = tree-sitter-microfun.
-# Update the commit hash after each grammar regeneration (grammar.js change).
-[grammars.microfun]
-repository = "https://github.com/noefalzon/tree-sitter-microfun"
-commit = "2db000641bbd781c3c11c57c45ac2e033904680a"
+# The grammar lives in its own repository: Zed clones it at this commit and
+# compiles src/parser.c to wasm itself. Bump the hash after every grammar change,
+# or Zed keeps building the old parser.
+[grammars.thunky]
+repository = "https://github.com/Castux/tree-sitter-thunky"
+commit = "84a7bfe5af6b2e551b5f5224b9055831b27215f4"
