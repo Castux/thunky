@@ -3,8 +3,10 @@ import list, math, core in
 
 module
 
--- pairs l: all ordered pairs [a, b] where a appears before b in l
-pairs = choose 2, -- all ordered pairs [a, b] where a appears before b in l
+-- pairs l: every two-element sublist [a; b], a appearing before b in l.
+-- These are lists, not tuples: `choose 2` is `choose` at n = 2, so the results
+-- have the same shape at every n. `crossPairs` is the one that yields tuples.
+pairs = choose 2,
 
 -- subsets l: power set — all subsets of l (including empty, shortest first)
 subsets = {
@@ -27,7 +29,7 @@ subsetsWithRest = {
 -- choose n l: all n-element subsets of l
 choose = n -> l -> map first (subsetsWithRest n l),
 
--- crossPairs a b: Cartesian product — all pairs [x, y] with x from a, y from b
+-- crossPairs a b: Cartesian product — all tuples [x, y] with x from a, y from b
 crossPairs = a -> b -> flatten (map (x -> map (y -> [x, y]) b) a),
 
 -- permutations l: all permutations of l

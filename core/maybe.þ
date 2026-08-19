@@ -1,5 +1,7 @@
 -- maybe.þ: optional values, represented as a 1-tuple [x] or the empty tuple [].
--- Depends on nothing, so any module may import it.
+-- Depends on nothing: the representation is plain tuples and every name here is
+-- defined below. Importing it is unconditional either way, since Thunky permits
+-- circular imports.
 
 module
 
@@ -41,8 +43,8 @@ default = def -> {
 	[x] -> x
 },
 
--- when cond x: some x if cond holds, none otherwise. Matching the condition
--- directly is what `core.if` does anyway, and it keeps this module dependency-free.
+-- when cond x: some x if cond holds, none otherwise. The condition is matched
+-- here rather than passed to `core.if`, so this module depends on nothing.
 when = cond -> x -> cond > { 1 -> [x], 0 -> [] },
 
 -- elseWhen cond x m: m if it is some, otherwise some x when cond holds. With
@@ -53,10 +55,10 @@ when = cond -> x -> cond > { 1 -> [x], 0 -> [] },
 --     > elseWhen (lt a b)      [[], a]
 --     > default  (divide a b)
 --
--- Each branch is a separate application, so every part of it has a type — which
--- the variadic `case … else …` it replaces could not have. Laziness is unchanged:
--- orElse matches on its second argument and never touches the first when that is
--- some, so no branch after the first true one is forced.
+-- Each branch is a separate application, so every part of the chain has a type.
+-- Only the branches that must be are forced: orElse matches on its second
+-- argument and never touches the first when that is some, so nothing after the
+-- first true condition is evaluated.
 elseWhen = cond -> x -> orElse (when cond x),
 
 -- orElse other m: return m if it is some, otherwise other. Both are maybes and

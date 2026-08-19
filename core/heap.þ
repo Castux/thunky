@@ -64,9 +64,12 @@ popSafe = cmp -> {
 
 fromList = cmp -> foldl (h -> x -> insert cmp x h) [], -- build a heap from a list
 
+-- The node is matched here rather than reached through top and pop, which are
+-- the partial pair: the empty case is already handled, so one destructuring
+-- serves both fields and assumes nothing.
 toList = cmp -> {
 	[] -> [],
-	h -> [top h, toList cmp (pop cmp h)]
+	[rank, value, left, right] -> [value, toList cmp (merge cmp left right)]
 }, -- convert a heap to a sorted list
 
 -- sortBy cmp l: heapsort using the provided comparator.

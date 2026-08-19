@@ -172,9 +172,9 @@ hexValue = c ->
 	> elseWhen (and (lte c (char 'A')) (lte (char 'F') c)) (add 10 (sub (char 'A') c)),
 
 parseHex4 = text -> if (lt 4 (length text)) maybe.none
-	-- allOrNone rather than testing with anyMatch isNone and then unwrapping with
-	-- maybe.value: the test and the unwrap were two statements of the same fact,
-	-- and only the first of them was checkable.
+	-- allOrNone states the all-or-nothing requirement once, where testing with
+	-- anyMatch isNone and then unwrapping with maybe.value would state it twice
+	-- and leave only the test checkable.
 	(take 4 text
 		> map hexValue
 		> allOrNone

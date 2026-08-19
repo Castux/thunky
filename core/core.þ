@@ -1,5 +1,7 @@
 -- core.þ: foundational combinators, tuple accessors, and boolean logic.
--- Depends on nothing: every other module may import it freely.
+-- Depends on nothing: every name here is a builtin or defined below. That is a
+-- property of this file, not a condition on importing it — circular imports are
+-- permitted, so any module may import any other regardless.
 
 module
 -- Combinators
@@ -37,13 +39,10 @@ false = 0,
 -- if cond t f: standard conditional (cond must be 1 or 0)
 if = cond -> t -> f -> cond > { 1 -> t, 0 -> f },
 
--- A chained conditional lives in `maybe` now, as `when` / `elseWhen` / `default`.
--- It used to be `case cond1 val1 … else defval` here: a variadic state machine
--- where `else` was the number 2 and the shape of the next argument depended on
--- the value of the last one. It was a nice trick and it had no type — the
--- analysis folded the chain into a recursive function type that leaked into every
--- caller's result, turning a `Maybe` into `[] | [a] | b -> … -> …` and forcing the
--- conflict checker to suppress every value passed to it.
+-- For more than two branches, chain `maybe.when` / `elseWhen` / `default`. Each
+-- is an ordinary function, so a chain reads as a pipeline; a variadic
+-- `cond val cond val … default` form would not, since the shape of one argument
+-- would depend on the value of the last.
 
 and = a -> b -> if a b 0, -- logical AND (short-circuiting)
 or  = a -> b -> if a 1 b, -- logical OR (short-circuiting)

@@ -60,8 +60,8 @@ set = k -> v ->
 remove = k ->
 	let
 		h = hash k,
-		-- minNode answers none for the empty tree, so it does the emptiness test
-		-- as well as the lookup, and the two-branch match on `right` goes away.
+		-- minNode answers none for the empty tree, so one call does the emptiness
+		-- test and the lookup together.
 		removeNode = left -> right -> right > {
 			[] -> left,
 			_ -> minNode right > {[mh, mk, mv] -> [mh, mk, mv, left, removeMin right]}

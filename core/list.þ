@@ -451,10 +451,9 @@ unzip = {
 },
 
 -- transpose rows: turn a list of rows into a list of columns; stops at the
--- shortest row. It used to test only the *first* row for emptiness, which is what
--- the comment already claimed it did not do: `transpose [[1;]; []]` reached
--- `head []` and crashed. Unconsing every row at once is both total and the
--- documented behaviour.
+-- shortest row, whichever row that is. Every row is unconsed at once, so a short
+-- row anywhere ends the column — testing only the first row would miss it, and
+-- would reach `head []` on `transpose [[1;]; []]`.
 transpose = {
 	[] -> [],
 	rows -> rows > map uncons > allOrNone

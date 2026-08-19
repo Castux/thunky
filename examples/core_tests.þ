@@ -49,8 +49,8 @@ runTests [
 	assert "core.fork-mean" (core.fork fdiv list.length list.sum [1; 2; 3; 4]) 2.5;
 	assert "core.fork-is-ap" (core.fork add (mul 2) (add 1) 5) (core.ap (mul 2 *> add) (add 1) 5);
 	assert "core.fix" (core.fix (f -> n -> if (eq n 0) 1 (mul n (f (sub 1 n)))) 5) 120;
-	-- The multiway conditional, replacing the variadic `case … else …`. The first
-	-- true branch wins, and a chain that matches nothing is none.
+	-- The multiway conditional: the first true branch wins, and a chain that
+	-- matches nothing is none.
 	assert "maybe.when-true" (maybe.when true 1) [1];
 	assert "maybe.when-false" (maybe.when false 1) [];
 	assert "maybe.elseWhen-first-wins"
@@ -255,14 +255,14 @@ runTests [
 	assert "list.intercalate-single" (list.intercalate [0;] [[1; 2];]) [1; 2];
 	assert "list.transpose" (list.transpose [[1; 2; 3]; [4; 5; 6]]) [[1; 4]; [2; 5]; [3; 6]];
 	assert "list.transpose-empty" (list.transpose []) [];
-	-- Stops at the shortest row, in either position. The second of these used to
-	-- reach `head []` and crash, because only the first row was tested.
+	-- Stops at the shortest row, wherever it is: every row is unconsed, so a short
+	-- row in any position ends the column.
 	assert "list.transpose-ragged-first" (list.transpose [[]; [1;]]) [];
 	assert "list.transpose-ragged-later" (list.transpose [[1;]; []]) [];
 	assert "list.transpose-ragged-short" (list.transpose [[1; 2]; [3;]]) [[1; 3];];
 
-	-- The total accessors: partial ones exist, but nothing in the library needs
-	-- them, and these are what callers should reach for.
+	-- The total accessors, which are what callers should reach for: nothing in the
+	-- library needs the partial ones.
 	assert "list.uncons" (list.uncons [1; 2]) [[1, [2;]]];
 	assert "list.uncons-empty" (list.uncons []) [];
 	assert "list.headOr" (list.headOr 7 [1; 2]) 1;
@@ -275,7 +275,8 @@ runTests [
 	assert "list.nthOr-past-end" (list.nthOr 9 5 [10; 20]) 9;
 	assert "list.maximumOr" (list.maximumOr 0 [3; 1; 2]) 3;
 	assert "list.maximumOr-empty" (list.maximumOr 42 []) 42;
-	-- Not `foldlStrict max def`: the default must not take part in the comparison.
+	-- The default must not take part in the comparison, as `foldlStrict max def`
+	-- would have it do.
 	assert "list.maximumOr-negative" (list.maximumOr 0 [sub 5 0; sub 3 0]) (sub 3 0);
 	assert "list.minimumOr" (list.minimumOr 0 [3; 1; 2]) 1;
 	assert "list.minimumOr-empty" (list.minimumOr 42 []) 42;
@@ -285,7 +286,7 @@ runTests [
 	assert "list.allOrNone-empty" (list.allOrNone []) [[]];
 	assert "list.times" (list.times 3 (add 1) 0) 3;
 	assert "list.times-0" (list.times 0 (add 1) 5) 5;
-	-- Indexing a stream with a negative n did not terminate; this returns x.
+	-- n <= 0 yields x itself.
 	assert "list.times-negative" (list.times (sub 2 0) (add 1) 5) 5;
 	assert "list.lookup-found" (list.lookup 2 [[1, 10]; [2, 20]; [3, 30]]) [20];
 	assert "list.lookup-missing" (list.lookup 5 [[1, 10]; [2, 20]]) [];
@@ -526,10 +527,9 @@ runTests [
 	assert "json.parse-whitespace" (json.parse ' { "a" : 1 } ' > maybe.value > json.stringify) '{"a":1}';
 	assert "json.parse-escape" (json.parse '"q\"b"' > maybe.value > json.asString > maybe.value)
 		(flatten ["q"; [dquote;]; "b"]);
-	-- The test that used to be here was named "unicode" but parsed a literal A, so
-	-- the \uXXXX path — parseHex4, four hex digits and a code point — had no
-	-- coverage at all. Single-quoted strings are raw, so the escape is written
-	-- straight into the source.
+	-- The \uXXXX path: parseHex4, four hex digits and a code point.
+	-- Single-quoted strings are raw, so the escape is written straight into the
+	-- source; the literal case below is the one that needs no escape at all.
 	assert "json.parse-unicode-literal" (json.parse '"A"' > maybe.value > json.asString) ["A"];
 	assert "json.parse-unicode-escape" (json.parse '"\u0041"' > maybe.value > json.asString) ["A"];
 	assert "json.parse-unicode-mixed" (json.parse '"a\u0041b"' > maybe.value > json.asString) ["aAb"];
