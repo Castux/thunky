@@ -16,3 +16,4 @@ _site*/
 # A local working note, deliberately not tracked (it keeps getting swept up
 # by `git add -A`).
 V1-READINESS.md
+etc/zed/grammars/thunky.wasm
