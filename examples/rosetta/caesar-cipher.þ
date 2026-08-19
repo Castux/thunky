@@ -2,13 +2,13 @@
 -- Rotate letters by a key, leaving everything else alone. Strings are lists of
 -- code points, so this is one `map` over an arithmetic function.
 
-import core, list, math, text in
+import core, list, math, text, maybe in
 
 let
-	rotate = key -> c -> case
-		(isUpper c) (add (char 'A') (mod 26 (add key (sub (char 'A') c))))
-		(isLower c) (add (char 'a') (mod 26 (add key (sub (char 'a') c))))
-		else        c,
+	rotate = key -> c ->
+		when       (isUpper c) (add (char 'A') (mod 26 (add key (sub (char 'A') c))))
+		> elseWhen (isLower c) (add (char 'a') (mod 26 (add key (sub (char 'a') c))))
+		> default              c,
 
 	encode = key -> map (rotate key),
 	decode = key -> map (rotate (sub key 26)),

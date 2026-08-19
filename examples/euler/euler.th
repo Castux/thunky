@@ -11,7 +11,7 @@
 -- divides it. Memoization means the primes below sqrt(n) are always computed by
 -- the time n is tested, and the stream grows only as far as it is used.
 
-import core, list, math in
+import core, list, math, maybe in
 
 module
 
@@ -37,11 +37,11 @@ factorise = n -> if (lte 1 n) [] (factoriseWith n primes),
 -- The n <= 1 guard is not redundant: when the last factor is removed exactly,
 -- what remains is 1, and the "square passed the remainder" branch would
 -- otherwise report 1 as a prime factor of itself.
-factoriseWith = n -> ps -> if (lte 1 n) [] (ps > ([p, rest] -> case
-	(gt n (mul p p))  [[n, 1];]
-	(divides p n)     (prepend [[p, multiplicity p n];]
+factoriseWith = n -> ps -> if (lte 1 n) [] (ps > ([p, rest] ->
+	when       (gt n (mul p p)) [[n, 1];]
+	> elseWhen (divides p n)    (prepend [[p, multiplicity p n];]
 		(factoriseWith (withoutFactor p n) rest))
-	else              (factoriseWith n rest))),
+	> default                   (factoriseWith n rest))),
 
 -- divisorCount n: the number of divisors, from the exponents alone.
 divisorCount = n -> if (lte 1 n) 1 (factorise n > map (second *> succ) > product),

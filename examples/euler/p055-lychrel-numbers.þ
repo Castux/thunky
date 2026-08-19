@@ -18,9 +18,9 @@ let
 
 	-- Lychrel until proven otherwise: fifty additions without a palindrome.
 	isLychrel = start ->
-		let step = remaining -> n -> case
-			(eq remaining 0)   1
-			else               (let next = big.intAdd n (reverseDigits n) in
+		let step = remaining -> n -> if (eq remaining 0)
+			1
+			(let next = big.intAdd n (reverseDigits n) in
 				if (isPalindrome next) 0 (step (pred remaining) next))
 		in
 			step 50 (big.intFromNumber start)

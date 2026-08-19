@@ -38,6 +38,12 @@ import core, list, math, maybe, text, table in
 
 module
 
+-- A JSON value is a tagged pair: the tag is a string, and what the content is
+-- depends on which tag. The analysis joins the branches rather than keeping them
+-- apart, so it cannot say "content is a number *when* the tag is \"number\"";
+-- leaving the content a parameter says exactly as much as is true, and keeps the
+-- signatures below readable.
+
 -- --- constructors ---------------------------------------------------------
 
 jsonNull   = ["null", 0],
@@ -68,6 +74,9 @@ at = index -> [tag, content] -> if (equal tag "array")
 
 -- path keys value: follow a chain of object keys and array indices. A number in
 -- the path indexes an array, a string looks up an object key.
+-- The value is left a variable rather than claimed as a Value: path walks with
+-- both `get` and `at`, and joining an object step with an array step loses the
+-- tag pair, so `Value b` here would be a claim the code does not support.
 path = steps -> value -> foldl (current -> step ->
 	current > maybe.andThen (v -> if (isList step) (get step v) (at step v)))
 	(maybe.some value) steps,
@@ -95,14 +104,14 @@ skipSpace = dropWhile isSpace,
 
 parseValue = skipSpace *> {
 	[] -> maybe.none,
-	[c, rest] -> case
-		(eq c (char '{'))  (parseObjectBody (skipSpace rest))
-		(eq c (char '['))  (parseArrayBody (skipSpace rest))
-		(eq c dquote)      (parseStringBody rest > maybe.fmap ([s, r] -> [["string", s], r]))
-		(eq c (char 't'))  (parseLiteral "true" jsonTrue [c, rest])
-		(eq c (char 'f'))  (parseLiteral "false" jsonFalse [c, rest])
-		(eq c (char 'n'))  (parseLiteral "null" jsonNull [c, rest])
-		else               (parseNumber [c, rest])
+	[c, rest] ->
+		when       (eq c (char '{')) (parseObjectBody (skipSpace rest))
+		> elseWhen (eq c (char '[')) (parseArrayBody (skipSpace rest))
+		> elseWhen (eq c dquote)     (parseStringBody rest > maybe.fmap ([s, r] -> [["string", s], r]))
+		> elseWhen (eq c (char 't')) (parseLiteral "true" jsonTrue [c, rest])
+		> elseWhen (eq c (char 'f')) (parseLiteral "false" jsonFalse [c, rest])
+		> elseWhen (eq c (char 'n')) (parseLiteral "null" jsonNull [c, rest])
+		> default                    (parseNumber [c, rest])
 },
 
 parseLiteral = word -> value -> text -> if (startsWith word text)
@@ -131,11 +140,10 @@ toNumber = map (c -> if (eq c (char 'E')) (char 'e') c)
 -- already consumed. parseEscape text: one escape sequence and the rest.
 parseStringBody = {
 	[] -> maybe.none,                                   -- unterminated
-	[c, rest] -> case
-		(eq c dquote)     (maybe.some [[], rest])
-		(eq c backslash)  (parseEscape rest)
-		else              (parseStringBody rest
-			> maybe.fmap ([chars, r] -> [[c, chars], r]))
+	[c, rest] ->
+		when       (eq c dquote)    (maybe.some [[], rest])
+		> elseWhen (eq c backslash) (parseEscape rest)
+		> default                   (parseStringBody rest > maybe.fmap ([chars, r] -> [[c, chars], r]))
 },
 
 parseEscape = {
@@ -146,22 +154,22 @@ parseEscape = {
 			parseStringBody rest > maybe.fmap ([chars, r] -> [[ch, chars], r])))
 },
 
-escapeChar = e -> case
-	(eq e dquote)        (maybe.some dquote)
-	(eq e backslash)     (maybe.some backslash)
-	(eq e (char '/'))    (maybe.some (char '/'))
-	(eq e (char 'n'))    (maybe.some lf)
-	(eq e (char 't'))    (maybe.some tab)
-	(eq e (char 'r'))    (maybe.some cr)
-	(eq e (char 'b'))    (maybe.some 8)
-	(eq e (char 'f'))    (maybe.some 12)
-	else                 maybe.none,
+-- No `some` or `none` here: `when` already builds the maybe, and a chain that
+-- matches nothing is none by construction.
+escapeChar = e ->
+	when       (eq e dquote)     dquote
+	> elseWhen (eq e backslash)  backslash
+	> elseWhen (eq e (char '/')) (char '/')
+	> elseWhen (eq e (char 'n')) lf
+	> elseWhen (eq e (char 't')) tab
+	> elseWhen (eq e (char 'r')) cr
+	> elseWhen (eq e (char 'b')) 8
+	> elseWhen (eq e (char 'f')) 12,
 
-hexValue = c -> case
-	(isDigit c)                          (maybe.some (digitToInt c))
-	(and (lte c (char 'a')) (lte (char 'f') c)) (maybe.some (add 10 (sub (char 'a') c)))
-	(and (lte c (char 'A')) (lte (char 'F') c)) (maybe.some (add 10 (sub (char 'A') c)))
-	else                                 maybe.none,
+hexValue = c ->
+	when       (isDigit c)                                (digitToInt c)
+	> elseWhen (and (lte c (char 'a')) (lte (char 'f') c)) (add 10 (sub (char 'a') c))
+	> elseWhen (and (lte c (char 'A')) (lte (char 'F') c)) (add 10 (sub (char 'A') c)),
 
 parseHex4 = text -> if (lt 4 (length text)) maybe.none
 	-- allOrNone rather than testing with anyMatch isNone and then unwrapping with
@@ -187,11 +195,10 @@ parseArrayBody = {
 
 parseElements = text -> parseValue text > maybe.andThen ([value, rest] ->
 	skipSpace rest > (t -> t > {
-		[c, more] -> case
-			(eq c (char ',')) (parseElements more
-				> maybe.fmap ([items, r] -> [[value, items], r]))
-			(eq c (char ']')) (maybe.some [[value;], more])
-			else              maybe.none,
+		[c, more] ->
+			when       (eq c (char ',')) (parseElements more > maybe.fmap ([items, r] -> [[value, items], r]))
+			> elseWhen (eq c (char ']')) (maybe.some [[value;], more])
+			> default                   maybe.none,
 		[] -> maybe.none
 	})),
 
@@ -204,11 +211,10 @@ parseObjectBody = {
 
 parseMembers = text -> parseMember (skipSpace text) > maybe.andThen ([pair, rest] ->
 	skipSpace rest > (t -> t > {
-		[c, more] -> case
-			(eq c (char ',')) (parseMembers more
-				> maybe.fmap ([pairs, r] -> [[pair, pairs], r]))
-			(eq c (char '}')) (maybe.some [[pair;], more])
-			else              maybe.none,
+		[c, more] ->
+			when       (eq c (char ',')) (parseMembers more > maybe.fmap ([pairs, r] -> [[pair, pairs], r]))
+			> elseWhen (eq c (char '}')) (maybe.some [[pair;], more])
+			> default                   maybe.none,
 		[] -> maybe.none
 	})),
 
@@ -228,27 +234,27 @@ parseMember = {
 -- --- printing -------------------------------------------------------------
 
 -- stringify value: compact, no spaces.
-stringify = [tag, content] -> case
-	(equal tag "null")    "null"
-	(equal tag "bool")    (if content "true" "false")
-	(equal tag "number")  (string content)
-	(equal tag "string")  (quote content)
-	(equal tag "array")   (flatten ["["; content > map stringify > join ","; "]"])
-	else                  (flatten ["{";
+stringify = [tag, content] ->
+	when       (equal tag "null")   "null"
+	> elseWhen (equal tag "bool")   (if content "true" "false")
+	> elseWhen (equal tag "number") (string content)
+	> elseWhen (equal tag "string") (quote content)
+	> elseWhen (equal tag "array")  (flatten ["["; content > map stringify > join ","; "]"])
+	> default                       (flatten ["{";
 		content > map ([k, v] -> flatten [quote k; ":"; stringify v]) > join ",";
 		"}"]),
 
 -- quote s: s as a quoted JSON string. escapeOne c: one character, escaped.
 quote = s -> flatten [[dquote;]; flatMap escapeOne s; [dquote;]],
 
-escapeOne = c -> case
-	(eq c dquote)     (flatten [[backslash;]; [dquote;]])
-	(eq c backslash)  (flatten [[backslash;]; [backslash;]])
-	(eq c lf)         (flatten [[backslash;]; "n"])
-	(eq c cr)         (flatten [[backslash;]; "r"])
-	(eq c tab)        (flatten [[backslash;]; "t"])
-	(lt 32 c)         (flatten [[backslash;]; "u"; padLeft 4 (char '0') (toHex4 c)])
-	else              [c;],
+escapeOne = c ->
+	when       (eq c dquote)    (flatten [[backslash;]; [dquote;]])
+	> elseWhen (eq c backslash) (flatten [[backslash;]; [backslash;]])
+	> elseWhen (eq c lf)        (flatten [[backslash;]; "n"])
+	> elseWhen (eq c cr)        (flatten [[backslash;]; "r"])
+	> elseWhen (eq c tab)       (flatten [[backslash;]; "t"])
+	> elseWhen (lt 32 c)        (flatten [[backslash;]; "u"; padLeft 4 (char '0') (toHex4 c)])
+	> default                   [c;],
 
 hexDigits = "0123456789abcdef",
 toHex4 = n -> if (eq n 0) "0" (toHexGo n),
@@ -263,17 +269,17 @@ prettyAt = indent -> depth -> [tag, content] ->
 	let
 		pad   = n -> replicate (mul indent n) space,
 		inner = succ depth
-	in case
-		(equal tag "array") (if (isEmpty content) "[]" (flatten [
+	in
+		when (equal tag "array") (if (isEmpty content) "[]" (flatten [
 			"["; [lf;];
 			content
 				> map (v -> flatten [pad inner; prettyAt indent inner v])
 				> join (flatten [","; [lf;]]);
 			[lf;]; pad depth; "]"]))
-		(equal tag "object") (if (isEmpty content) "{}" (flatten [
+		> elseWhen (equal tag "object") (if (isEmpty content) "{}" (flatten [
 			"{"; [lf;];
 			content
 				> map ([k, v] -> flatten [pad inner; quote k; ": "; prettyAt indent inner v])
 				> join (flatten [","; [lf;]]);
 			[lf;]; pad depth; "}"]))
-		else (stringify [tag, content])
+		> default (stringify [tag, content])

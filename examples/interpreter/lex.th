@@ -9,7 +9,7 @@
 -- several times by the parser, and `eq` on a number is one comparison where
 -- `equal` on a tag walks a list.
 
-import core, list, math, text in
+import core, list, math, maybe, text in
 
 module
 
@@ -39,14 +39,14 @@ tokens = source -> scan source 0,
 
 scan = rest -> offset -> rest > {
 	[] -> [[tokenEnd, "", offset];],
-	[c, more] -> case
-		(isSpace c)              (scan more (succ offset))
-		(startsWith "--" rest)   (let dropped = takeWhile (neq lf) rest in
+	[c, more] ->
+		when       (isSpace c)            (scan more (succ offset))
+		> elseWhen (startsWith "--" rest) (let dropped = takeWhile (neq lf) rest in
 			scan (drop (length dropped) rest) (add offset (length dropped)))
-		(isDigit c)              (scanNumber rest offset)
-		(isIdentifierStart c)    (scanWord rest offset)
-		(or (eq c dquote) (eq c quote)) (scanString rest offset)
-		else                     (scanSymbol rest offset)
+		> elseWhen (isDigit c)            (scanNumber rest offset)
+		> elseWhen (isIdentifierStart c)  (scanWord rest offset)
+		> elseWhen (or (eq c dquote) (eq c quote)) (scanString rest offset)
+		> default                         (scanSymbol rest offset)
 },
 
 scanNumber = rest -> offset ->

@@ -71,23 +71,26 @@ least as often, when it is not.
 ### Conditionals
 
 ```
-import core in
+import core, maybe in
 show [
   core.if 1 "yes" "no",             -- "yes"
   core.if 0 "yes" "no",             -- "no"
-  core.case 0 10 0 20 1 30 else 99  -- 30 (first true condition)
+  -- the first true branch, or the default
+  maybe.when 0 10 > maybe.elseWhen 0 20 > maybe.elseWhen 1 30 > maybe.default 99
 ]
 ```
 
 `core.if cond t f` — selects `t` if `cond = 1`, `f` if `cond = 0`. Runtime error for any other value.
 
-`core.case` is a chained conditional:
+For more than two branches, chain `maybe.when` / `maybe.elseWhen` / `maybe.default`:
 
 ```thunky-static
-core.case cond1 val1 cond2 val2 ... else default
+maybe.when cond1 val1 > maybe.elseWhen cond2 val2 > maybe.default default
 ```
 
-Evaluates each `condN`; returns `valN` for the first condition equal to `1`. The keyword `else` is a builtin constant that marks the final default value. (Technically, `else` in `core` is just a constant that breaks the chaining — it is not special syntax.)
+Each condition is tested in turn and the first true one wins; conditions after it are never evaluated, and neither are the values of branches that lose. `when` builds a `maybe`, `elseWhen` fills it in if it is still `none`, and `default` unwraps it. There is no special syntax here — they are ordinary functions, so a chain is built and read like any other pipeline.
+
+If a branch is the last one, drop the `default` and the result stays a `maybe`: a chain that matches nothing is `none`.
 
 ### Boolean logic
 
@@ -710,9 +713,9 @@ The full interface of all three is in
 
 | Module | What it provides |
 |--------|-----------------|
-| `core` | `id`, `flip`, `compose`, `const`, `on`, `ap`, `fork`, `if`, `case`, `and`, `or`, `not`, `curry`, `uncurry`, `fix` |
+| `core` | `id`, `flip`, `compose`, `const`, `on`, `ap`, `fork`, `if`, `and`, `or`, `not`, `curry`, `uncurry`, `fix` |
 | `math` | `succ`, `pred`, `abs`, `max`, `min`, `clamp`, `even`, `odd`, `gcd`, `factorial`, `digits`, rounding |
-| `maybe` | Optional values: `none`, `some`, `fmap`, `andThen`, `default`, `value`, `orElse` |
+| `maybe` | Optional values: `none`, `some`, `fmap`, `andThen`, `default`, `value`, `orElse`, `when`, `elseWhen` |
 | `list` | Complete list library: construction, higher-order, folding, slicing, sorting, infinite lists |
 | `text` | Strings: `char`, constants, formatting, classification, parsing |
 | `table` | Association lists (O(n)): `get`, `set`, `update`, `keys`, `values`, `merge` |

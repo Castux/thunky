@@ -125,11 +125,11 @@ parseChain = operator -> collected -> tokens ->
 
 -- a > b > c  is  c (b a);  a < b < c  is  a (b c).
 -- a *> b *> c is  x -> c (b (a x));  a <* b <* c is  x -> a (b (c x)).
-foldOperator = operator -> parts -> case
-	(equal operator ">")  (foldl (acc -> f -> [astApply, f, acc]) (head parts) (tail parts))
-	(equal operator "<")  (foldr (f -> acc -> [astApply, f, acc]) (last parts) (init parts))
-	(equal operator "*>") (composeAll parts)
-	else                  (composeAll (reverse parts)),
+foldOperator = operator -> parts ->
+	when       (equal operator ">")  (foldl (acc -> f -> [astApply, f, acc]) (head parts) (tail parts))
+	> elseWhen (equal operator "<")  (foldr (f -> acc -> [astApply, f, acc]) (last parts) (init parts))
+	> elseWhen (equal operator "*>") (composeAll parts)
+	> default                        (composeAll (reverse parts)),
 
 -- composeAll [f; g; h] is  x -> h (g (f x)).
 composeAll = parts -> let hidden = "composed value" in
@@ -150,14 +150,14 @@ startsAtom = token -> let kind = lex.kindOf token in
 		(contains (lex.valueOf token) ["("; "["; "{"]),
 
 parseAtom = tokens ->
-	let token = peek tokens, rest = tail tokens in case
-		(eq lex.tokenNumber (lex.kindOf token)) (ok [astNumber, lex.valueOf token] rest)
-		(eq lex.tokenString (lex.kindOf token)) (ok [astString, lex.valueOf token] rest)
-		(eq lex.tokenName (lex.kindOf token))   (parseNameOrQualified (lex.valueOf token) rest)
-		(isSymbol "(" token)                    (parseParenthesised rest)
-		(isSymbol "[" token)                    (parseBracketed rest)
-		(isSymbol "{" token)                    (parseBraceLambda rest)
-		else (fail "expected an expression" (lex.offsetOf token)),
+	let token = peek tokens, rest = tail tokens in
+		when       (eq lex.tokenNumber (lex.kindOf token)) (ok [astNumber, lex.valueOf token] rest)
+		> elseWhen (eq lex.tokenString (lex.kindOf token)) (ok [astString, lex.valueOf token] rest)
+		> elseWhen (eq lex.tokenName (lex.kindOf token))   (parseNameOrQualified (lex.valueOf token) rest)
+		> elseWhen (isSymbol "(" token)                    (parseParenthesised rest)
+		> elseWhen (isSymbol "[" token)                    (parseBracketed rest)
+		> elseWhen (isSymbol "{" token)                    (parseBraceLambda rest)
+		> default       (fail "expected an expression" (lex.offsetOf token)),
 
 parseNameOrQualified = name -> tokens -> if (isSymbol "." (peek tokens))
 	(expectName (tail tokens) > fmapResult (field -> [astQualified, name, field]))
@@ -170,27 +170,27 @@ parseParenthesised = tokens -> parseExpr tokens > andThen (inner -> rest ->
 
 parseBracketed = tokens -> if (isSymbol "]" (peek tokens))
 	(ok emptyTuple (tail tokens))
-	(parseExpr tokens > andThen (first -> rest -> case
-		(isSymbol "," (peek rest)) (parseTupleRest [first;] (tail rest))
-		(isSymbol ";" (peek rest)) (parseListRest [first;] (tail rest))
-		(isSymbol "]" (peek rest)) (ok [astTuple, [first;]] (tail rest))
-		else (fail "expected , ; or ] in brackets" (lex.offsetOf (peek rest))))),
+	(parseExpr tokens > andThen (first -> rest ->
+		when       (isSymbol "," (peek rest)) (parseTupleRest [first;] (tail rest))
+		> elseWhen (isSymbol ";" (peek rest)) (parseListRest [first;] (tail rest))
+		> elseWhen (isSymbol "]" (peek rest)) (ok [astTuple, [first;]] (tail rest))
+		> default       (fail "expected , ; or ] in brackets" (lex.offsetOf (peek rest))))),
 
 parseTupleRest = collected -> tokens -> parseExpr tokens > andThen (item -> rest ->
-	let sofar = append [item;] collected in case
-		(isSymbol "," (peek rest)) (parseTupleRest sofar (tail rest))
-		(isSymbol "]" (peek rest)) (ok [astTuple, sofar] (tail rest))
-		else (fail "expected , or ] in a tuple" (lex.offsetOf (peek rest)))),
+	let sofar = append [item;] collected in
+		when       (isSymbol "," (peek rest)) (parseTupleRest sofar (tail rest))
+		> elseWhen (isSymbol "]" (peek rest)) (ok [astTuple, sofar] (tail rest))
+		> default       (fail "expected , or ] in a tuple" (lex.offsetOf (peek rest)))),
 
 -- A list is sugar for nested 2-tuples, so it is built as such here. `[a;]` is
 -- the one-element list, which is why a `]` right after `;` is allowed.
 parseListRest = collected -> tokens -> if (isSymbol "]" (peek tokens))
 	(ok (buildList collected) (tail tokens))
 	(parseExpr tokens > andThen (item -> rest ->
-		let sofar = append [item;] collected in case
-			(isSymbol ";" (peek rest)) (parseListRest sofar (tail rest))
-			(isSymbol "]" (peek rest)) (ok (buildList sofar) (tail rest))
-			else (fail "expected ; or ] in a list" (lex.offsetOf (peek rest))))),
+		let sofar = append [item;] collected in
+			when       (isSymbol ";" (peek rest)) (parseListRest sofar (tail rest))
+			> elseWhen (isSymbol "]" (peek rest)) (ok (buildList sofar) (tail rest))
+			> default       (fail "expected ; or ] in a list" (lex.offsetOf (peek rest))))),
 
 buildList = foldr (item -> rest -> [astTuple, [item; rest]]) emptyTuple,
 
@@ -219,15 +219,15 @@ parseCases = tokens -> parseOperation tokens > andThen (left -> afterLeft ->
 -- a let has a different arity and falls through to the catch-all, which is how
 -- `f x -> …` is rejected without a special case for it.
 toPattern = {
-	[tag, a] -> case
-		(eq tag astVar)    (maybe.some [patVar, a])
-		(eq tag astNumber) (maybe.some [patNumber, a])
-		(eq tag astString) (maybe.some [patString, a])
-		(eq tag astTuple)  (let converted = map toPattern a in
+	[tag, a] ->
+		when       (eq tag astVar)    (maybe.some [patVar, a])
+		> elseWhen (eq tag astNumber) (maybe.some [patNumber, a])
+		> elseWhen (eq tag astString) (maybe.some [patString, a])
+		> elseWhen (eq tag astTuple)  (let converted = map toPattern a in
 			if (allMatch maybe.isSome converted)
 				(maybe.some [patTuple, map maybe.value converted])
 				maybe.none)
-		else               maybe.none,
+		> default                     maybe.none,
 	other -> maybe.none
 },
 
@@ -238,11 +238,11 @@ parseImports = tokens -> if (isKeyword "import" (peek tokens))
 	(parseImportNames (tail tokens))
 	(ok [] tokens),
 
-parseImportNames = tokens -> expectName tokens > andThen (name -> rest -> case
-	(isSymbol "," (peek rest)) (parseImportNames (tail rest)
+parseImportNames = tokens -> expectName tokens > andThen (name -> rest ->
+	when       (isSymbol "," (peek rest)) (parseImportNames (tail rest)
 		> fmapResult (more -> prepend [name;] more))
-	(isKeyword "in" (peek rest)) (ok [name;] (tail rest))
-	else (fail "expected , or in after an import" (lex.offsetOf (peek rest)))),
+	> elseWhen (isKeyword "in" (peek rest)) (ok [name;] (tail rest))
+	> default       (fail "expected , or in after an import" (lex.offsetOf (peek rest)))),
 
 -- parseProgram source: [imports, expression] or a failure.
 parseProgram = source -> lex.tokens source > (tokens ->

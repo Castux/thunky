@@ -20,7 +20,7 @@
 -- five-tuple, matches nothing, and fails at run time rather than at compile
 -- time, since the two are the same syntax for different shapes.
 
-import core, list, math, text, comb in
+import core, list, math, text, comb, maybe in
 
 let
 	arrangements = comb.permutations (rangeIncl 1 5),
@@ -46,12 +46,11 @@ let
 		)))))))))),
 
 	nationAt = position -> [water, zebra, norwegian, japanese, english, spaniard, ukrainian] ->
-		case
-			(eq position norwegian)  "Norwegian"
-			(eq position japanese)   "Japanese"
-			(eq position english)    "Englishman"
-			(eq position spaniard)   "Spaniard"
-			else                     "Ukrainian",
+		when       (eq position norwegian) "Norwegian"
+		> elseWhen (eq position japanese)  "Japanese"
+		> elseWhen (eq position english)   "Englishman"
+		> elseWhen (eq position spaniard)  "Spaniard"
+		> default                          "Ukrainian",
 
 	-- core.first and core.second read 2-tuples only, and this is a 7-tuple, so
 	-- the fields are taken by pattern rather than by accessor.

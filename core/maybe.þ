@@ -28,7 +28,7 @@ fmap = f -> {
 },
 
 -- andThen f m: if m is some x, apply f to x and return the result; propagate none.
--- f may return a maybe (chaining) or any other value (extraction + mapping).
+-- f returns a maybe, so andThen chains operations that may each fail.
 andThen = f -> {
 	[] -> [],
 	[x] -> f x
@@ -41,7 +41,29 @@ default = def -> {
 	[x] -> x
 },
 
--- orElse other m: return m if it is some, otherwise other.
+-- when cond x: some x if cond holds, none otherwise. Matching the condition
+-- directly is what `core.if` does anyway, and it keeps this module dependency-free.
+when = cond -> x -> cond > { 1 -> [x], 0 -> [] },
+
+-- elseWhen cond x m: m if it is some, otherwise some x when cond holds. With
+-- `when` to open a chain and `default` to close it, this is a multiway
+-- conditional built out of ordinary functions:
+--
+--     when     (magIsZero b) [[], []]
+--     > elseWhen (lt a b)      [[], a]
+--     > default  (divide a b)
+--
+-- Each branch is a separate application, so every part of it has a type — which
+-- the variadic `case … else …` it replaces could not have. Laziness is unchanged:
+-- orElse matches on its second argument and never touches the first when that is
+-- some, so no branch after the first true one is forced.
+elseWhen = cond -> x -> orElse (when cond x),
+
+-- orElse other m: return m if it is some, otherwise other. Both are maybes and
+-- so is the result, which is what distinguishes it from `default`: orElse picks
+-- the first of two maybes and stays inside Maybe, where default leaves it.
+-- (Scala names this pair orElse/getOrElse. Java's Optional.orElse is the
+-- unwrapping one, so a reader coming from there wants `default`.)
 orElse = other -> {
 	[] -> other,
 	[x] -> [x]

@@ -49,9 +49,8 @@ let
 	-- `sortWith f` calls `f pivot element`, and `f` answers "does element come
 	-- before pivot?", so the comparison reads pivot-first.
 
-	byCount = [word1, count1] -> [word2, count2] -> case
-		(neq count1 count2) (gt count1 count2)
-		else                (ltString word1 word2),
+	byCount = [word1, count1] -> [word2, count2] ->
+		if (neq count1 count2) (gt count1 count2) (ltString word1 word2),
 
 	ranked = counts > hashmap.keyValues > sortWith byCount,
 	top    = take topN ranked,
@@ -68,9 +67,9 @@ let
 	lineCount = input > count (eq lf),
 	wordCount = length words,
 
-	report = case
-		(eq wordCount 0) ["(no words on standard input)";]
-		else (flatten [
+	report = if (eq wordCount 0)
+		["(no words on standard input)";]
+		(flatten [
 			[["characters"; charCount];
 			 ["lines"; lineCount];
 			 ["words"; wordCount];

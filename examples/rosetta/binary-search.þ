@@ -18,10 +18,10 @@ let
 				(let
 					middle = div 2 (add low high),
 					value  = nth middle items
-				in case
-					(eq value target) (maybe.some middle)
-					(lt target value) (probe (succ middle) high)    -- lt t v: v < t, go right
-					else              (probe low (pred middle)))
+				in
+					when       (eq value target) (maybe.some middle)
+					> elseWhen (lt target value) (probe (succ middle) high)  -- lt t v: v < t, go right
+					> default                    (probe low (pred middle)))
 		in
 			probe 0 (pred (length items)),
 

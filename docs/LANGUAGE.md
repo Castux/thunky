@@ -735,11 +735,16 @@ show [ap add (mul 2) 5, mean [1; 2; 3; 4]]    -- [15, 2.5]
 | `true` | the constant `1` |
 | `false` | the constant `0` |
 | `if cond t f` | conditional; `cond` must be `0` or `1` |
-| `case cond1 val1 cond2 val2 … else defval` | chained conditional: the value of the first condition equal to `1`, else `defval` |
-| `else` | the constant that terminates a `case` chain (an ordinary value, not syntax) |
 | `and a b` | logical and (short-circuits: if `a` is `0`, `b` is not evaluated) |
 | `or a b` | logical or (short-circuits: if `a` is `1`, `b` is not evaluated) |
 | `not b` | logical not |
+
+For more than two branches, chain `maybe.when` / `maybe.elseWhen` /
+`maybe.default` ([below](#maybe)) rather than nesting `if`. `core` used to carry
+a variadic `case cond1 val1 … else defval` for this. It was removed: the shape of
+each argument depended on the *value* of the one before it — `else` was the
+number `2` — so nothing about a call said how many branches it had, and a
+mis-stepped chain failed somewhere else entirely.
 
 ---
 
@@ -764,6 +769,8 @@ A *maybe* value is either `none` (absent) or `some x` (present). The representat
 | `fmap f m` | apply `f` to the wrapped value; propagate `none` |
 | `andThen f m` | apply `f` to the wrapped value and return its result; propagate `none`. `f` may return a maybe (chaining) or any other value (extract and map) |
 | `orElse other m` | `m` if it is `some`, otherwise `other` |
+| `when cond x` | `some x` if `cond` holds, `none` otherwise |
+| `elseWhen cond x m` | `m` if it is `some`, otherwise `some x` when `cond` holds |
 | `value m` | the wrapped value; runtime error on `none` |
 | `default def m` | the wrapped value, or `def` if `none` |
 | `mapDefault def f m` | `f` applied to the wrapped value, or `def` if `none` |

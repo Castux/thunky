@@ -99,18 +99,18 @@ trim = s -> dropWhile isSpace (reverse (dropWhile isSpace (reverse s))),
 -- ignored. String literals may span lines, so a template can be a whole block.
 format = template -> values -> template > {
 	[] -> [],
-	[c, rest] -> core.case
-		(startsWith "%%s" template) (prepend "%s" (format (drop 3 template) values))
-		(startsWith "%%v" template) (prepend "%v" (format (drop 3 template) values))
-		(startsWith "%s" template) (values > {
+	[c, rest] ->
+		when       (startsWith "%%s" template) (prepend "%s" (format (drop 3 template) values))
+		> elseWhen (startsWith "%%v" template) (prepend "%v" (format (drop 3 template) values))
+		> elseWhen (startsWith "%s" template) (values > {
 			[]     -> prepend "%s" (format (drop 2 template) []),
 			[v, t] -> prepend v (format (drop 2 template) t)
 		})
-		(startsWith "%v" template) (values > {
+		> elseWhen (startsWith "%v" template) (values > {
 			[]     -> prepend "%v" (format (drop 2 template) []),
 			[v, t] -> prepend (string v) (format (drop 2 template) t)
 		})
-		core.else (prepend [c;] (format rest values))
+		> default  (prepend [c;] (format rest values))
 },
 
 -- Character classification — all functions take a Unicode code point (integer)
@@ -233,9 +233,9 @@ replaceAllWith = f -> repl -> s ->
 ltString = a -> b -> [a, b] > {
 	[[], _]           -> 0,          -- a exhausted: b equals a or extends it, so b is not before a
 	[_, []]           -> 1,          -- b exhausted first: b is a proper prefix of a, so b is before a
-	[[ha,ta],[hb,tb]] -> core.case
-		(eq ha hb) (ltString ta tb)  -- same code point: compare the rest
-		core.else (lte ha hb)        -- they differ, so hb <= ha means hb < ha
+	[[ha,ta],[hb,tb]] -> if (eq ha hb)
+		(ltString ta tb)             -- same code point: compare the rest
+		(lte ha hb)                  -- they differ, so hb <= ha means hb < ha
 },
 
 -- gtString a b: 1 when b sorts strictly after a.

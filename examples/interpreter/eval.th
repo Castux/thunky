@@ -49,12 +49,12 @@ crash = message -> seq (write (flatten ["runtime error: "; message]))
 -- match pattern subject env: the extended environment, or none. A name pattern
 -- forces nothing; the others force only as far as the shape they test.
 
-match = [tag, contents] -> subject -> env -> case
-	(eq tag parse.patVar)    (maybe.some (bind contents subject env))
-	(eq tag parse.patNumber) (if (isNumberEqual subject contents) (maybe.some env) maybe.none)
-	(eq tag parse.patString) (matchAll (map (c -> [parse.patNumber, c]) contents > asListPattern)
+match = [tag, contents] -> subject -> env ->
+	when       (eq tag parse.patVar)    (maybe.some (bind contents subject env))
+	> elseWhen (eq tag parse.patNumber) (if (isNumberEqual subject contents) (maybe.some env) maybe.none)
+	> elseWhen (eq tag parse.patString) (matchAll (map (c -> [parse.patNumber, c]) contents > asListPattern)
 		subject env)
-	else                     (matchTuple contents subject env),
+	> default                           (matchTuple contents subject env),
 
 -- The name pattern binds without forcing, so the subject is forced by
 -- `isNumber` and not by getting here: a number pattern forces its subject to a
@@ -113,26 +113,26 @@ applyCases = cases -> env -> argument -> cases > {
 -- error. Finding 12 again, reached through a module this time.
 
 expression = env -> node -> node > {
-	[tag, contents] -> case
-		(eq tag parse.astNumber) contents
-		(eq tag parse.astString) (value.fromText contents)
-		(eq tag parse.astVar)    (lookupIn env contents
+	[tag, contents] ->
+		when       (eq tag parse.astNumber) contents
+		> elseWhen (eq tag parse.astString) (value.fromText contents)
+		> elseWhen (eq tag parse.astVar)    (lookupIn env contents
 			> maybe.mapDefault (crash (flatten ["unbound name "; contents])) core.id)
-		(eq tag parse.astTuple)  (value.tupleValue (map (expression env) contents))
-		(eq tag parse.astLambda) [value.valClosure, contents, env]
-		else                     (crash "unknown expression"),
+		> elseWhen (eq tag parse.astTuple)  (value.tupleValue (map (expression env) contents))
+		> elseWhen (eq tag parse.astLambda) [value.valClosure, contents, env]
+		> default                           (crash "unknown expression"),
 
-	[tag, a, b] -> case
+	[tag, a, b] ->
 		-- The argument is passed unevaluated: this single line is where the
 		-- object language's laziness comes from.
-		(eq tag parse.astApply)     (apply (expression env a) (expression env b))
-		(eq tag parse.astLet)       (expression (letEnv env a) b)
+		when       (eq tag parse.astApply)     (apply (expression env a) (expression env b))
+		> elseWhen (eq tag parse.astLet)       (expression (letEnv env a) b)
 		-- `list.map` is bound under that very name alongside the unqualified
 		-- one, so a qualified reference is an ordinary lookup and the
 		-- environment stays flat.
-		(eq tag parse.astQualified) (lookupIn env (flatten [a; "."; b])
+		> elseWhen (eq tag parse.astQualified) (lookupIn env (flatten [a; "."; b])
 			> maybe.mapDefault (crash (flatten ["unbound name "; a; "."; b])) core.id)
-		else                        (crash "unknown expression"),
+		> default                              (crash "unknown expression"),
 
 	other -> crash "unknown expression"
 },
@@ -176,31 +176,31 @@ runPrimitive = index -> collected ->
 		one = head arguments,
 		two = a -> nth 1 arguments,
 		name = first (nth index primitives)
-	in case
-		(equal name "add")  (numeric2 add arguments)
-		(equal name "sub")  (numeric2 sub arguments)
-		(equal name "mul")  (numeric2 mul arguments)
-		(equal name "div")  (numeric2 div arguments)
-		(equal name "fdiv") (numeric2 fdiv arguments)
-		(equal name "mod")  (numeric2 mod arguments)
-		(equal name "fmod") (numeric2 fmod arguments)
-		(equal name "pow")  (numeric2 pow arguments)
-		(equal name "sqrt") (sqrt (forceNumber one))
-		(equal name "eq")   (numeric2 eq arguments)
-		(equal name "lt")   (numeric2 lt arguments)
-		(equal name "lte")  (numeric2 lte arguments)
-		(equal name "gte")  (numeric2 gte arguments)
-		(equal name "gt")   (numeric2 gt arguments)
-		(equal name "neq")  (numeric2 neq arguments)
-		(equal name "equal") (if (deepEqual (head arguments) (nth 1 arguments)) 1 0)
-		(equal name "seq")  (seq (forceValue (head arguments)) (nth 1 arguments))
-		(equal name "eval") (seq (value.render one) one)
-		(equal name "peek") (seq (write (value.render one)) one)
-		(equal name "show") (seq (write (value.render one)) one)
-		(equal name "write") (seq (write (textOf one)) one)
-		(equal name "bwrite") (seq (bwrite (textOf one)) one)
-		(equal name "string") (value.fromText (value.render one))
-		else                (hash (value.render one)),
+	in
+		when       (equal name "add")  (numeric2 add arguments)
+		> elseWhen (equal name "sub")  (numeric2 sub arguments)
+		> elseWhen (equal name "mul")  (numeric2 mul arguments)
+		> elseWhen (equal name "div")  (numeric2 div arguments)
+		> elseWhen (equal name "fdiv") (numeric2 fdiv arguments)
+		> elseWhen (equal name "mod")  (numeric2 mod arguments)
+		> elseWhen (equal name "fmod") (numeric2 fmod arguments)
+		> elseWhen (equal name "pow")  (numeric2 pow arguments)
+		> elseWhen (equal name "sqrt") (sqrt (forceNumber one))
+		> elseWhen (equal name "eq")   (numeric2 eq arguments)
+		> elseWhen (equal name "lt")   (numeric2 lt arguments)
+		> elseWhen (equal name "lte")  (numeric2 lte arguments)
+		> elseWhen (equal name "gte")  (numeric2 gte arguments)
+		> elseWhen (equal name "gt")   (numeric2 gt arguments)
+		> elseWhen (equal name "neq")  (numeric2 neq arguments)
+		> elseWhen (equal name "equal") (if (deepEqual (head arguments) (nth 1 arguments)) 1 0)
+		> elseWhen (equal name "seq")  (seq (forceValue (head arguments)) (nth 1 arguments))
+		> elseWhen (equal name "eval") (seq (value.render one) one)
+		> elseWhen (equal name "peek") (seq (write (value.render one)) one)
+		> elseWhen (equal name "show") (seq (write (value.render one)) one)
+		> elseWhen (equal name "write") (seq (write (textOf one)) one)
+		> elseWhen (equal name "bwrite") (seq (bwrite (textOf one)) one)
+		> elseWhen (equal name "string") (value.fromText (value.render one))
+		> default                      (hash (value.render one)),
 
 numeric2 = operation -> arguments ->
 	operation (forceNumber (head arguments)) (forceNumber (nth 1 arguments)),

@@ -49,8 +49,20 @@ runTests [
 	assert "core.fork-mean" (core.fork fdiv list.length list.sum [1; 2; 3; 4]) 2.5;
 	assert "core.fork-is-ap" (core.fork add (mul 2) (add 1) 5) (core.ap (mul 2 *> add) (add 1) 5);
 	assert "core.fix" (core.fix (f -> n -> if (eq n 0) 1 (mul n (f (sub 1 n)))) 5) 120;
-	assert "core.case" (core.case false 0 false 1 true 2 false 3 true 4 else 5) 2;
-	assert "core.case-else" (core.case false 0 false 1 false 2 false 3 false 4 else 5) 5;
+	-- The multiway conditional, replacing the variadic `case … else …`. The first
+	-- true branch wins, and a chain that matches nothing is none.
+	assert "maybe.when-true" (maybe.when true 1) [1];
+	assert "maybe.when-false" (maybe.when false 1) [];
+	assert "maybe.elseWhen-first-wins"
+		(maybe.when false 0 > maybe.elseWhen true 2 > maybe.elseWhen true 4 > maybe.default 5) 2;
+	assert "maybe.elseWhen-default"
+		(maybe.when false 0 > maybe.elseWhen false 2 > maybe.elseWhen false 4 > maybe.default 5) 5;
+	assert "maybe.elseWhen-no-default"
+		(maybe.when false 0 > maybe.elseWhen false 2) [];
+	-- Later branches are not forced once one has matched: a diverging branch after
+	-- the winner must not stop this from reducing.
+	assert "maybe.elseWhen-lazy"
+		(maybe.when true 1 > maybe.elseWhen true (list.head []) > maybe.default (list.head [])) 1;
 
 	-- math.mf
 	assert "math.succ" (math.succ 5) 6;
@@ -763,7 +775,7 @@ runTests [
 	assert "big.floatGt" (big.floatFromNumber 64 3 > big.floatGt (big.floatFromNumber 64 2)) 1;
 	assert "big.floatGte" (big.floatFromNumber 64 2 > big.floatGte (big.floatFromNumber 64 2)) 1;
 
-	-- core constants used structurally by core.case --------------------------
-	assert "core.true" (core.case core.true 1 else 0) 1;
-	assert "core.false" (core.case core.false 1 else 0) 0
+	-- core's boolean constants, used as conditions -----------------------------
+	assert "core.true" (if core.true 1 0) 1;
+	assert "core.false" (if core.false 1 0) 0
 ]
