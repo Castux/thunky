@@ -1,19 +1,27 @@
-test.mf
+test.þ
 test.th
 .DS_Store
 
 # Advent of Code asks that puzzle inputs not be republished, so they stay local
 # (see examples/aoc2025/README.md).
 examples/aoc2025/*.txt
-thunky.exe
-thunky.test.exe
-thunky.bench.exe
-thunky.oracle.exe
-thunky
-_site/
-_site*/
+
+# Build outputs, all at the repository root. The leading slash matters: as a bare
+# pattern, `thunky` also matched every directory named `thunky` at any depth —
+# which silently swallowed etc/zed/languages/thunky/.
+/thunky
+/thunky.exe
+/thunky.test.exe
+/thunky.bench.exe
+/thunky.oracle.exe
+/_site/
+/_site*/
 
 # A local working note, deliberately not tracked (it keeps getting swept up
 # by `git add -A`).
 V1-READINESS.md
-etc/zed/grammars/thunky.wasm
+
+# Zed writes into the extension directory when you install it as a dev
+# extension: a shallow clone of the pinned tree-sitter-thunky commit, plus the
+# wasm it compiles from it. Generated, never source.
+/etc/zed/grammars/
