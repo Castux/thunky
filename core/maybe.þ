@@ -64,8 +64,6 @@ elseWhen = cond -> x -> orElse (when cond x),
 -- orElse other m: return m if it is some, otherwise other. Both are maybes and
 -- so is the result, which is what distinguishes it from `default`: orElse picks
 -- the first of two maybes and stays inside Maybe, where default leaves it.
--- (Scala names this pair orElse/getOrElse. Java's Optional.orElse is the
--- unwrapping one, so a reader coming from there wants `default`.)
 orElse = other -> {
 	[] -> other,
 	[x] -> [x]
