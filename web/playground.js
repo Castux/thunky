@@ -61,6 +61,7 @@ const EXAMPLE_GROUPS = [
             { file: "huffman.þ", name: "Huffman coding" },
             { file: "countdown.þ", name: "Countdown numbers game", slow: true },
             { file: "sudoku.þ", name: "Sudoku solver" },
+            { file: "pentomino.þ", name: "Pentomino tilings of a 3x20 rectangle" },
             { file: "random-chisquare.þ", name: "Chi-square of a hash stream", slow: true },
             { file: "core_tests.þ", name: "Standard library test suite" },
         ],
