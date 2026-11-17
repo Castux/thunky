@@ -60,7 +60,11 @@ if (alsoRun) {
             const out = execFileSync("node", ["web/smoke.mjs", ...args], { encoding: "utf8", timeout: 300000 });
             if (out.trim() === "") fail(`${item.file}: ran but produced no output`);
         } catch (err) {
-            const tail = text => String(text || "").trim().split("\n").slice(-5).join("\n");
+            const tail = text => {
+                const lines = String(text || "").trim().split("\n");
+                return lines.length <= 12 ? lines.join("\n")
+                    : [...lines.slice(0, 7), "  [...]", ...lines.slice(-5)].join("\n");
+            };
             fail(`${item.file}: ${String(err.message).split("\n")[0]}`
                 + ` [status=${err.status} signal=${err.signal} code=${err.code}]`
                 + `\n  stderr: ${tail(err.stderr)}\n  stdout: ${tail(err.stdout)}`);
